@@ -75,13 +75,13 @@ export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
         <span className={`text-[10px] font-mono font-bold ${tierColor}`}>
           T{item.source_tier}
         </span>
-        <span className="text-[#1E2A3A]">│</span>
+        <span className="text-[#1E2A3A]">|</span>
         <span
           className={`text-[10px] font-mono font-bold px-1.5 py-0 rounded-sm ${impactClass}`}
         >
           {impactLevel.toUpperCase()}
         </span>
-        <span className="text-[#1E2A3A]">│</span>
+        <span className="text-[#1E2A3A]">|</span>
         <span className="text-[10px] font-mono text-[#5A6A7A]">
           {timeFormatted}
         </span>
@@ -102,17 +102,9 @@ export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
         </p>
       )}
 
-      {/* Tags & rating row */}
+      {/* Rating row */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1 overflow-hidden">
-          {(item.subcategories || []).slice(0, 3).map((tag) => (
-            <span
-              key={tag}
-              className="text-[10px] font-mono text-[#4488FF]/70 bg-[#4488FF]/5 px-1.5 py-0 rounded-sm"
-            >
-              #{tag}
-            </span>
-          ))}
           {item.group_source_count && item.group_source_count > 1 && (
             <span className="text-[10px] font-mono text-[#8899AA] bg-[#8899AA]/10 px-1.5 py-0 rounded-sm">
               {item.group_source_count} sources
