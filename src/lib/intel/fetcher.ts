@@ -50,7 +50,6 @@ async function fetchArxiv(source: IntelSource): Promise<FetchedItem[]> {
     signal: AbortSignal.timeout(15000),
   });
   const xml = await res.text();
-  // Simple XML parse for arxiv entries
   const entries: FetchedItem[] = [];
   const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
   let match;
@@ -73,7 +72,10 @@ async function fetchArxiv(source: IntelSource): Promise<FetchedItem[]> {
 }
 
 async function fetchHackerNews(source: IntelSource): Promise<FetchedItem[]> {
-  const res = await fetch(source.url, {
+  // Only fetch stories from the last 24 hours
+  const oneDayAgo = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
+  const url = `${source.url}&numericFilters=created_at_i>${oneDayAgo}`;
+  const res = await fetch(url, {
     signal: AbortSignal.timeout(15000),
   });
   const data = await res.json();
@@ -121,7 +123,6 @@ export async function ingestItems(
   let dup_count = 0;
 
   for (const item of items) {
-    // Check for existing hash (dedup layer 1)
     const { data: existing } = await db
       .from('intel_items')
       .select('id')
@@ -147,7 +148,6 @@ export async function ingestItems(
     });
 
     if (error) {
-      // Unique constraint violation = duplicate
       if (error.code === '23505') {
         dup_count++;
       }
@@ -156,7 +156,6 @@ export async function ingestItems(
     new_count++;
   }
 
-  // Update source last_fetched_at
   await db
     .from('intel_sources')
     .update({ last_fetched_at: new Date().toISOString(), error_count: 0 })
