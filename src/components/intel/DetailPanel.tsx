@@ -43,32 +43,31 @@ function extractBullets(raw: string): string[] {
 }
 
 function renderStructuredSummary(text: string) {
-  // Split into lines and parse sections
   const lines = text.replace(/\r\n/g, '\n');
-  const thesisMatch = lines.match(/THESIS:\s*([^\n]+)/);
+  const thesisMatch = lines.match(/THESIS:\s*([^\n]+(?:\n(?!KEY POINTS:)[^\n]+)*)/);
   const pointsMatch = lines.match(/KEY POINTS:\s*\n((?:- [^\n]+\n?)+)/);
   const mattersMatch = lines.match(/WHY IT MATTERS:\s*([^\n]+(?:\n(?!DATA POINTS:)[^\n]+)*)/);
   const dataMatch = lines.match(/DATA POINTS:\s*\n((?:- [^\n]+\n?)+)/);
 
   if (!thesisMatch) {
-    return <p className="text-sm text-[#E8EAED]/90 leading-relaxed whitespace-pre-wrap">{text}</p>;
+    return <p className="text-[13px] text-[#E8EAED]/90 leading-relaxed whitespace-pre-wrap">{text}</p>;
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {thesisMatch && (
         <div>
-          <h5 className="text-[10px] font-mono text-[#FF8C00] uppercase tracking-wider mb-1">Thesis</h5>
-          <p className="text-sm font-semibold text-[#E8EAED] leading-snug">{thesisMatch[1].trim()}</p>
+          <h5 className="text-[11px] font-mono text-[#FF8C00] uppercase tracking-wider mb-1.5">Thesis</h5>
+          <p className="text-[13px] text-[#E8EAED]/90 leading-relaxed">{thesisMatch[1].trim()}</p>
         </div>
       )}
 
       {pointsMatch && (
         <div>
-          <h5 className="text-[10px] font-mono text-[#4488FF] uppercase tracking-wider mb-1">Key Points</h5>
-          <ul className="space-y-0.5">
+          <h5 className="text-[11px] font-mono text-[#4488FF] uppercase tracking-wider mb-1.5">Key Points</h5>
+          <ul className="space-y-1">
             {extractBullets(pointsMatch[1]).map((point, i) => (
-              <li key={i} className="text-xs text-[#E8EAED]/80 leading-relaxed flex gap-2">
+              <li key={i} className="text-[13px] text-[#E8EAED]/80 leading-relaxed flex gap-2">
                 <span className="text-[#4488FF] flex-shrink-0">&#8250;</span>
                 <span>{point}</span>
               </li>
@@ -79,17 +78,17 @@ function renderStructuredSummary(text: string) {
 
       {mattersMatch && (
         <div>
-          <h5 className="text-[10px] font-mono text-[#00CC66] uppercase tracking-wider mb-1">Why It Matters</h5>
-          <p className="text-sm text-[#E8EAED]/90 leading-relaxed">{mattersMatch[1].trim()}</p>
+          <h5 className="text-[11px] font-mono text-[#00CC66] uppercase tracking-wider mb-1.5">Why It Matters</h5>
+          <p className="text-[13px] text-[#E8EAED]/90 leading-relaxed">{mattersMatch[1].trim()}</p>
         </div>
       )}
 
       {dataMatch && (
         <div>
-          <h5 className="text-[10px] font-mono text-[#8899AA] uppercase tracking-wider mb-1">Data Points</h5>
-          <ul className="space-y-0.5">
+          <h5 className="text-[11px] font-mono text-[#8899AA] uppercase tracking-wider mb-1.5">Data</h5>
+          <ul className="space-y-1">
             {extractBullets(dataMatch[1]).map((point, i) => (
-              <li key={i} className="text-xs text-[#8899AA] leading-relaxed flex gap-2">
+              <li key={i} className="text-[13px] text-[#8899AA] leading-relaxed flex gap-2">
                 <span className="text-[#5A6A7A] font-mono flex-shrink-0">{i + 1}.</span>
                 <span>{point}</span>
               </li>
@@ -172,7 +171,7 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
         </div>
 
         <div className="space-y-1">
-          <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider">
+          <h4 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider">
             Intelligence Briefing
           </h4>
           {summaryLoading ? (
@@ -184,21 +183,21 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
           ) : aiSummary ? (
             renderStructuredSummary(aiSummary)
           ) : item.summary ? (
-            <p className="text-sm text-[#E8EAED]/90 leading-relaxed">
+            <p className="text-[13px] text-[#E8EAED]/90 leading-relaxed">
               {item.summary}
             </p>
           ) : (
-            <p className="text-sm text-[#5A6A7A]">No briefing available</p>
+            <p className="text-[13px] text-[#5A6A7A]">No briefing available</p>
           )}
         </div>
 
         {beliefEvidence.length > 0 && (
           <div className="space-y-1">
-            <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider">
+            <h4 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider">
               Belief Impact
             </h4>
             {beliefEvidence.map((ev) => (
-              <div key={ev.id} className="flex items-center gap-2 text-xs">
+              <div key={ev.id} className="flex items-center gap-2 text-[13px]">
                 <span className={ev.direction === 'supports' ? 'text-[#00CC66]' : 'text-[#FF4444]'}>
                   {ev.direction === 'supports' ? '▲' : '▼'}
                 </span>
@@ -215,13 +214,13 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
           href={item.original_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs font-mono text-[#4488FF] hover:text-[#6699FF] transition-colors"
+          className="inline-flex items-center gap-1 text-[13px] font-mono text-[#4488FF] hover:text-[#6699FF] transition-colors"
         >
           Open Source →
         </a>
 
         <div className="pt-2 border-t border-[#1E2A3A]">
-          <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-2">
+          <h4 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-2">
             Rate This Item
           </h4>
           <RatingButtons
@@ -237,7 +236,7 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             placeholder="Optional feedback..."
-            className="w-full bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1.5 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]"
+            className="w-full bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1.5 text-[13px] text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]"
             onKeyDown={async (e) => {
               if (e.key === 'Enter' && feedback.trim()) {
                 await fetch('/api/intel/rate', {
@@ -256,7 +255,7 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
         </div>
 
         {item.group_source_count && item.group_source_count > 1 && (
-          <div className="text-xs font-mono text-[#8899AA] bg-[#8899AA]/5 px-2 py-1 rounded-sm">
+          <div className="text-[13px] font-mono text-[#8899AA] bg-[#8899AA]/5 px-2 py-1 rounded-sm">
             Reported by {item.group_source_count} sources
           </div>
         )}

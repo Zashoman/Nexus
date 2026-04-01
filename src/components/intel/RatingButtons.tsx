@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { RatingValue } from '@/types/intel';
 
 interface RatingButtonsProps {
@@ -19,10 +19,14 @@ export default function RatingButtons({
   const [rating, setRating] = useState<RatingValue | null>(currentRating || null);
   const [loading, setLoading] = useState(false);
 
+  // Sync with prop when itemId changes
+  useEffect(() => {
+    setRating(currentRating || null);
+  }, [itemId, currentRating]);
+
   async function handleRate(value: RatingValue) {
     if (loading) return;
 
-    // Toggle off if same rating
     const newRating = rating === value ? null : value;
     setLoading(true);
 

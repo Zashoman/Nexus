@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   try {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 500,
+      max_tokens: 800,
       messages: [
         {
           role: 'user',
@@ -43,27 +43,32 @@ export async function POST(req: NextRequest) {
 
 Title: ${item.title}
 Source: ${item.source_name} (Tier ${item.source_tier})
-Content: ${content.slice(0, 1500)}
+Content: ${content.slice(0, 2000)}
 
 Format your response EXACTLY like this (use the exact headers):
 
-THESIS: [One sentence — the core claim or development]
+THESIS: [Write 4-5 sentences explaining the core development, what happened, who is involved, and the immediate context. Do not bold this section. Write it as a flowing analytical paragraph.]
 
 KEY POINTS:
 - [Supporting point 1]
 - [Supporting point 2]
 - [Supporting point 3]
 
-WHY IT MATTERS: [1-2 sentences — what changed, what's the implication]
+WHY IT MATTERS: [1-2 sentences — what changed, what's the implication for the AI/tech landscape]
 
 DATA POINTS:
-- [Specific number, date, fact, or quote 1]
-- [Specific number, date, fact, or quote 2]
-- [Specific number, date, fact, or quote 3]
-- [Specific number, date, fact, or quote 4]
-- [Specific number, date, fact, or quote 5]
+- [A specific quantitative fact: a number, percentage, dollar amount, date, or direct quote from the source]
+- [Another specific quantitative fact]
+- [Another specific quantitative fact]
+- [Another specific quantitative fact]
+- [Another specific quantitative fact]
 
-If the source content is thin, still produce the format but note where data is limited. Never fabricate data points — if they aren't in the source, say "Not available in source."`,
+IMPORTANT rules for DATA POINTS:
+- Only include REAL quantitative data: numbers, percentages, dollar amounts, dates, or direct quotes
+- Example of GOOD data point: "34% of AI researchers reported using open-source models"
+- Example of BAD data point: "Traffic impact: vehicles stranded on highways" — this is a description, not data
+- If there are fewer than 5 real data points in the source, only include what exists. Do NOT pad with descriptions.
+- If there are zero quantitative data points, omit the DATA POINTS section entirely.`,
         },
       ],
     });
