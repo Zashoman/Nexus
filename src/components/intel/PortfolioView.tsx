@@ -12,35 +12,28 @@ interface WatchlistEntry {
   top_holdings: string[];
 }
 
-interface MatchedItem {
-  id: string;
-  title: string;
-  source_name: string;
-  source_tier: number;
-  impact_level: string | null;
-  published_at: string | null;
-  ingested_at: string;
-  ai_summary: string | null;
-  summary: string | null;
-  original_url: string;
-  category: string;
+interface Quote {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  high: number;
+  low: number;
+  open: number;
+  prevClose: number;
 }
 
-const TIER_DOT: Record<number, string> = {
-  1: 'bg-[#00CC66]',
-  2: 'bg-[#4488FF]',
-  3: 'bg-[#888888]',
-};
+interface CompanyNews {
+  datetime: number;
+  headline: string;
+  source: string;
+  summary: string;
+  url: string;
+  image: string;
+}
 
-const IMPACT_COLORS: Record<string, string> = {
-  critical: 'text-[#FF4444]',
-  high: 'text-[#FF8C00]',
-  medium: 'text-[#4488FF]',
-  low: 'text-[#666666]',
-};
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts * 1000;
   const mins = Math.floor(diff / 60000);
   if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
@@ -51,7 +44,8 @@ function timeAgo(dateStr: string): string {
 
 export default function PortfolioView() {
   const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
-  const [matches, setMatches] = useState<Record<string, MatchedItem[]>>({});
+  const [quotes, setQuotes] = useState<Record<string, Quote>>({});
+  const [news, setNews] = useState<Record<string, CompanyNews[]>>({});
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -70,13 +64,16 @@ export default function PortfolioView() {
 
   async function fetchData() {
     try {
-      const res = await fetch('/api/intel/watchlist');
-      const data = await res.json();
-      setWatchlist(data.watchlist || []);
-      setMatches(data.matches || {});
-      if (!selectedSymbol && data.watchlist?.length > 0) {
-        setSelectedSymbol(data.watchlist[0].symbol);
-      }
+      const [watchRes, stockRes] = await Promise.all([
+        fetch('/api/intel/watchlist'),
+        fetch('/api/intel/stocks'),
+      ]);
+      const watchData = await watchRes.json();
+      const stockData = await stockRes.json();
+
+      setWatchlist(watchData.watchlist || []);
+      setQuotes(stockData.quotes || {});
+      setNews(stockData.news || {});
     } catch {
       // Silent
     } finally {
@@ -113,25 +110,15 @@ export default function PortfolioView() {
 
   async function handleDelete(id: string) {
     await fetch(`/api/intel/watchlist?id=${id}`, { method: 'DELETE' });
+    if (watchlist.find(w => w.id === id)?.symbol === selectedSymbol) {
+      setSelectedSymbol(null);
+    }
     fetchData();
   }
 
   const selectedEntry = watchlist.find(w => w.symbol === selectedSymbol);
-  const selectedNews = selectedSymbol ? (matches[selectedSymbol] || []) : [];
-
-  // All news across all positions, deduped
-  const allNewsMap = new Map<string, { item: MatchedItem; symbols: string[] }>();
-  for (const [symbol, items] of Object.entries(matches)) {
-    for (const item of items) {
-      if (allNewsMap.has(item.id)) {
-        allNewsMap.get(item.id)!.symbols.push(symbol);
-      } else {
-        allNewsMap.set(item.id, { item, symbols: [symbol] });
-      }
-    }
-  }
-  const allNews = Array.from(allNewsMap.values())
-    .sort((a, b) => new Date(b.item.published_at || b.item.ingested_at).getTime() - new Date(a.item.published_at || a.item.ingested_at).getTime());
+  const selectedQuote = selectedSymbol ? quotes[selectedSymbol] : null;
+  const selectedNews = selectedSymbol ? (news[selectedSymbol] || []) : [];
 
   if (loading) {
     return (
@@ -142,203 +129,171 @@ export default function PortfolioView() {
   }
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#0B0E11]">
-      {/* Left Panel — Watchlist */}
-      <div className="w-[320px] border-r border-[#1E2A3A] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="px-3 py-2 border-b border-[#1E2A3A] flex items-center justify-between bg-[#0D1117]">
-          <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider">Watchlist</h3>
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#0B0E11]">
+      {/* Price Grid Header */}
+      <div className="border-b border-[#1E2A3A] bg-[#0D1117] px-4 py-2">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider">Portfolio Overview</h3>
           <button
             onClick={() => setShowAdd(!showAdd)}
             className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF] cursor-pointer"
           >
-            {showAdd ? '✕ Cancel' : '+ Add'}
+            {showAdd ? '✕ Cancel' : '+ Add Position'}
           </button>
         </div>
 
         {/* Add Form */}
         {showAdd && (
-          <div className="px-3 py-2 border-b border-[#1E2A3A] bg-[#141820] space-y-2">
+          <div className="mb-3 p-2 bg-[#141820] border border-[#1E2A3A] rounded-sm space-y-2">
             <div className="flex gap-2">
-              <input
-                type="text"
-                value={addForm.symbol}
-                onChange={(e) => setAddForm({ ...addForm, symbol: e.target.value })}
-                placeholder="Ticker"
-                className="w-20 bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF] uppercase"
-              />
-              <input
-                type="text"
-                value={addForm.company_name}
-                onChange={(e) => setAddForm({ ...addForm, company_name: e.target.value })}
-                placeholder="Company / ETF name"
-                className="flex-1 bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]"
-              />
-            </div>
-            <div className="flex gap-2">
-              <select
-                value={addForm.type}
-                onChange={(e) => setAddForm({ ...addForm, type: e.target.value as 'stock' | 'etf' })}
-                className="bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] focus:outline-none focus:border-[#4488FF]"
-              >
+              <input type="text" value={addForm.symbol} onChange={(e) => setAddForm({ ...addForm, symbol: e.target.value })} placeholder="Ticker" className="w-20 bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF] uppercase" />
+              <input type="text" value={addForm.company_name} onChange={(e) => setAddForm({ ...addForm, company_name: e.target.value })} placeholder="Company / ETF name" className="flex-1 bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]" />
+              <select value={addForm.type} onChange={(e) => setAddForm({ ...addForm, type: e.target.value as 'stock' | 'etf' })} className="bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] focus:outline-none focus:border-[#4488FF]">
                 <option value="stock">Stock</option>
                 <option value="etf">ETF</option>
               </select>
-              <input
-                type="text"
-                value={addForm.sector}
-                onChange={(e) => setAddForm({ ...addForm, sector: e.target.value })}
-                placeholder="Sector"
-                className="flex-1 bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]"
-              />
             </div>
-            <input
-              type="text"
-              value={addForm.keywords}
-              onChange={(e) => setAddForm({ ...addForm, keywords: e.target.value })}
-              placeholder="Keywords (comma separated)"
-              className="w-full bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]"
-            />
-            <button
-              onClick={handleAdd}
-              disabled={adding || !addForm.symbol.trim() || !addForm.company_name.trim()}
-              className="w-full py-1 text-xs font-mono bg-[#4488FF] text-white rounded-sm hover:bg-[#5599FF] disabled:opacity-50 cursor-pointer"
-            >
-              {adding ? 'Adding...' : 'Add to Watchlist'}
-            </button>
+            <div className="flex gap-2">
+              <input type="text" value={addForm.sector} onChange={(e) => setAddForm({ ...addForm, sector: e.target.value })} placeholder="Sector" className="w-32 bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]" />
+              <input type="text" value={addForm.keywords} onChange={(e) => setAddForm({ ...addForm, keywords: e.target.value })} placeholder="Keywords (comma separated)" className="flex-1 bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]" />
+              <button onClick={handleAdd} disabled={adding || !addForm.symbol.trim() || !addForm.company_name.trim()} className="px-3 py-1 text-xs font-mono bg-[#4488FF] text-white rounded-sm hover:bg-[#5599FF] disabled:opacity-50 cursor-pointer whitespace-nowrap">
+                {adding ? '...' : 'Add'}
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Watchlist Rows */}
-        <div className="flex-1 overflow-y-auto">
-          {watchlist.length === 0 ? (
-            <div className="px-3 py-8 text-center">
-              <p className="text-xs text-[#5A6A7A] font-mono">No positions tracked</p>
-              <p className="text-[10px] text-[#5A6A7A] font-mono mt-1">Click + Add to start</p>
-            </div>
-          ) : (
-            watchlist.map((entry) => {
-              const newsCount = (matches[entry.symbol] || []).length;
+        {/* Price Grid */}
+        {watchlist.length === 0 ? (
+          <p className="text-xs text-[#5A6A7A] font-mono py-2">No positions tracked. Click + Add Position to start.</p>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {watchlist.map((entry) => {
+              const q = quotes[entry.symbol];
               const isSelected = selectedSymbol === entry.symbol;
+              const newsCount = (news[entry.symbol] || []).length;
               return (
                 <div
                   key={entry.id}
-                  onClick={() => setSelectedSymbol(entry.symbol)}
-                  className={`px-3 py-2 cursor-pointer border-b border-[#1E2A3A]/50 transition-colors ${
-                    isSelected ? 'bg-[#1A2332]' : 'bg-[#0D1117] hover:bg-[#141820]'
+                  onClick={() => setSelectedSymbol(isSelected ? null : entry.symbol)}
+                  className={`px-3 py-2 rounded-sm cursor-pointer transition-colors border ${
+                    isSelected
+                      ? 'bg-[#1A2332] border-[#4488FF]/50'
+                      : 'bg-[#141820] border-[#1E2A3A]/50 hover:border-[#1E2A3A]'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[13px] font-mono font-bold text-[#E8EAED]">
-                        {entry.symbol}
-                      </span>
-                      <span className={`text-[9px] font-mono uppercase px-1 py-0 rounded-sm ${
-                        entry.type === 'etf'
-                          ? 'bg-[#FF8C00]/10 text-[#FF8C00]'
-                          : 'bg-[#4488FF]/10 text-[#4488FF]'
-                      }`}>
-                        {entry.type}
-                      </span>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[13px] font-mono font-bold text-[#E8EAED]">{entry.symbol}</span>
+                      <span className={`text-[8px] font-mono uppercase px-1 rounded-sm ${
+                        entry.type === 'etf' ? 'bg-[#FF8C00]/10 text-[#FF8C00]' : 'bg-[#4488FF]/10 text-[#4488FF]'
+                      }`}>{entry.type}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {newsCount > 0 && (
-                        <span className="text-[10px] font-mono text-[#00CC66]">
-                          {newsCount} article{newsCount !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(entry.id);
-                        }}
-                        className="text-[#5A6A7A] hover:text-[#FF4444] text-[10px] cursor-pointer"
-                        title="Remove"
-                      >
-                        ✕
-                      </button>
-                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(entry.id); }}
+                      className="text-[#5A6A7A] hover:text-[#FF4444] text-[10px] cursor-pointer opacity-0 group-hover:opacity-100"
+                      title="Remove"
+                    >✕</button>
                   </div>
-                  <div className="text-[10px] text-[#5A6A7A] font-mono mt-0.5 truncate">
+                  {q ? (
+                    <div>
+                      <span className="text-[16px] font-mono text-[#E8EAED]">${q.price.toFixed(2)}</span>
+                      <span className={`text-[11px] font-mono ml-2 ${q.changePercent >= 0 ? 'text-[#00CC66]' : 'text-[#FF4444]'}`}>
+                        {q.changePercent >= 0 ? '▲' : '▼'} {Math.abs(q.changePercent).toFixed(2)}%
+                      </span>
+                      <div className="text-[9px] font-mono text-[#5A6A7A] mt-0.5">
+                        O: {q.open.toFixed(2)} H: {q.high.toFixed(2)} L: {q.low.toFixed(2)}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-[13px] font-mono text-[#5A6A7A]">--</span>
+                  )}
+                  <div className="text-[9px] font-mono text-[#5A6A7A] mt-0.5 truncate">
                     {entry.company_name}
-                    {entry.sector && ` · ${entry.sector}`}
+                    {newsCount > 0 && <span className="text-[#00CC66] ml-1">· {newsCount} news</span>}
                   </div>
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Right Panel — Detail / News Feed */}
+      {/* Bottom Section — Selected Stock Detail or All News */}
       <div className="flex-1 overflow-y-auto">
         {selectedEntry ? (
-          <div className="p-4 space-y-4">
-            {/* Stock Header */}
-            <div className="border-b border-[#1E2A3A] pb-3">
-              <div className="flex items-center gap-3">
+          <div className="flex h-full">
+            {/* Stock Info Panel */}
+            <div className="w-[300px] border-r border-[#1E2A3A] p-4 space-y-3 overflow-y-auto">
+              <div>
                 <h2 className="text-xl font-mono font-bold text-[#E8EAED]">{selectedEntry.symbol}</h2>
-                <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded-sm ${
-                  selectedEntry.type === 'etf'
-                    ? 'bg-[#FF8C00]/10 text-[#FF8C00]'
-                    : 'bg-[#4488FF]/10 text-[#4488FF]'
-                }`}>
-                  {selectedEntry.type}
-                </span>
+                <p className="text-[13px] text-[#8899AA]">{selectedEntry.company_name}</p>
+                {selectedEntry.sector && (
+                  <p className="text-[11px] text-[#5A6A7A] font-mono">Sector: {selectedEntry.sector}</p>
+                )}
               </div>
-              <p className="text-[13px] text-[#8899AA] mt-0.5">{selectedEntry.company_name}</p>
-              {selectedEntry.sector && (
-                <p className="text-[11px] text-[#5A6A7A] font-mono mt-0.5">Sector: {selectedEntry.sector}</p>
-              )}
-              {selectedEntry.keywords.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {selectedEntry.keywords.map((kw) => (
-                    <span key={kw} className="text-[10px] font-mono text-[#4488FF]/60 bg-[#4488FF]/5 px-1.5 py-0 rounded-sm">
-                      {kw}
+
+              {selectedQuote && (
+                <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3 space-y-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[20px] font-mono font-bold text-[#E8EAED]">${selectedQuote.price.toFixed(2)}</span>
+                    <span className={`text-[13px] font-mono ${selectedQuote.changePercent >= 0 ? 'text-[#00CC66]' : 'text-[#FF4444]'}`}>
+                      {selectedQuote.changePercent >= 0 ? '+' : ''}{selectedQuote.change.toFixed(2)} ({selectedQuote.changePercent.toFixed(2)}%)
                     </span>
-                  ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] font-mono">
+                    <span className="text-[#5A6A7A]">Open</span><span className="text-[#8899AA] text-right">{selectedQuote.open.toFixed(2)}</span>
+                    <span className="text-[#5A6A7A]">High</span><span className="text-[#8899AA] text-right">{selectedQuote.high.toFixed(2)}</span>
+                    <span className="text-[#5A6A7A]">Low</span><span className="text-[#8899AA] text-right">{selectedQuote.low.toFixed(2)}</span>
+                    <span className="text-[#5A6A7A]">Prev Close</span><span className="text-[#8899AA] text-right">{selectedQuote.prevClose.toFixed(2)}</span>
+                  </div>
                 </div>
               )}
+
+              {selectedEntry.keywords.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-1">Tracking Keywords</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedEntry.keywords.map((kw) => (
+                      <span key={kw} className="text-[9px] font-mono text-[#4488FF]/60 bg-[#4488FF]/5 px-1.5 py-0 rounded-sm">{kw}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {selectedEntry.top_holdings.length > 0 && (
-                <div className="mt-1">
-                  <span className="text-[10px] font-mono text-[#5A6A7A]">Top holdings: </span>
-                  <span className="text-[10px] font-mono text-[#8899AA]">
-                    {selectedEntry.top_holdings.join(', ')}
-                  </span>
+                <div>
+                  <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-1">Top Holdings</h4>
+                  <p className="text-[10px] font-mono text-[#8899AA]">{selectedEntry.top_holdings.join(', ')}</p>
                 </div>
               )}
             </div>
 
-            {/* Relevant News */}
-            <div>
-              <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-2">
-                Relevant News ({selectedNews.length})
+            {/* News Feed */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-3">
+                News — {selectedEntry.symbol} ({selectedNews.length} articles, last 30 days)
               </h3>
               {selectedNews.length === 0 ? (
-                <p className="text-[13px] text-[#5A6A7A]">No matching articles in the last 3 days</p>
+                <p className="text-[13px] text-[#5A6A7A]">No recent news found</p>
               ) : (
-                <div className="space-y-1">
-                  {selectedNews.map((item) => (
+                <div className="space-y-1.5">
+                  {selectedNews.map((item, idx) => (
                     <a
-                      key={item.id}
-                      href={item.original_url}
+                      key={idx}
+                      href={item.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block px-3 py-2 bg-[#141820] border border-[#1E2A3A]/50 rounded-sm hover:bg-[#1A2030] transition-colors"
                     >
                       <div className="flex items-center gap-2 mb-0.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${TIER_DOT[item.source_tier] || TIER_DOT[3]}`} />
-                        <span className="text-[10px] font-mono text-[#5A6A7A]">{item.source_name}</span>
-                        {item.impact_level && (
-                          <span className={`text-[10px] font-mono ${IMPACT_COLORS[item.impact_level] || ''}`}>
-                            {item.impact_level.toUpperCase()}
-                          </span>
-                        )}
-                        <span className="text-[10px] font-mono text-[#5A6A7A] ml-auto">
-                          {timeAgo(item.published_at || item.ingested_at)}
-                        </span>
+                        <span className="text-[10px] font-mono text-[#5A6A7A]">{item.source}</span>
+                        <span className="text-[10px] font-mono text-[#5A6A7A] ml-auto">{timeAgo(item.datetime)}</span>
                       </div>
-                      <p className="text-[13px] text-[#E8EAED] leading-tight">{item.title}</p>
+                      <p className="text-[13px] text-[#E8EAED] leading-tight">{item.headline}</p>
+                      {item.summary && (
+                        <p className="text-[11px] text-[#5A6A7A] mt-0.5 line-clamp-2">{item.summary}</p>
+                      )}
                     </a>
                   ))}
                 </div>
@@ -346,39 +301,45 @@ export default function PortfolioView() {
             </div>
           </div>
         ) : (
-          /* All Portfolio News */
-          <div className="p-4 space-y-4">
-            <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider">
-              All Portfolio News ({allNews.length})
+          <div className="p-4">
+            <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-3">
+              Recent News Across All Positions
             </h3>
-            {allNews.length === 0 ? (
-              <p className="text-[13px] text-[#5A6A7A]">No matching articles found</p>
-            ) : (
-              <div className="space-y-1">
-                {allNews.map(({ item, symbols }) => (
-                  <a
-                    key={item.id}
-                    href={item.original_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block px-3 py-2 bg-[#141820] border border-[#1E2A3A]/50 rounded-sm hover:bg-[#1A2030] transition-colors"
-                  >
-                    <div className="flex items-center gap-2 mb-0.5">
-                      {symbols.map(s => (
-                        <span key={s} className="text-[10px] font-mono font-bold text-[#FF8C00] bg-[#FF8C00]/10 px-1 rounded-sm">
-                          {s}
-                        </span>
-                      ))}
-                      <span className="text-[10px] font-mono text-[#5A6A7A]">{item.source_name}</span>
-                      <span className="text-[10px] font-mono text-[#5A6A7A] ml-auto">
-                        {timeAgo(item.published_at || item.ingested_at)}
-                      </span>
-                    </div>
-                    <p className="text-[13px] text-[#E8EAED] leading-tight">{item.title}</p>
-                  </a>
-                ))}
-              </div>
-            )}
+            {(() => {
+              const allNews: { item: CompanyNews; symbol: string }[] = [];
+              for (const [symbol, items] of Object.entries(news)) {
+                for (const item of items) {
+                  allNews.push({ item, symbol });
+                }
+              }
+              allNews.sort((a, b) => b.item.datetime - a.item.datetime);
+              const top = allNews.slice(0, 30);
+
+              if (top.length === 0) {
+                return <p className="text-[13px] text-[#5A6A7A]">No recent news</p>;
+              }
+
+              return (
+                <div className="space-y-1.5">
+                  {top.map((entry, idx) => (
+                    <a
+                      key={idx}
+                      href={entry.item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block px-3 py-2 bg-[#141820] border border-[#1E2A3A]/50 rounded-sm hover:bg-[#1A2030] transition-colors"
+                    >
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-[10px] font-mono font-bold text-[#FF8C00] bg-[#FF8C00]/10 px-1 rounded-sm">{entry.symbol}</span>
+                        <span className="text-[10px] font-mono text-[#5A6A7A]">{entry.item.source}</span>
+                        <span className="text-[10px] font-mono text-[#5A6A7A] ml-auto">{timeAgo(entry.item.datetime)}</span>
+                      </div>
+                      <p className="text-[13px] text-[#E8EAED] leading-tight">{entry.item.headline}</p>
+                    </a>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
