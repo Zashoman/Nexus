@@ -46,8 +46,9 @@ function renderStructuredSummary(text: string) {
   const lines = text.replace(/\r\n/g, '\n');
   const thesisMatch = lines.match(/THESIS:\s*([^\n]+(?:\n(?!KEY POINTS:)[^\n]+)*)/);
   const pointsMatch = lines.match(/KEY POINTS:\s*\n((?:- [^\n]+\n?)+)/);
-  const mattersMatch = lines.match(/WHY IT MATTERS:\s*([^\n]+(?:\n(?!DATA POINTS:)[^\n]+)*)/);
+  const mattersMatch = lines.match(/WHY IT MATTERS:\s*([^\n]+(?:\n(?!DATA POINTS:|RELEVANCE)[^\n]+)*)/);
   const dataMatch = lines.match(/DATA POINTS:\s*\n((?:- [^\n]+\n?)+)/);
+  const relevanceMatch = lines.match(/RELEVANCE TO YOU:\s*([^\n]+(?:\n(?!$|\n)[^\n]+)*)/);
 
   if (!thesisMatch) {
     return <p className="text-[13px] text-[#E8EAED]/90 leading-relaxed whitespace-pre-wrap">{text}</p>;
@@ -94,6 +95,13 @@ function renderStructuredSummary(text: string) {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {relevanceMatch && (
+        <div className="bg-[#4488FF]/5 border-l-2 border-[#4488FF]/30 px-3 py-2">
+          <h5 className="text-[11px] font-mono text-[#4488FF] uppercase tracking-wider mb-1">Relevance to You</h5>
+          <p className="text-[13px] text-[#E8EAED]/80 leading-relaxed">{relevanceMatch[1].trim()}</p>
         </div>
       )}
     </div>
@@ -235,7 +243,7 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
             type="text"
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            placeholder="Optional feedback..."
+            placeholder="Quick note — why did you rate this way?"
             className="w-full bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1.5 text-[13px] text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]"
             onKeyDown={async (e) => {
               if (e.key === 'Enter' && feedback.trim()) {
