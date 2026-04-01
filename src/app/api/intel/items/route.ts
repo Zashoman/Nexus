@@ -12,10 +12,15 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
   const offset = (page - 1) * limit;
 
+  // Only show items from the last 7 days by default
+  const maxAge = searchParams.get('max_age_days') || '7';
+  const cutoff = new Date(Date.now() - parseInt(maxAge) * 24 * 60 * 60 * 1000).toISOString();
+
   let query = db
     .from('intel_items')
     .select('*', { count: 'exact' })
-    .order('ingested_at', { ascending: false })
+    .gte('published_at', cutoff)
+    .order('published_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (category) {
@@ -65,9 +70,6 @@ export async function GET(req: NextRequest) {
   }));
 
   // Filter out non-primary grouped items
-  const primaryIds = new Set(
-    (groups || []).map((g) => g.primary_item_id)
-  );
   const groupedNonPrimary = new Set<string>();
   for (const group of groups || []) {
     for (const id of group.grouped_item_ids) {
