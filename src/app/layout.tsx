@@ -57,8 +57,13 @@ export default function RootLayout({
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-              <circle cx="12" cy="12" r="3" />
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <rect x="9" y="9" width="2" height="2" />
+              <rect x="13" y="9" width="2" height="2" />
+              <path d="M9 15h6" />
+              <path d="M4 8h16" />
+              <line x1="8" y1="2" x2="8" y2="4" />
+              <line x1="16" y1="2" x2="16" y2="4" />
             </svg>
           </a>
         </nav>
