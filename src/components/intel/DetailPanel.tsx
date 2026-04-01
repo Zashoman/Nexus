@@ -37,13 +37,30 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
     (IntelBeliefEvidence & { belief_title?: string })[]
   >([]);
   const [feedback, setFeedback] = useState('');
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   useEffect(() => {
     if (!item) return;
-    // We could fetch belief evidence linked to this item
-    // For now, this data comes from the synthesis view
     setBeliefEvidence([]);
     setFeedback('');
+    setAiSummary(item.ai_summary || null);
+
+    // Generate summary on-demand if none exists
+    if (!item.ai_summary) {
+      setSummaryLoading(true);
+      fetch('/api/intel/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: item.id }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.summary) setAiSummary(data.summary);
+        })
+        .catch(() => {})
+        .finally(() => setSummaryLoading(false));
+    }
   }, [item?.id]);
 
   if (!item) {
@@ -59,7 +76,6 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
   const tierColor = TIER_COLORS[item.source_tier] || TIER_COLORS[3];
   const impactColor = IMPACT_COLORS[item.impact_level || 'low'] || IMPACT_COLORS.low;
   const published = item.published_at || item.ingested_at;
-  const keywords = (item.metadata as { keywords?: string[] })?.keywords || [];
 
   return (
     <div className="flex-1 bg-[#141820] overflow-y-auto border-l border-[#1E2A3A]">
@@ -95,56 +111,28 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
         </div>
 
         {/* AI Summary */}
-        {item.ai_summary && (
-          <div className="space-y-1">
-            <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider">
-              AI Summary
-            </h4>
-            <p className="text-sm text-[#E8EAED]/90 leading-relaxed">
-              {item.ai_summary}
+        <div className="space-y-1">
+          <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider">
+            AI Summary
+          </h4>
+          {summaryLoading ? (
+            <p className="text-sm text-[#5A6A7A] animate-pulse">
+              Generating summary...
             </p>
-          </div>
-        )}
-
-        {/* Original summary fallback */}
-        {!item.ai_summary && item.summary && (
-          <div className="space-y-1">
-            <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider">
-              Summary
-            </h4>
+          ) : aiSummary ? (
+            <p className="text-sm text-[#E8EAED]/90 leading-relaxed">
+              {aiSummary}
+            </p>
+          ) : item.summary ? (
             <p className="text-sm text-[#E8EAED]/90 leading-relaxed">
               {item.summary}
             </p>
-          </div>
-        )}
+          ) : (
+            <p className="text-sm text-[#5A6A7A]">No summary available</p>
+          )}
+        </div>
 
-        {/* Keywords */}
-        {keywords.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {keywords.map((kw) => (
-              <span
-                key={kw}
-                className="text-[10px] font-mono text-[#4488FF]/70 bg-[#4488FF]/5 px-1.5 py-0.5 rounded-sm"
-              >
-                {kw}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Subcategories */}
-        {item.subcategories && item.subcategories.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {item.subcategories.map((sub) => (
-              <span
-                key={sub}
-                className="text-[10px] font-mono text-[#8899AA] bg-[#8899AA]/10 px-1.5 py-0.5 rounded-sm"
-              >
-                #{sub}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Tags are stored in metadata for internal use (dedup, filtering, beliefs) but hidden from UI */}
 
         {/* Belief Impact */}
         {beliefEvidence.length > 0 && (
