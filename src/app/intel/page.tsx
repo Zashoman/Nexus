@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { IntelItem, IntelCategory } from '@/types/intel';
 import StatusBar from '@/components/intel/StatusBar';
 import CategoryTabs from '@/components/intel/CategoryTabs';
@@ -13,9 +14,16 @@ import StockTicker from '@/components/intel/StockTicker';
 type TabKey = IntelCategory | 'all' | 'synthesis' | 'portfolio';
 
 export default function IntelPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get('tab') as TabKey) || 'all';
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
   const [selectedItem, setSelectedItem] = useState<IntelItem | null>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab') as TabKey;
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
 
   function handleSelectItem(item: IntelItem) {
     setSelectedItem(item);
