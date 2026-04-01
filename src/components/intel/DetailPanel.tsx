@@ -15,6 +15,12 @@ const TIER_COLORS: Record<number, string> = {
   3: 'text-[#888888]',
 };
 
+const TIER_LABELS: Record<number, string> = {
+  1: 'Primary Source',
+  2: 'Quality Press',
+  3: 'Commentary',
+};
+
 const IMPACT_COLORS: Record<string, string> = {
   critical: 'text-[#FF4444]',
   high: 'text-[#FF8C00]',
@@ -30,6 +36,72 @@ function timeAgo(dateStr: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+function renderStructuredSummary(text: string) {
+  const sections: { type: 'thesis' | 'points' | 'matters' | 'data' | 'text'; content: string }[] = [];
+
+  const thesisMatch = text.match(/THESIS:\s*(.+?)(?=\n\n|KEY POINTS:|$)/s);
+  const pointsMatch = text.match(/KEY POINTS:\s*\n((?:- .+\n?)+)/);
+  const mattersMatch = text.match(/WHY IT MATTERS:\s*(.+?)(?=\n\n|DATA POINTS:|$)/s);
+  const dataMatch = text.match(/DATA POINTS:\s*\n((?:- .+\n?)+)/);
+
+  if (!thesisMatch) {
+    return <p className="text-sm text-[#E8EAED]/90 leading-relaxed whitespace-pre-wrap">{text}</p>;
+  }
+
+  const extractBullets = (raw: string) =>
+    raw.split('\n').filter(l => l.trim().startsWith('-')).map(l => l.trim().replace(/^- /, ''));
+
+  return (
+    <div className="space-y-3">
+      {/* Thesis */}
+      {thesisMatch && (
+        <div>
+          <h5 className="text-[10px] font-mono text-[#FF8C00] uppercase tracking-wider mb-1">Thesis</h5>
+          <p className="text-sm font-semibold text-[#E8EAED] leading-snug">{thesisMatch[1].trim()}</p>
+        </div>
+      )}
+
+      {/* Key Points */}
+      {pointsMatch && (
+        <div>
+          <h5 className="text-[10px] font-mono text-[#4488FF] uppercase tracking-wider mb-1">Key Points</h5>
+          <ul className="space-y-0.5">
+            {extractBullets(pointsMatch[1]).map((point, i) => (
+              <li key={i} className="text-xs text-[#E8EAED]/80 leading-relaxed flex gap-2">
+                <span className="text-[#4488FF] flex-shrink-0">&#8250;</span>
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Why It Matters */}
+      {mattersMatch && (
+        <div>
+          <h5 className="text-[10px] font-mono text-[#00CC66] uppercase tracking-wider mb-1">Why It Matters</h5>
+          <p className="text-sm text-[#E8EAED]/90 leading-relaxed">{mattersMatch[1].trim()}</p>
+        </div>
+      )}
+
+      {/* Data Points */}
+      {dataMatch && (
+        <div>
+          <h5 className="text-[10px] font-mono text-[#8899AA] uppercase tracking-wider mb-1">Data Points</h5>
+          <ul className="space-y-0.5">
+            {extractBullets(dataMatch[1]).map((point, i) => (
+              <li key={i} className="text-xs text-[#8899AA] leading-relaxed flex gap-2">
+                <span className="text-[#5A6A7A] font-mono flex-shrink-0">{i + 1}.</span>
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function DetailPanel({ item, onClose }: DetailPanelProps) {
@@ -74,6 +146,7 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
   }
 
   const tierColor = TIER_COLORS[item.source_tier] || TIER_COLORS[3];
+  const tierLabel = TIER_LABELS[item.source_tier] || 'Source';
   const impactColor = IMPACT_COLORS[item.impact_level || 'low'] || IMPACT_COLORS.low;
   const published = item.published_at || item.ingested_at;
 
@@ -98,41 +171,34 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
         {/* Meta row */}
         <div className="flex items-center gap-3 text-xs font-mono">
           <span className="text-[#8899AA]">{item.source_name}</span>
-          <span className={tierColor}>T{item.source_tier}</span>
+          <span className={tierColor} title={tierLabel}>T{item.source_tier} {tierLabel}</span>
           <span className={impactColor}>
             {(item.impact_level || 'low').toUpperCase()}
           </span>
           <span className="text-[#5A6A7A]">{timeAgo(published)}</span>
-          {item.relevance_score != null && (
-            <span className="text-[#5A6A7A]">
-              Relevance: {(item.relevance_score * 100).toFixed(0)}%
-            </span>
-          )}
         </div>
 
-        {/* AI Summary */}
+        {/* Intelligence Briefing */}
         <div className="space-y-1">
           <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider">
-            AI Summary
+            Intelligence Briefing
           </h4>
           {summaryLoading ? (
-            <p className="text-sm text-[#5A6A7A] animate-pulse">
-              Generating summary...
-            </p>
+            <div className="space-y-2 py-2">
+              <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-3/4" />
+              <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
+              <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-2/3" />
+            </div>
           ) : aiSummary ? (
-            <p className="text-sm text-[#E8EAED]/90 leading-relaxed">
-              {aiSummary}
-            </p>
+            renderStructuredSummary(aiSummary)
           ) : item.summary ? (
             <p className="text-sm text-[#E8EAED]/90 leading-relaxed">
               {item.summary}
             </p>
           ) : (
-            <p className="text-sm text-[#5A6A7A]">No summary available</p>
+            <p className="text-sm text-[#5A6A7A]">No briefing available</p>
           )}
         </div>
-
-        {/* Tags are stored in metadata for internal use (dedup, filtering, beliefs) but hidden from UI */}
 
         {/* Belief Impact */}
         {beliefEvidence.length > 0 && (
