@@ -30,7 +30,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ summary: item.ai_summary });
   }
 
-  const content = item.summary || item.raw_content || item.title;
+  const content = item.summary || item.raw_content || '';
+  const contentLength = content.replace(/\s+/g, ' ').trim().length;
+
+  // If content is too thin (just a headline or <100 chars), don't waste an API call
+  if (contentLength < 100) {
+    const thinSummary = `THESIS: ${item.title}. Insufficient source content available for full analysis — open the original source for details.`;
+    await db
+      .from('intel_items')
+      .update({ ai_summary: thinSummary })
+      .eq('id', item_id);
+    return NextResponse.json({ summary: thinSummary });
+  }
 
   try {
     const response = await anthropic.messages.create({
@@ -63,12 +74,15 @@ DATA POINTS:
 - [Another specific quantitative fact]
 - [Another specific quantitative fact]
 
-IMPORTANT rules for DATA POINTS:
-- Only include REAL quantitative data: numbers, percentages, dollar amounts, dates, or direct quotes
+CRITICAL RULES:
+- Only analyze what is ACTUALLY in the provided content. Never speculate about what might be in the full article.
+- Never say "the article lacks detail" or "without access to the full article" — just work with what you have.
+- If the content is thin, write a shorter thesis (2-3 sentences) and fewer key points. Keep it factual.
+- DATA POINTS must be real quantitative data only: numbers, percentages, dollar amounts, dates, or direct quotes.
 - Example of GOOD data point: "34% of AI researchers reported using open-source models"
 - Example of BAD data point: "Traffic impact: vehicles stranded on highways" — this is a description, not data
-- If there are fewer than 5 real data points in the source, only include what exists. Do NOT pad with descriptions.
-- If there are zero quantitative data points, omit the DATA POINTS section entirely.`,
+- If there are fewer than 5 real data points, only include what exists. Do NOT pad with descriptions.
+- If there are zero quantitative data points in the source, omit the DATA POINTS section entirely.`,
         },
       ],
     });
