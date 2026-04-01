@@ -38,24 +38,24 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-function renderStructuredSummary(text: string) {
-  const sections: { type: 'thesis' | 'points' | 'matters' | 'data' | 'text'; content: string }[] = [];
+function extractBullets(raw: string): string[] {
+  return raw.split('\n').filter(l => l.trim().startsWith('-')).map(l => l.trim().replace(/^- /, ''));
+}
 
-  const thesisMatch = text.match(/THESIS:\s*(.+?)(?=\n\n|KEY POINTS:|$)/s);
-  const pointsMatch = text.match(/KEY POINTS:\s*\n((?:- .+\n?)+)/);
-  const mattersMatch = text.match(/WHY IT MATTERS:\s*(.+?)(?=\n\n|DATA POINTS:|$)/s);
-  const dataMatch = text.match(/DATA POINTS:\s*\n((?:- .+\n?)+)/);
+function renderStructuredSummary(text: string) {
+  // Split into lines and parse sections
+  const lines = text.replace(/\r\n/g, '\n');
+  const thesisMatch = lines.match(/THESIS:\s*([^\n]+)/);
+  const pointsMatch = lines.match(/KEY POINTS:\s*\n((?:- [^\n]+\n?)+)/);
+  const mattersMatch = lines.match(/WHY IT MATTERS:\s*([^\n]+(?:\n(?!DATA POINTS:)[^\n]+)*)/);
+  const dataMatch = lines.match(/DATA POINTS:\s*\n((?:- [^\n]+\n?)+)/);
 
   if (!thesisMatch) {
     return <p className="text-sm text-[#E8EAED]/90 leading-relaxed whitespace-pre-wrap">{text}</p>;
   }
 
-  const extractBullets = (raw: string) =>
-    raw.split('\n').filter(l => l.trim().startsWith('-')).map(l => l.trim().replace(/^- /, ''));
-
   return (
     <div className="space-y-3">
-      {/* Thesis */}
       {thesisMatch && (
         <div>
           <h5 className="text-[10px] font-mono text-[#FF8C00] uppercase tracking-wider mb-1">Thesis</h5>
@@ -63,7 +63,6 @@ function renderStructuredSummary(text: string) {
         </div>
       )}
 
-      {/* Key Points */}
       {pointsMatch && (
         <div>
           <h5 className="text-[10px] font-mono text-[#4488FF] uppercase tracking-wider mb-1">Key Points</h5>
@@ -78,7 +77,6 @@ function renderStructuredSummary(text: string) {
         </div>
       )}
 
-      {/* Why It Matters */}
       {mattersMatch && (
         <div>
           <h5 className="text-[10px] font-mono text-[#00CC66] uppercase tracking-wider mb-1">Why It Matters</h5>
@@ -86,7 +84,6 @@ function renderStructuredSummary(text: string) {
         </div>
       )}
 
-      {/* Data Points */}
       {dataMatch && (
         <div>
           <h5 className="text-[10px] font-mono text-[#8899AA] uppercase tracking-wider mb-1">Data Points</h5>
@@ -118,7 +115,6 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
     setFeedback('');
     setAiSummary(item.ai_summary || null);
 
-    // Generate summary on-demand if none exists
     if (!item.ai_summary) {
       setSummaryLoading(true);
       fetch('/api/intel/summarize', {
@@ -152,7 +148,6 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
 
   return (
     <div className="flex-1 bg-[#141820] overflow-y-auto border-l border-[#1E2A3A]">
-      {/* Mobile close button */}
       {onClose && (
         <button
           onClick={onClose}
@@ -163,12 +158,10 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
       )}
 
       <div className="p-4 space-y-4">
-        {/* Title */}
         <h2 className="text-lg font-semibold text-[#E8EAED] leading-tight">
           {item.title}
         </h2>
 
-        {/* Meta row */}
         <div className="flex items-center gap-3 text-xs font-mono">
           <span className="text-[#8899AA]">{item.source_name}</span>
           <span className={tierColor} title={tierLabel}>T{item.source_tier} {tierLabel}</span>
@@ -178,7 +171,6 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
           <span className="text-[#5A6A7A]">{timeAgo(published)}</span>
         </div>
 
-        {/* Intelligence Briefing */}
         <div className="space-y-1">
           <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider">
             Intelligence Briefing
@@ -200,7 +192,6 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
           )}
         </div>
 
-        {/* Belief Impact */}
         {beliefEvidence.length > 0 && (
           <div className="space-y-1">
             <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider">
@@ -208,28 +199,18 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
             </h4>
             {beliefEvidence.map((ev) => (
               <div key={ev.id} className="flex items-center gap-2 text-xs">
-                <span
-                  className={
-                    ev.direction === 'supports'
-                      ? 'text-[#00CC66]'
-                      : 'text-[#FF4444]'
-                  }
-                >
+                <span className={ev.direction === 'supports' ? 'text-[#00CC66]' : 'text-[#FF4444]'}>
                   {ev.direction === 'supports' ? '▲' : '▼'}
                 </span>
                 <span className="text-[#8899AA]">
                   {ev.direction === 'supports' ? 'Supports' : 'Challenges'}{' '}
                   &quot;{ev.belief_title}&quot;
                 </span>
-                <span className="text-[#5A6A7A]">
-                  (strength: {(ev.strength * 100).toFixed(0)}%)
-                </span>
               </div>
             ))}
           </div>
         )}
 
-        {/* Source link */}
         <a
           href={item.original_url}
           target="_blank"
@@ -239,7 +220,6 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
           Open Source →
         </a>
 
-        {/* Rating buttons (large) */}
         <div className="pt-2 border-t border-[#1E2A3A]">
           <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-2">
             Rate This Item
@@ -251,7 +231,6 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
           />
         </div>
 
-        {/* Feedback */}
         <div className="space-y-1">
           <input
             type="text"
@@ -276,7 +255,6 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
           />
         </div>
 
-        {/* Multi-source indicator */}
         {item.group_source_count && item.group_source_count > 1 && (
           <div className="text-xs font-mono text-[#8899AA] bg-[#8899AA]/5 px-2 py-1 rounded-sm">
             Reported by {item.group_source_count} sources
