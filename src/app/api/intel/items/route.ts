@@ -12,14 +12,13 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
   const offset = (page - 1) * limit;
 
-  // Only show items from the last 7 days by default
-  const maxAge = searchParams.get('max_age_days') || '7';
-  const cutoff = new Date(Date.now() - parseInt(maxAge) * 24 * 60 * 60 * 1000).toISOString();
+  // Only show items from the last 2 days
+  const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
   let query = db
     .from('intel_items')
     .select('*', { count: 'exact' })
-    .gte('published_at', cutoff)
+    .or(`published_at.gte.${cutoff},and(published_at.is.null,ingested_at.gte.${cutoff})`)
     .order('published_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
