@@ -2,12 +2,14 @@
 
 import { CATEGORY_LABELS, type IntelCategory } from '@/types/intel';
 
+type TabKey = IntelCategory | 'all' | 'synthesis' | 'portfolio';
+
 interface CategoryTabsProps {
-  activeTab: IntelCategory | 'all' | 'synthesis';
-  onTabChange: (tab: IntelCategory | 'all' | 'synthesis') => void;
+  activeTab: TabKey;
+  onTabChange: (tab: TabKey) => void;
 }
 
-const TABS: { key: IntelCategory | 'all' | 'synthesis'; label: string }[] = [
+const TABS: { key: TabKey; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'frontier_models', label: 'Frontier' },
   { key: 'infrastructure_compute', label: 'Infrastructure' },
@@ -15,6 +17,7 @@ const TABS: { key: IntelCategory | 'all' | 'synthesis'; label: string }[] = [
   { key: 'health_bio_ai', label: 'Health' },
   { key: 'cybersecurity_ai', label: 'Cyber' },
   { key: 'regulation_policy', label: 'Regulation' },
+  { key: 'portfolio', label: 'Portfolio' },
   { key: 'synthesis', label: 'Synthesis' },
 ];
 
@@ -29,7 +32,7 @@ export default function CategoryTabs({ activeTab, onTabChange }: CategoryTabsPro
             activeTab === tab.key
               ? 'border-[#4488FF] text-[#E8EAED] bg-[#141820]'
               : 'border-transparent text-[#5A6A7A] hover:text-[#8899AA] hover:bg-[#141820]/50'
-          } ${tab.key === 'synthesis' ? 'ml-auto text-[#FFD700]' : ''}`}
+          } ${tab.key === 'synthesis' ? 'text-[#FFD700]' : ''} ${tab.key === 'portfolio' ? 'ml-auto text-[#00CC66]' : ''}`}
         >
           {tab.label}
         </button>
