@@ -26,6 +26,71 @@ interface CompanyNews {
   url: string;
 }
 
+// Headlines that indicate noise — not company-specific news
+const NOISE_PATTERNS = [
+  /how much.*would have/i,
+  /if you.*invested/i,
+  /\$\d+.*years? ago/i,
+  /best stocks to buy/i,
+  /top \d+ stocks/i,
+  /stocks? to watch/i,
+  /should you buy/i,
+  /is it time to/i,
+  /dividend aristocrat/i,
+  /passive income/i,
+  /retire early/i,
+  /millionaire/i,
+  /wall street.*(love|hate|think)/i,
+  /analyst.*(upgrade|downgrade|rating)/i,
+  /price target/i,
+  /bull case|bear case/i,
+  /vs\.\s/i,
+  /compared to/i,
+  /better than/i,
+  /gold price/i,
+  /bitcoin/i,
+  /crypto/i,
+];
+
+// Headlines that indicate signal — company-specific news
+const SIGNAL_PATTERNS = [
+  /earnings|revenue|profit|loss|EPS/i,
+  /CEO|CFO|COO|management|appoint|resign/i,
+  /contract|deal|agreement|partnership/i,
+  /lawsuit|sued|litigation|settlement|SEC/i,
+  /acquisition|merger|buyout/i,
+  /guidance|forecast|outlook/i,
+  /production|output|capacity/i,
+  /dividend|buyback|repurchase/i,
+  /FDA|approval|permit|license/i,
+  /IPO|offering|filing/i,
+  /layoff|restructur|workforce/i,
+  /quarterly|annual report|10-K|10-Q|8-K/i,
+];
+
+function isRelevantNews(item: CompanyNews, companyName: string, symbol: string): boolean {
+  const text = `${item.headline} ${item.summary}`;
+
+  // Reject if matches noise patterns
+  for (const pattern of NOISE_PATTERNS) {
+    if (pattern.test(text)) return false;
+  }
+
+  // Accept if matches signal patterns
+  for (const pattern of SIGNAL_PATTERNS) {
+    if (pattern.test(text)) return true;
+  }
+
+  // Accept if headline contains company name or symbol directly
+  const headlineLower = item.headline.toLowerCase();
+  if (headlineLower.includes(symbol.toLowerCase()) || headlineLower.includes(companyName.toLowerCase())) {
+    return true;
+  }
+
+  // Default: include it (Finnhub already filtered by symbol)
+  return true;
+}
+
 export async function GET() {
   const db = getServiceSupabase();
 
@@ -45,16 +110,13 @@ export async function GET() {
     return NextResponse.json({ quotes, news, error: 'No Finnhub API key configured' });
   }
 
-  // Fetch quotes and news for each symbol
   const thirtyDaysAgo = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
   const today = Math.floor(Date.now() / 1000);
   const fromDate = new Date(thirtyDaysAgo * 1000).toISOString().split('T')[0];
   const toDate = new Date(today * 1000).toISOString().split('T')[0];
 
-  // Process in parallel but respect rate limits (60/min free tier)
   for (const entry of watchlist) {
     try {
-      // Fetch quote
       const quoteRes = await fetch(
         `https://finnhub.io/api/v1/quote?symbol=${entry.symbol}&token=${FINNHUB_KEY}`,
         { signal: AbortSignal.timeout(10000) }
@@ -74,7 +136,6 @@ export async function GET() {
         };
       }
 
-      // Fetch company news (last 30 days)
       const newsRes = await fetch(
         `https://finnhub.io/api/v1/company-news?symbol=${entry.symbol}&from=${fromDate}&to=${toDate}&token=${FINNHUB_KEY}`,
         { signal: AbortSignal.timeout(10000) }
@@ -82,7 +143,11 @@ export async function GET() {
       const newsData = await newsRes.json();
 
       if (Array.isArray(newsData)) {
-        news[entry.symbol] = newsData.slice(0, 15); // Cap at 15 per symbol
+        // Filter to only company-specific news
+        const filtered = newsData.filter((item: CompanyNews) =>
+          isRelevantNews(item, entry.company_name, entry.symbol)
+        );
+        news[entry.symbol] = filtered.slice(0, 15);
       }
     } catch {
       // Skip failed symbols
