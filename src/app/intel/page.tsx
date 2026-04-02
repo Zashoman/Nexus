@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { IntelItem, IntelCategory } from '@/types/intel';
 import StatusBar from '@/components/intel/StatusBar';
@@ -13,10 +13,9 @@ import StockTicker from '@/components/intel/StockTicker';
 
 type TabKey = IntelCategory | 'all' | 'synthesis' | 'portfolio';
 
-export default function IntelPage() {
+function IntelPageInner() {
   const searchParams = useSearchParams();
-  const initialTab = (searchParams.get('tab') as TabKey) || 'all';
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+  const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [selectedItem, setSelectedItem] = useState<IntelItem | null>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
@@ -67,5 +66,13 @@ export default function IntelPage() {
 
       <StockTicker />
     </div>
+  );
+}
+
+export default function IntelPage() {
+  return (
+    <Suspense fallback={<div className="flex-1 bg-[#0B0E11]" />}>
+      <IntelPageInner />
+    </Suspense>
   );
 }
