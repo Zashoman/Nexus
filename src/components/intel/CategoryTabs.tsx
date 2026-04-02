@@ -1,6 +1,6 @@
 'use client';
 
-import { CATEGORY_LABELS, type IntelCategory } from '@/types/intel';
+import type { IntelCategory } from '@/types/intel';
 
 type TabKey = IntelCategory | 'all' | 'synthesis' | 'portfolio';
 
