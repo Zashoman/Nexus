@@ -27,88 +27,81 @@ interface FetchedItem {
   content_hash: string;
 }
 
-// ArXiv papers must match at least one of these to be included
-const ARXIV_RELEVANT_KEYWORDS = [
-  // Frontier model topics
-  'large language model', 'llm', 'foundation model', 'gpt', 'transformer architecture',
-  'reasoning', 'chain of thought', 'instruction tuning', 'rlhf', 'alignment',
-  'multimodal', 'vision language', 'text to image', 'diffusion model',
-  // Safety & alignment
-  'ai safety', 'ai alignment', 'constitutional ai', 'red teaming', 'jailbreak',
-  'hallucination', 'truthfulness', 'deception',
-  // Robotics & physical AI
-  'robot', 'humanoid', 'manipulation', 'embodied', 'autonomous driving',
-  'reinforcement learning', 'sim to real',
-  // Health & bio
-  'drug discovery', 'protein', 'medical imaging', 'clinical', 'diagnosis',
-  'alphafold', 'biomedical',
-  // Cybersecurity
-  'vulnerability', 'malware', 'adversarial attack', 'cybersecurity',
-  // Infrastructure
-  'training efficiency', 'inference speed', 'quantization', 'distillation',
-  'scaling law', 'mixture of experts', 'sparse',
-  // Agents
-  'agent', 'tool use', 'code generation', 'autonomous',
+// Papers from these labs ALWAYS pass (if title doesn't match skip patterns)
+const ARXIV_TRUSTED_LABS = [
+  'openai', 'anthropic', 'deepmind', 'google deepmind', 'google research',
+  'google brain', 'meta fair', 'meta ai research', 'microsoft research',
+  'nvidia research', 'apple machine learning',
 ];
 
-// Papers from these institutions/labs always pass
-const ARXIV_TRUSTED_AUTHORS = [
-  'openai', 'anthropic', 'deepmind', 'google research', 'google brain',
-  'meta ai', 'meta fair', 'microsoft research', 'nvidia research',
-  'stanford', 'mit', 'berkeley', 'cmu', 'carnegie mellon',
-  'princeton', 'oxford', 'cambridge', 'toronto', 'mila',
-  'allen institute', 'eleutherai', 'stability ai', 'cohere',
-];
-
-// These title patterns indicate papers we should skip
+// Title patterns that ALWAYS get skipped — academic noise
 const ARXIV_SKIP_PATTERNS = [
-  /survey of/i,
-  /a review of/i,
-  /benchmark for/i,
-  /dataset for/i,
-  /improving .* by \d/i,
-  /mathematical foundation/i,
-  /theoretical analysis/i,
-  /convergence of/i,
-  /optimal .* bounds/i,
-  /stochastic .* optimization/i,
-  /graph neural network/i,
-  /time series/i,
-  /recommendation system/i,
-  /sentiment analysis/i,
-  /named entity/i,
-  /text classification/i,
-  /speech recognition/i,
-  /weather predict/i,
-  /climate model/i,
-  /phase inference/i,
-  /decoder/i,
-  /shallow recurrent/i,
+  /survey/i, /review of/i, /tutorial/i, /overview of/i,
+  /benchmark/i, /dataset/i, /leaderboard/i, /evaluation of/i,
+  /mathematical/i, /theoretical/i, /convergence/i, /bounds for/i,
+  /stochastic/i, /optimization/i, /variational/i, /bayesian inference/i,
+  /graph neural/i, /graph network/i, /knowledge graph/i,
+  /time series/i, /forecasting/i, /anomaly detection/i,
+  /recommendation/i, /collaborative filtering/i,
+  /sentiment/i, /named entity/i, /text classification/i, /text mining/i,
+  /speech recognition/i, /speech synthesis/i, /speaker/i,
+  /weather/i, /climate/i, /ocean/i, /seismic/i, /geophysic/i,
+  /medical image segmentation/i, /lesion/i, /tumor detection/i,
+  /point cloud/i, /3d reconstruction/i, /mesh/i, /nerf/i,
+  /federated learning/i, /privacy preserving/i, /differential privacy/i,
+  /decoder/i, /encoder/i, /autoencoder/i, /recurrent/i,
+  /recipe/i, /pipeline/i, /shallow/i, /latent phase/i,
+  /hippocam/i, /contextual agent.*personal/i,
+  /improved .* via/i, /improving .* using/i, /improving .* with/i,
+  /novel approach/i, /new method/i, /efficient method/i,
+  /low-resource/i, /cross-lingual/i, /multilingual/i,
+  /image classification/i, /object detection/i, /semantic segmentation/i,
+  /video understanding/i, /action recognition/i,
+  /network pruning/i, /model compression/i,
+  /contrastive learning/i, /self-supervised/i, /semi-supervised/i,
+  /knowledge distill/i,
+  /music generat/i, /art generat/i, /style transfer/i,
+];
+
+// Only papers about these HIGH-SIGNAL topics pass (need 2+ matches from different groups)
+const ARXIV_SIGNAL_GROUPS = [
+  // Group 1: Scale & frontier capability
+  ['large language model', 'llm', 'foundation model', 'gpt-4', 'gpt-5', 'claude', 'gemini', 'llama'],
+  // Group 2: Reasoning & intelligence
+  ['reasoning', 'chain of thought', 'planning', 'world model', 'system 2'],
+  // Group 3: Safety & alignment
+  ['ai safety', 'alignment', 'constitutional ai', 'rlhf', 'red team', 'jailbreak', 'deception'],
+  // Group 4: Robotics breakthroughs
+  ['humanoid', 'dexterous manipulation', 'legged locomotion', 'sim to real', 'whole body control'],
+  // Group 5: Agents & autonomy
+  ['autonomous agent', 'tool use', 'code generation', 'web agent', 'computer use'],
+  // Group 6: Infrastructure & scaling
+  ['scaling law', 'mixture of experts', 'training at scale', 'inference optimization'],
+  // Group 7: Bio & health breakthroughs
+  ['drug discovery', 'protein structure', 'alphafold', 'clinical trial', 'fda'],
 ];
 
 function isArxivPaperRelevant(title: string, summary: string): boolean {
   const text = `${title} ${summary}`.toLowerCase();
 
-  // Skip papers matching noise patterns
+  // Always skip papers matching noise patterns
   for (const pattern of ARXIV_SKIP_PATTERNS) {
     if (pattern.test(title)) return false;
   }
 
-  // Always include papers from trusted institutions
-  for (const author of ARXIV_TRUSTED_AUTHORS) {
-    if (text.includes(author)) return true;
+  // Always include papers from trusted labs (checked in abstract/affiliations)
+  for (const lab of ARXIV_TRUSTED_LABS) {
+    if (text.includes(lab)) return true;
   }
 
-  // Check if paper matches relevant topics (need at least 1 keyword match)
-  let keywordHits = 0;
-  for (const keyword of ARXIV_RELEVANT_KEYWORDS) {
-    if (text.includes(keyword)) {
-      keywordHits++;
-      if (keywordHits >= 1) return true;
-    }
+  // For everything else: must match keywords from 2+ different signal groups
+  let groupsMatched = 0;
+  for (const group of ARXIV_SIGNAL_GROUPS) {
+    const hasMatch = group.some((keyword: string) => text.includes(keyword));
+    if (hasMatch) groupsMatched++;
   }
 
-  return false;
+  return groupsMatched >= 2;
 }
 
 async function fetchRSS(source: IntelSource): Promise<FetchedItem[]> {
@@ -144,7 +137,6 @@ async function fetchArxiv(source: IntelSource): Promise<FetchedItem[]> {
     const url = entry.match(/<id>([\s\S]*?)<\/id>/)?.[1]?.trim() || source.url;
     const published = entry.match(/<published>([\s\S]*?)<\/published>/)?.[1]?.trim() || null;
 
-    // Pre-filter: only include papers that are relevant to the user
     if (!isArxivPaperRelevant(title, summary)) continue;
 
     entries.push({
@@ -156,7 +148,8 @@ async function fetchArxiv(source: IntelSource): Promise<FetchedItem[]> {
       content_hash: generateContentHash(title, summary),
     });
   }
-  return entries.slice(0, 10);
+  // Only take top 5 — very selective
+  return entries.slice(0, 5);
 }
 
 async function fetchHackerNews(source: IntelSource): Promise<FetchedItem[]> {
