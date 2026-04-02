@@ -7,6 +7,8 @@ interface ItemCardProps {
   item: IntelItem;
   isSelected: boolean;
   onClick: () => void;
+  currentRating: RatingValue | null;
+  onRate: (rating: RatingValue) => void;
 }
 
 const IMPACT_COLORS: Record<string, string> = {
@@ -38,18 +40,17 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
+export default function ItemCard({ item, isSelected, onClick, currentRating, onRate }: ItemCardProps) {
   const impactLevel = item.impact_level || 'low';
   const impactClass = IMPACT_COLORS[impactLevel] || IMPACT_COLORS.low;
   const tierColor = TIER_COLORS[item.source_tier] || TIER_COLORS[3];
   const tierDot = TIER_DOT_COLORS[item.source_tier] || TIER_DOT_COLORS[3];
-  const rating = item.rating as RatingValue | undefined;
 
-  const borderColor = rating === 'signal'
+  const borderColor = currentRating === 'signal'
     ? 'border-l-[#00CC66]'
-    : rating === 'starred'
+    : currentRating === 'starred'
     ? 'border-l-[#FFD700]'
-    : rating === 'noise'
+    : currentRating === 'noise'
     ? 'border-l-[#333333]'
     : 'border-l-transparent';
 
@@ -67,7 +68,7 @@ export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
         isSelected
           ? 'bg-[#1A2332] border-b border-[#1E2A3A]'
           : 'bg-[#141820] border-b border-[#1E2A3A]/50 hover:bg-[#1A2030]'
-      } ${rating === 'noise' ? 'opacity-50' : ''}`}
+      } ${currentRating === 'noise' ? 'opacity-50' : ''}`}
     >
       {/* Header row */}
       <div className="flex items-center gap-2 mb-1">
@@ -113,7 +114,8 @@ export default function ItemCard({ item, isSelected, onClick }: ItemCardProps) {
         </div>
         <RatingButtons
           itemId={item.id}
-          currentRating={rating}
+          currentRating={currentRating}
+          onRate={onRate}
         />
       </div>
     </div>

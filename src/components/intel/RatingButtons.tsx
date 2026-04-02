@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { RatingValue } from '@/types/intel';
 
 interface RatingButtonsProps {
@@ -16,33 +16,23 @@ export default function RatingButtons({
   size = 'sm',
   onRate,
 }: RatingButtonsProps) {
-  const [rating, setRating] = useState<RatingValue | null>(currentRating || null);
   const [loading, setLoading] = useState(false);
 
-  // Sync with prop when itemId changes
-  useEffect(() => {
-    setRating(currentRating || null);
-  }, [itemId, currentRating]);
+  // Use the prop directly — parent owns the state
+  const rating = currentRating || null;
 
   async function handleRate(value: RatingValue) {
     if (loading) return;
-
-    const newRating = rating === value ? null : value;
     setLoading(true);
 
     try {
-      if (newRating) {
-        const res = await fetch('/api/intel/rate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ item_id: itemId, rating: newRating }),
-        });
-        if (res.ok) {
-          setRating(newRating);
-          onRate?.(newRating);
-        }
-      } else {
-        setRating(null);
+      const res = await fetch('/api/intel/rate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: itemId, rating: value }),
+      });
+      if (res.ok) {
+        onRate?.(value);
       }
     } catch {
       // Silent fail

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import type { IntelItem, IntelCategory } from '@/types/intel';
+import type { IntelItem, IntelCategory, RatingValue } from '@/types/intel';
 import ItemCard from './ItemCard';
 
 interface FeedPanelProps {
@@ -21,6 +21,8 @@ export default function FeedPanel({
   const [hasMore, setHasMore] = useState(true);
   const [showFiltered, setShowFiltered] = useState(false);
   const [filteredCount, setFilteredCount] = useState(0);
+  // Track ratings centrally so they persist across re-renders
+  const [ratings, setRatings] = useState<Record<string, RatingValue>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchItems = useCallback(
@@ -47,7 +49,19 @@ export default function FeedPanel({
         }
         setHasMore(newItems.length === 30);
 
-        // Count filtered items
+        // Initialize ratings from fetched data
+        const newRatings: Record<string, RatingValue> = {};
+        for (const item of newItems) {
+          if (item.rating) {
+            newRatings[item.id] = item.rating;
+          }
+        }
+        if (append) {
+          setRatings((prev) => ({ ...prev, ...newRatings }));
+        } else {
+          setRatings(newRatings);
+        }
+
         if (!showFiltered) {
           const filteredRes = await fetch(
             `/api/intel/items?category=${category !== 'all' ? category : ''}&include_filtered=true&limit=1`
@@ -71,11 +85,14 @@ export default function FeedPanel({
     fetchItems(1);
   }, [fetchItems]);
 
-  // Auto-refresh every 5 minutes
   useEffect(() => {
     const interval = setInterval(() => fetchItems(1), 300000);
     return () => clearInterval(interval);
   }, [fetchItems]);
+
+  function handleRate(itemId: string, rating: RatingValue) {
+    setRatings((prev) => ({ ...prev, [itemId]: rating }));
+  }
 
   function loadMore() {
     const nextPage = page + 1;
@@ -111,10 +128,11 @@ export default function FeedPanel({
               item={item}
               isSelected={item.id === selectedItemId}
               onClick={() => onSelectItem(item)}
+              currentRating={ratings[item.id] || null}
+              onRate={(rating) => handleRate(item.id, rating)}
             />
           ))}
 
-          {/* Load more */}
           {hasMore && (
             <button
               onClick={loadMore}
@@ -125,7 +143,6 @@ export default function FeedPanel({
             </button>
           )}
 
-          {/* Show filtered toggle */}
           {filteredCount > 0 && !showFiltered && (
             <button
               onClick={() => setShowFiltered(true)}
