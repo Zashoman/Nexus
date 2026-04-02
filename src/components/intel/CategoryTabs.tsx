@@ -17,7 +17,6 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'health_bio_ai', label: 'Health' },
   { key: 'cybersecurity_ai', label: 'Cyber' },
   { key: 'regulation_policy', label: 'Regulation' },
-  { key: 'drones_autonomous', label: 'Drones' },
   { key: 'portfolio', label: 'Portfolio' },
   { key: 'synthesis', label: 'Synthesis' },
   { key: 'settings', label: 'Settings' },
