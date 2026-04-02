@@ -8,9 +8,10 @@ import FeedPanel from '@/components/intel/FeedPanel';
 import DetailPanel from '@/components/intel/DetailPanel';
 import SynthesisView from '@/components/intel/SynthesisView';
 import PortfolioView from '@/components/intel/PortfolioView';
+import SettingsView from '@/components/intel/SettingsView';
 import StockTicker from '@/components/intel/StockTicker';
 
-type TabKey = IntelCategory | 'all' | 'synthesis' | 'portfolio';
+type TabKey = IntelCategory | 'all' | 'synthesis' | 'portfolio' | 'settings';
 
 export default function IntelPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('all');
@@ -24,6 +25,7 @@ export default function IntelPage() {
 
   const isSynthesis = activeTab === 'synthesis';
   const isPortfolio = activeTab === 'portfolio';
+  const isSettings = activeTab === 'settings';
 
   return (
     <div className="flex flex-col h-screen bg-[#0B0E11] text-[#E8EAED]">
@@ -31,7 +33,9 @@ export default function IntelPage() {
       <CategoryTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
       <div className="flex-1 flex overflow-hidden">
-        {isPortfolio ? (
+        {isSettings ? (
+          <SettingsView />
+        ) : isPortfolio ? (
           <PortfolioView />
         ) : isSynthesis ? (
           <SynthesisView />
