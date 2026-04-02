@@ -94,7 +94,7 @@ export default function PortfolioView() {
           type: addForm.type,
           sector: addForm.sector || null,
           keywords: addForm.keywords
-            ? addForm.keywords.split(',').map(k => k.trim()).filter(Boolean)
+            ? addForm.keywords.split(',').map((k: string) => k.trim()).filter(Boolean)
             : [],
         }),
       });
@@ -110,13 +110,13 @@ export default function PortfolioView() {
 
   async function handleDelete(id: string) {
     await fetch(`/api/intel/watchlist?id=${id}`, { method: 'DELETE' });
-    if (watchlist.find(w => w.id === id)?.symbol === selectedSymbol) {
+    if (watchlist.find((w: WatchlistEntry) => w.id === id)?.symbol === selectedSymbol) {
       setSelectedSymbol(null);
     }
     fetchData();
   }
 
-  const selectedEntry = watchlist.find(w => w.symbol === selectedSymbol);
+  const selectedEntry = watchlist.find((w: WatchlistEntry) => w.symbol === selectedSymbol);
   const selectedQuote = selectedSymbol ? quotes[selectedSymbol] : null;
   const selectedNews = selectedSymbol ? (news[selectedSymbol] || []) : [];
 
@@ -130,19 +130,14 @@ export default function PortfolioView() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[#0B0E11]">
-      {/* Price Grid Header */}
       <div className="border-b border-[#1E2A3A] bg-[#0D1117] px-4 py-2">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider">Portfolio Overview</h3>
-          <button
-            onClick={() => setShowAdd(!showAdd)}
-            className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF] cursor-pointer"
-          >
+          <button onClick={() => setShowAdd(!showAdd)} className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF] cursor-pointer">
             {showAdd ? '✕ Cancel' : '+ Add Position'}
           </button>
         </div>
 
-        {/* Add Form */}
         {showAdd && (
           <div className="mb-3 p-2 bg-[#141820] border border-[#1E2A3A] rounded-sm space-y-2">
             <div className="flex gap-2">
@@ -163,7 +158,6 @@ export default function PortfolioView() {
           </div>
         )}
 
-        {/* Price Grid */}
         {watchlist.length === 0 ? (
           <p className="text-xs text-[#5A6A7A] font-mono py-2">No positions tracked. Click + Add Position to start.</p>
         ) : (
@@ -173,27 +167,13 @@ export default function PortfolioView() {
               const isSelected = selectedSymbol === entry.symbol;
               const newsCount = (news[entry.symbol] || []).length;
               return (
-                <div
-                  key={entry.id}
-                  onClick={() => setSelectedSymbol(isSelected ? null : entry.symbol)}
-                  className={`px-3 py-2 rounded-sm cursor-pointer transition-colors border ${
-                    isSelected
-                      ? 'bg-[#1A2332] border-[#4488FF]/50'
-                      : 'bg-[#141820] border-[#1E2A3A]/50 hover:border-[#1E2A3A]'
-                  }`}
-                >
+                <div key={entry.id} onClick={() => setSelectedSymbol(isSelected ? null : entry.symbol)} className={`px-3 py-2 rounded-sm cursor-pointer transition-colors border ${isSelected ? 'bg-[#1A2332] border-[#4488FF]/50' : 'bg-[#141820] border-[#1E2A3A]/50 hover:border-[#1E2A3A]'}`}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[13px] font-mono font-bold text-[#E8EAED]">{entry.symbol}</span>
-                      <span className={`text-[8px] font-mono uppercase px-1 rounded-sm ${
-                        entry.type === 'etf' ? 'bg-[#FF8C00]/10 text-[#FF8C00]' : 'bg-[#4488FF]/10 text-[#4488FF]'
-                      }`}>{entry.type}</span>
+                      <span className={`text-[8px] font-mono uppercase px-1 rounded-sm ${entry.type === 'etf' ? 'bg-[#FF8C00]/10 text-[#FF8C00]' : 'bg-[#4488FF]/10 text-[#4488FF]'}`}>{entry.type}</span>
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(entry.id); }}
-                      className="text-[#5A6A7A] hover:text-[#FF4444] text-[10px] cursor-pointer opacity-0 group-hover:opacity-100"
-                      title="Remove"
-                    >✕</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(entry.id); }} className="text-[#5A6A7A] hover:text-[#FF4444] text-[10px] cursor-pointer" title="Remove">✕</button>
                   </div>
                   {q ? (
                     <div>
@@ -201,9 +181,7 @@ export default function PortfolioView() {
                       <span className={`text-[11px] font-mono ml-2 ${q.changePercent >= 0 ? 'text-[#00CC66]' : 'text-[#FF4444]'}`}>
                         {q.changePercent >= 0 ? '▲' : '▼'} {Math.abs(q.changePercent).toFixed(2)}%
                       </span>
-                      <div className="text-[9px] font-mono text-[#5A6A7A] mt-0.5">
-                        O: {q.open.toFixed(2)} H: {q.high.toFixed(2)} L: {q.low.toFixed(2)}
-                      </div>
+                      <div className="text-[9px] font-mono text-[#5A6A7A] mt-0.5">O: {q.open.toFixed(2)} H: {q.high.toFixed(2)} L: {q.low.toFixed(2)}</div>
                     </div>
                   ) : (
                     <span className="text-[13px] font-mono text-[#5A6A7A]">--</span>
@@ -219,20 +197,15 @@ export default function PortfolioView() {
         )}
       </div>
 
-      {/* Bottom Section — Selected Stock Detail or All News */}
       <div className="flex-1 overflow-y-auto">
         {selectedEntry ? (
           <div className="flex h-full">
-            {/* Stock Info Panel */}
             <div className="w-[300px] border-r border-[#1E2A3A] p-4 space-y-3 overflow-y-auto">
               <div>
                 <h2 className="text-xl font-mono font-bold text-[#E8EAED]">{selectedEntry.symbol}</h2>
                 <p className="text-[13px] text-[#8899AA]">{selectedEntry.company_name}</p>
-                {selectedEntry.sector && (
-                  <p className="text-[11px] text-[#5A6A7A] font-mono">Sector: {selectedEntry.sector}</p>
-                )}
+                {selectedEntry.sector && <p className="text-[11px] text-[#5A6A7A] font-mono">Sector: {selectedEntry.sector}</p>}
               </div>
-
               {selectedQuote && (
                 <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3 space-y-1">
                   <div className="flex items-baseline gap-2">
@@ -249,18 +222,16 @@ export default function PortfolioView() {
                   </div>
                 </div>
               )}
-
               {selectedEntry.keywords.length > 0 && (
                 <div>
                   <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-1">Tracking Keywords</h4>
                   <div className="flex flex-wrap gap-1">
-                    {selectedEntry.keywords.map((kw) => (
+                    {selectedEntry.keywords.map((kw: string) => (
                       <span key={kw} className="text-[9px] font-mono text-[#4488FF]/60 bg-[#4488FF]/5 px-1.5 py-0 rounded-sm">{kw}</span>
                     ))}
                   </div>
                 </div>
               )}
-
               {selectedEntry.top_holdings.length > 0 && (
                 <div>
                   <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-1">Top Holdings</h4>
@@ -268,8 +239,6 @@ export default function PortfolioView() {
                 </div>
               )}
             </div>
-
-            {/* News Feed */}
             <div className="flex-1 overflow-y-auto p-4">
               <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-3">
                 News — {selectedEntry.symbol} ({selectedNews.length} articles, last 30 days)
@@ -278,22 +247,14 @@ export default function PortfolioView() {
                 <p className="text-[13px] text-[#5A6A7A]">No recent news found</p>
               ) : (
                 <div className="space-y-1.5">
-                  {selectedNews.map((item, idx) => (
-                    <a
-                      key={idx}
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block px-3 py-2 bg-[#141820] border border-[#1E2A3A]/50 rounded-sm hover:bg-[#1A2030] transition-colors"
-                    >
+                  {selectedNews.map((item: CompanyNews, idx: number) => (
+                    <a key={idx} href={item.url} target="_blank" rel="noopener noreferrer" className="block px-3 py-2 bg-[#141820] border border-[#1E2A3A]/50 rounded-sm hover:bg-[#1A2030] transition-colors">
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="text-[10px] font-mono text-[#5A6A7A]">{item.source}</span>
                         <span className="text-[10px] font-mono text-[#5A6A7A] ml-auto">{timeAgo(item.datetime)}</span>
                       </div>
                       <p className="text-[13px] text-[#E8EAED] leading-tight">{item.headline}</p>
-                      {item.summary && (
-                        <p className="text-[11px] text-[#5A6A7A] mt-0.5 line-clamp-2">{item.summary}</p>
-                      )}
+                      {item.summary && <p className="text-[11px] text-[#5A6A7A] mt-0.5 line-clamp-2">{item.summary}</p>}
                     </a>
                   ))}
                 </div>
@@ -302,33 +263,21 @@ export default function PortfolioView() {
           </div>
         ) : (
           <div className="p-4">
-            <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-3">
-              Recent News Across All Positions
-            </h3>
+            <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-3">Recent News Across All Positions</h3>
             {(() => {
-              const allNews: { item: CompanyNews; symbol: string }[] = [];
-              for (const [symbol, items] of Object.entries(news)) {
+              const allItems: { item: CompanyNews; symbol: string }[] = [];
+              for (const [sym, items] of Object.entries(news)) {
                 for (const item of items) {
-                  allNews.push({ item, symbol });
+                  allItems.push({ item, symbol: sym });
                 }
               }
-              allNews.sort((a, b) => b.item.datetime - a.item.datetime);
-              const top = allNews.slice(0, 30);
-
-              if (top.length === 0) {
-                return <p className="text-[13px] text-[#5A6A7A]">No recent news</p>;
-              }
-
+              allItems.sort((a, b) => b.item.datetime - a.item.datetime);
+              const top = allItems.slice(0, 30);
+              if (top.length === 0) return <p className="text-[13px] text-[#5A6A7A]">No recent news</p>;
               return (
                 <div className="space-y-1.5">
                   {top.map((entry, idx) => (
-                    <a
-                      key={idx}
-                      href={entry.item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block px-3 py-2 bg-[#141820] border border-[#1E2A3A]/50 rounded-sm hover:bg-[#1A2030] transition-colors"
-                    >
+                    <a key={idx} href={entry.item.url} target="_blank" rel="noopener noreferrer" className="block px-3 py-2 bg-[#141820] border border-[#1E2A3A]/50 rounded-sm hover:bg-[#1A2030] transition-colors">
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="text-[10px] font-mono font-bold text-[#FF8C00] bg-[#FF8C00]/10 px-1 rounded-sm">{entry.symbol}</span>
                         <span className="text-[10px] font-mono text-[#5A6A7A]">{entry.item.source}</span>
