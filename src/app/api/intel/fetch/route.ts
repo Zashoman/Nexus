@@ -1,19 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { fetchSource, ingestItems } from '@/lib/intel/fetcher';
-import { processItems, getUnprocessedItems } from '@/lib/intel/processor';
 import { deduplicateNewItems } from '@/lib/intel/deduplicator';
-import { evaluateItemsAgainstBeliefs } from '@/lib/intel/belief-evaluator';
 import type { IntelSource, FetchResult } from '@/types/intel';
 
-export const maxDuration = 300; // 5 minute timeout for Vercel
+export const maxDuration = 300;
+
+// Items matching these patterns are events/meetups/conferences — always filter out
+const EVENT_PATTERNS = [
+  /schelling/i,
+  /meetup/i,
+  /meet-up/i,
+  /conference registration/i,
+  /register now/i,
+  /join us (at|for|in)/i,
+  /save the date/i,
+  /call for (papers|proposals|abstracts|submissions)/i,
+  /workshop at /i,
+  /spring \d{4}|fall \d{4}|summer \d{4}|winter \d{4}/i,
+  /ACX .* \d{4}/i,
+  /rationalist|lesswrong meetup|SSC meetup/i,
+  /tickets (available|on sale)/i,
+  /early bird/i,
+  /\bcfp\b/i,
+  /hackathon/i,
+  /webinar/i,
+  /office hours/i,
+  /AMA with/i,
+  /fireside chat/i,
+  /panel discussion/i,
+  /roundtable/i,
+];
+
+function isEventOrMeetup(title: string, summary: string): boolean {
+  const text = `${title} ${summary}`;
+  return EVENT_PATTERNS.some((pattern) => pattern.test(text));
+}
 
 export async function GET(req: NextRequest) {
-  // Verify cron secret for production
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    // Allow without secret in development
     if (process.env.NODE_ENV === 'production') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -22,8 +49,8 @@ export async function GET(req: NextRequest) {
   const db = getServiceSupabase();
   const startTime = Date.now();
   const errors: string[] = [];
+  let filtered = 0;
 
-  // Get all active sources
   const { data: sources } = await db
     .from('intel_sources')
     .select('*')
@@ -37,7 +64,6 @@ export async function GET(req: NextRequest) {
   let totalNew = 0;
   let totalDuplicates = 0;
 
-  // Fetch all sources in parallel (batches of 5)
   const batchSize = 5;
   for (let i = 0; i < sources.length; i += batchSize) {
     const batch = sources.slice(i, i + batchSize) as IntelSource[];
@@ -47,7 +73,6 @@ export async function GET(req: NextRequest) {
         const { items, error } = await fetchSource(source);
 
         if (error) {
-          // Increment error count
           await db
             .from('intel_sources')
             .update({ error_count: source.error_count + 1 })
@@ -90,45 +115,42 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Step 2: AI Processing of new items
-  let processed = 0;
-  try {
-    const unprocessed = await getUnprocessedItems();
-    if (unprocessed.length > 0) {
-      await processItems(unprocessed);
-      processed = unprocessed.length;
+  // Post-ingestion: filter out events/meetups/conferences
+  const { data: recentItems } = await db
+    .from('intel_items')
+    .select('id, title, summary')
+    .eq('is_filtered_out', false)
+    .gte('ingested_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
 
-      // Step 3: Deduplication
-      await deduplicateNewItems();
-
-      // Step 4: Belief evaluation
-      // Re-fetch processed items (now they have AI summaries)
-      const { data: processedItems } = await db
-        .from('intel_items')
-        .select('*')
-        .not('ai_summary', 'is', null)
-        .gte('ingested_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
-        .gt('relevance_score', 0.5);
-
-      if (processedItems && processedItems.length > 0) {
-        await evaluateItemsAgainstBeliefs(processedItems);
+  if (recentItems) {
+    for (const item of recentItems) {
+      if (isEventOrMeetup(item.title || '', item.summary || '')) {
+        await db
+          .from('intel_items')
+          .update({ is_filtered_out: true, filter_reason: 'Event/meetup/conference' })
+          .eq('id', item.id);
+        filtered++;
       }
     }
+  }
+
+  // Deduplication only — no batch AI processing (summaries generate on-demand when clicked)
+  try {
+    await deduplicateNewItems();
   } catch (err) {
-    errors.push(`Processing: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    errors.push(`Dedup: ${err instanceof Error ? err.message : 'Unknown error'}`);
   }
 
   const result: FetchResult = {
     total_fetched: totalFetched,
     new_items: totalNew,
     duplicates: totalDuplicates,
-    filtered: 0,
+    filtered,
     errors,
   };
 
   return NextResponse.json({
     ...result,
-    processed,
     duration_ms: Date.now() - startTime,
   });
 }
