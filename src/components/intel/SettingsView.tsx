@@ -34,6 +34,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   health_bio_ai: 'Health & Bio',
   cybersecurity_ai: 'Cyber & Defense',
   regulation_policy: 'Regulation',
+  drones_autonomous: 'Drones & Autonomous',
   safety_alignment: 'Safety & Alignment',
 };
 
