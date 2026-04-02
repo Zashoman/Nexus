@@ -2,7 +2,7 @@
 
 import type { IntelCategory } from '@/types/intel';
 
-type TabKey = IntelCategory | 'all' | 'synthesis' | 'portfolio';
+type TabKey = IntelCategory | 'all' | 'synthesis' | 'portfolio' | 'settings';
 
 interface CategoryTabsProps {
   activeTab: TabKey;
@@ -19,6 +19,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'regulation_policy', label: 'Regulation' },
   { key: 'portfolio', label: 'Portfolio' },
   { key: 'synthesis', label: 'Synthesis' },
+  { key: 'settings', label: 'Settings' },
 ];
 
 export default function CategoryTabs({ activeTab, onTabChange }: CategoryTabsProps) {
@@ -32,7 +33,7 @@ export default function CategoryTabs({ activeTab, onTabChange }: CategoryTabsPro
             activeTab === tab.key
               ? 'border-[#4488FF] text-[#E8EAED] bg-[#141820]'
               : 'border-transparent text-[#5A6A7A] hover:text-[#8899AA] hover:bg-[#141820]/50'
-          } ${tab.key === 'synthesis' ? 'text-[#FFD700]' : ''} ${tab.key === 'portfolio' ? 'ml-auto text-[#00CC66]' : ''}`}
+          } ${tab.key === 'synthesis' ? 'text-[#FFD700]' : ''} ${tab.key === 'portfolio' ? 'ml-auto text-[#00CC66]' : ''} ${tab.key === 'settings' ? 'text-[#8899AA]' : ''}`}
         >
           {tab.label}
         </button>
