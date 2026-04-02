@@ -19,7 +19,8 @@ export type IntelCategory =
   | 'robotics_physical_ai'
   | 'health_bio_ai'
   | 'cybersecurity_ai'
-  | 'regulation_policy';
+  | 'regulation_policy'
+  | 'drones_autonomous';
 
 export const CATEGORY_LABELS: Record<IntelCategory, string> = {
   frontier_models: 'Frontier & Models',
@@ -28,6 +29,7 @@ export const CATEGORY_LABELS: Record<IntelCategory, string> = {
   health_bio_ai: 'Health & Bio AI',
   cybersecurity_ai: 'Cybersecurity AI',
   regulation_policy: 'Regulation & Policy',
+  drones_autonomous: 'Drones & Autonomous',
 };
 
 export interface IntelSource {
