@@ -26,34 +26,29 @@ export async function GET() {
 
   const items = recentItems || [];
 
-  // Match articles to watchlist entries — require 2+ keyword matches to reduce false positives
   const matches: Record<string, typeof items> = {};
 
   for (const entry of watchlist || []) {
     matches[entry.symbol] = [];
 
-    // Direct matches (ticker or exact company name)
     const directTerms = [
       entry.symbol.toLowerCase(),
       entry.company_name.toLowerCase(),
       ...(entry.top_holdings || []).map((h: string) => h.toLowerCase()),
     ];
 
-    // Keyword matches (need 2+ to count)
     const keywordTerms = (entry.keywords || []).map((k: string) => k.toLowerCase());
 
     for (const item of items) {
       const text = `${item.title} ${item.ai_summary || ''} ${item.summary || ''}`.toLowerCase();
 
-      // Direct match = instant include
-      const directMatch = directTerms.some(term => text.includes(term));
+      const directMatch = directTerms.some((term: string) => text.includes(term));
       if (directMatch) {
         matches[entry.symbol].push(item);
         continue;
       }
 
-      // Keyword match = need 2+ keywords to match
-      const keywordHits = keywordTerms.filter(term => text.includes(term)).length;
+      const keywordHits = keywordTerms.filter((term: string) => text.includes(term)).length;
       if (keywordHits >= 2) {
         matches[entry.symbol].push(item);
       }
