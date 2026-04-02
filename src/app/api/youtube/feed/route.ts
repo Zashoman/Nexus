@@ -25,9 +25,16 @@ export async function GET() {
     try {
       const feed = await parser.parseURL(channel.rss_url);
 
+      // Only include videos from the last 3 days
+      const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+
       for (const item of (feed.items || []).slice(0, 10)) {
         const videoId = item.id?.split(':').pop() || '';
         if (!videoId) continue;
+
+        // Skip videos older than 3 days
+        const pubDate = item.isoDate || item.pubDate;
+        if (pubDate && new Date(pubDate).getTime() < threeDaysAgo) continue;
 
         // Check if already exists
         const { data: existing } = await db
@@ -40,7 +47,6 @@ export async function GET() {
 
         const description = (item.contentSnippet || item.content || '').slice(0, 1000);
 
-        // Generate a mini summary from the first ~200 chars of description
         const miniSummary = description.length > 0
           ? description.split('\n').filter((l: string) => l.trim().length > 0).slice(0, 2).join(' ').slice(0, 200)
           : null;
@@ -64,12 +70,14 @@ export async function GET() {
     }
   }
 
-  // Return all recent videos
+  // Return only recent videos (last 3 days)
+  const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
   const { data: videos } = await db
     .from('intel_youtube_videos')
     .select('*')
+    .gte('published_at', cutoff)
     .order('published_at', { ascending: false })
-    .limit(100);
+    .limit(50);
 
   return NextResponse.json({
     videos: videos || [],
