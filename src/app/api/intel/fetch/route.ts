@@ -49,6 +49,33 @@ const NOISE_PATTERNS = [
   /we.re hiring/i,
   /job opening/i,
   /internship/i,
+  // Promotional & sponsored content
+  /learn how to/i,
+  /how to build/i,
+  /step.by.step guide/i,
+  /tutorial:/i,
+  /beginner.s guide/i,
+  /getting started with/i,
+  /introduction to/i,
+  /what is (a |an )?(machine learning|deep learning|neural network|ai)\?/i,
+  /keynote/i,
+  /sponsored/i,
+  /partner content/i,
+  /advertis/i,
+  /brought to you by/i,
+  /in partnership with/i,
+  /register for/i,
+  /sign up for/i,
+  /free trial/i,
+  /discount code/i,
+  /promo code/i,
+  /product launch/i,
+  /now available/i,
+  /announcing our/i,
+  /check out our/i,
+  /top \d+ (tools|apps|platforms)/i,
+  /best (tools|apps|platforms) for/i,
+  /\d+ (ways|things|reasons) (to|why)/i,
 ];
 
 function isNoise(title: string, summary: string): boolean {
@@ -134,7 +161,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Post-ingestion: filter out noise (events, career advice, etc.)
+  // Post-ingestion: filter out noise
   const { data: recentItems } = await db
     .from('intel_items')
     .select('id, title, summary')
@@ -146,14 +173,13 @@ export async function GET(req: NextRequest) {
       if (isNoise(item.title || '', item.summary || '')) {
         await db
           .from('intel_items')
-          .update({ is_filtered_out: true, filter_reason: 'Noise: event/career/meetup' })
+          .update({ is_filtered_out: true, filter_reason: 'Noise: promotional/event/career' })
           .eq('id', item.id);
         filtered++;
       }
     }
   }
 
-  // Deduplication only — no batch AI processing (summaries generate on-demand when clicked)
   try {
     await deduplicateNewItems();
   } catch (err) {
