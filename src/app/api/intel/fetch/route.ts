@@ -6,8 +6,9 @@ import type { IntelSource, FetchResult } from '@/types/intel';
 
 export const maxDuration = 300;
 
-// Items matching these patterns are events/meetups/conferences — always filter out
-const EVENT_PATTERNS = [
+// Items matching these patterns are always filtered out
+const NOISE_PATTERNS = [
+  // Events & meetups
   /schelling/i,
   /meetup/i,
   /meet-up/i,
@@ -30,11 +31,29 @@ const EVENT_PATTERNS = [
   /fireside chat/i,
   /panel discussion/i,
   /roundtable/i,
+  // Career advice & academia noise
+  /advice for.*researcher/i,
+  /junior researcher/i,
+  /career advice/i,
+  /how to get into/i,
+  /tips for (phd|grad|student|researcher)/i,
+  /applying to (phd|grad school|programs)/i,
+  /my journey/i,
+  /lessons learned/i,
+  /what i wish i knew/i,
+  /how to write.*paper/i,
+  /academic job market/i,
+  /tenure track/i,
+  /postdoc/i,
+  /hiring (for|at) (our|the) lab/i,
+  /we.re hiring/i,
+  /job opening/i,
+  /internship/i,
 ];
 
-function isEventOrMeetup(title: string, summary: string): boolean {
+function isNoise(title: string, summary: string): boolean {
   const text = `${title} ${summary}`;
-  return EVENT_PATTERNS.some((pattern) => pattern.test(text));
+  return NOISE_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 export async function GET(req: NextRequest) {
@@ -115,7 +134,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Post-ingestion: filter out events/meetups/conferences
+  // Post-ingestion: filter out noise (events, career advice, etc.)
   const { data: recentItems } = await db
     .from('intel_items')
     .select('id, title, summary')
@@ -124,10 +143,10 @@ export async function GET(req: NextRequest) {
 
   if (recentItems) {
     for (const item of recentItems) {
-      if (isEventOrMeetup(item.title || '', item.summary || '')) {
+      if (isNoise(item.title || '', item.summary || '')) {
         await db
           .from('intel_items')
-          .update({ is_filtered_out: true, filter_reason: 'Event/meetup/conference' })
+          .update({ is_filtered_out: true, filter_reason: 'Noise: event/career/meetup' })
           .eq('id', item.id);
         filtered++;
       }
