@@ -13,8 +13,8 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Get relevant news for each watchlist item
-  const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  // Get relevant news for each watchlist item (30 day window)
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const { data: recentItems } = await db
     .from('intel_items')
@@ -22,27 +22,39 @@ export async function GET() {
     .gte('ingested_at', cutoff)
     .eq('is_filtered_out', false)
     .order('published_at', { ascending: false })
-    .limit(200);
+    .limit(300);
 
   const items = recentItems || [];
 
-  // Match articles to watchlist entries
+  // Match articles to watchlist entries — require 2+ keyword matches to reduce false positives
   const matches: Record<string, typeof items> = {};
 
   for (const entry of watchlist || []) {
     matches[entry.symbol] = [];
 
-    const searchTerms = [
+    // Direct matches (ticker or exact company name)
+    const directTerms = [
       entry.symbol.toLowerCase(),
       entry.company_name.toLowerCase(),
-      ...(entry.keywords || []).map((k: string) => k.toLowerCase()),
       ...(entry.top_holdings || []).map((h: string) => h.toLowerCase()),
     ];
 
+    // Keyword matches (need 2+ to count)
+    const keywordTerms = (entry.keywords || []).map((k: string) => k.toLowerCase());
+
     for (const item of items) {
       const text = `${item.title} ${item.ai_summary || ''} ${item.summary || ''}`.toLowerCase();
-      const matched = searchTerms.some(term => text.includes(term));
-      if (matched) {
+
+      // Direct match = instant include
+      const directMatch = directTerms.some(term => text.includes(term));
+      if (directMatch) {
+        matches[entry.symbol].push(item);
+        continue;
+      }
+
+      // Keyword match = need 2+ keywords to match
+      const keywordHits = keywordTerms.filter(term => text.includes(term)).length;
+      if (keywordHits >= 2) {
         matches[entry.symbol].push(item);
       }
     }
