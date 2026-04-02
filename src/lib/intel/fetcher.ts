@@ -27,6 +27,90 @@ interface FetchedItem {
   content_hash: string;
 }
 
+// ArXiv papers must match at least one of these to be included
+const ARXIV_RELEVANT_KEYWORDS = [
+  // Frontier model topics
+  'large language model', 'llm', 'foundation model', 'gpt', 'transformer architecture',
+  'reasoning', 'chain of thought', 'instruction tuning', 'rlhf', 'alignment',
+  'multimodal', 'vision language', 'text to image', 'diffusion model',
+  // Safety & alignment
+  'ai safety', 'ai alignment', 'constitutional ai', 'red teaming', 'jailbreak',
+  'hallucination', 'truthfulness', 'deception',
+  // Robotics & physical AI
+  'robot', 'humanoid', 'manipulation', 'embodied', 'autonomous driving',
+  'reinforcement learning', 'sim to real',
+  // Health & bio
+  'drug discovery', 'protein', 'medical imaging', 'clinical', 'diagnosis',
+  'alphafold', 'biomedical',
+  // Cybersecurity
+  'vulnerability', 'malware', 'adversarial attack', 'cybersecurity',
+  // Infrastructure
+  'training efficiency', 'inference speed', 'quantization', 'distillation',
+  'scaling law', 'mixture of experts', 'sparse',
+  // Agents
+  'agent', 'tool use', 'code generation', 'autonomous',
+];
+
+// Papers from these institutions/labs always pass
+const ARXIV_TRUSTED_AUTHORS = [
+  'openai', 'anthropic', 'deepmind', 'google research', 'google brain',
+  'meta ai', 'meta fair', 'microsoft research', 'nvidia research',
+  'stanford', 'mit', 'berkeley', 'cmu', 'carnegie mellon',
+  'princeton', 'oxford', 'cambridge', 'toronto', 'mila',
+  'allen institute', 'eleutherai', 'stability ai', 'cohere',
+];
+
+// These title patterns indicate papers we should skip
+const ARXIV_SKIP_PATTERNS = [
+  /survey of/i,
+  /a review of/i,
+  /benchmark for/i,
+  /dataset for/i,
+  /improving .* by \d/i,
+  /mathematical foundation/i,
+  /theoretical analysis/i,
+  /convergence of/i,
+  /optimal .* bounds/i,
+  /stochastic .* optimization/i,
+  /graph neural network/i,
+  /time series/i,
+  /recommendation system/i,
+  /sentiment analysis/i,
+  /named entity/i,
+  /text classification/i,
+  /speech recognition/i,
+  /weather predict/i,
+  /climate model/i,
+  /phase inference/i,
+  /decoder/i,
+  /shallow recurrent/i,
+];
+
+function isArxivPaperRelevant(title: string, summary: string): boolean {
+  const text = `${title} ${summary}`.toLowerCase();
+
+  // Skip papers matching noise patterns
+  for (const pattern of ARXIV_SKIP_PATTERNS) {
+    if (pattern.test(title)) return false;
+  }
+
+  // Always include papers from trusted institutions
+  for (const author of ARXIV_TRUSTED_AUTHORS) {
+    if (text.includes(author)) return true;
+  }
+
+  // Check if paper matches relevant topics (need at least 1 keyword match)
+  let keywordHits = 0;
+  for (const keyword of ARXIV_RELEVANT_KEYWORDS) {
+    if (text.includes(keyword)) {
+      keywordHits++;
+      if (keywordHits >= 1) return true;
+    }
+  }
+
+  return false;
+}
+
 async function fetchRSS(source: IntelSource): Promise<FetchedItem[]> {
   const feed = await parser.parseURL(source.url);
   return (feed.items || []).slice(0, 30).map((item) => {
@@ -59,6 +143,10 @@ async function fetchArxiv(source: IntelSource): Promise<FetchedItem[]> {
     const summary = entry.match(/<summary>([\s\S]*?)<\/summary>/)?.[1]?.trim().replace(/\s+/g, ' ') || '';
     const url = entry.match(/<id>([\s\S]*?)<\/id>/)?.[1]?.trim() || source.url;
     const published = entry.match(/<published>([\s\S]*?)<\/published>/)?.[1]?.trim() || null;
+
+    // Pre-filter: only include papers that are relevant to the user
+    if (!isArxivPaperRelevant(title, summary)) continue;
+
     entries.push({
       title,
       summary: summary.slice(0, 500),
@@ -68,11 +156,10 @@ async function fetchArxiv(source: IntelSource): Promise<FetchedItem[]> {
       content_hash: generateContentHash(title, summary),
     });
   }
-  return entries.slice(0, 20);
+  return entries.slice(0, 10);
 }
 
 async function fetchHackerNews(source: IntelSource): Promise<FetchedItem[]> {
-  // Only fetch stories from the last 24 hours
   const oneDayAgo = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
   const url = `${source.url}&numericFilters=created_at_i>${oneDayAgo}`;
   const res = await fetch(url, {
@@ -81,12 +168,12 @@ async function fetchHackerNews(source: IntelSource): Promise<FetchedItem[]> {
   const data = await res.json();
   return (data.hits || []).slice(0, 20).map((hit: { title?: string; url?: string; story_text?: string; created_at?: string; objectID?: string }) => {
     const title = hit.title || 'Untitled';
-    const url = hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`;
+    const hitUrl = hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`;
     const summary = hit.story_text || '';
     return {
       title,
       summary: summary.slice(0, 500),
-      url,
+      url: hitUrl,
       published_at: hit.created_at || null,
       raw_content: summary,
       content_hash: generateContentHash(title, summary),
