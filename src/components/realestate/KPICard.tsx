@@ -20,15 +20,15 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   const min = Math.min(...data);
   const range = max - min || 1;
   const w = 80;
-  const h = 24;
+  const h = 28;
   const points = data.map((v, i) => {
     const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - min) / range) * h;
+    const y = h - ((v - min) / range) * (h - 4) - 2;
     return `${x},${y}`;
   }).join(' ');
 
   return (
-    <svg width={w} height={h} className="mt-1">
+    <svg width={w} height={h} className="mt-1.5">
       <polyline
         points={points}
         fill="none"
@@ -43,7 +43,6 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
 
 function InfoTooltip({ text }: { text: string }) {
   const [show, setShow] = useState(false);
-
   return (
     <span
       className="relative inline-flex ml-1 cursor-help"
@@ -68,18 +67,38 @@ function InfoTooltip({ text }: { text: string }) {
 export default function KPICard({ stat }: { stat: KPIStat }) {
   const { label, value, changePercent, trend, key } = stat;
 
+  // Color logic
   let statusColor = '#5A6A7A';
   let arrow = '';
+  let bgTint = '';
   if (changePercent != null) {
     if (Math.abs(changePercent) <= 5) {
       statusColor = '#FFB020';
       arrow = changePercent >= 0 ? '\u25B2' : '\u25BC';
+      bgTint = 'bg-[#FFB020]/[0.03]';
     } else if (changePercent > 0) {
       statusColor = '#00CC66';
       arrow = '\u25B2';
+      bgTint = 'bg-[#00CC66]/[0.03]';
     } else {
       statusColor = '#FF4444';
       arrow = '\u25BC';
+      bgTint = changePercent < -20 ? 'bg-[#FF4444]/[0.06]' : 'bg-[#FF4444]/[0.03]';
+    }
+  }
+
+  // Week over week
+  let wowChange: number | null = null;
+  let wowColor = '#5A6A7A';
+  let wowArrow = '';
+  if (trend.length >= 2) {
+    const current = trend[trend.length - 1];
+    const prev = trend[trend.length - 2];
+    if (prev > 0) {
+      wowChange = ((current - prev) / prev) * 100;
+      if (wowChange > 0) { wowColor = '#00CC66'; wowArrow = '\u25B2'; }
+      else if (wowChange < 0) { wowColor = '#FF4444'; wowArrow = '\u25BC'; }
+      else { wowColor = '#5A6A7A'; }
     }
   }
 
@@ -94,20 +113,28 @@ export default function KPICard({ stat }: { stat: KPIStat }) {
   const info = METRIC_INFO[key];
 
   return (
-    <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3 min-w-[160px]">
+    <div className={`border border-[#1E2A3A] rounded-sm p-3 ${bgTint || 'bg-[#141820]'}`}>
       <div className="text-[10px] uppercase tracking-wider text-[#5A6A7A] font-mono mb-1 flex items-center">
         {label}
         {info && <InfoTooltip text={info} />}
       </div>
-      <div className="text-xl font-mono font-semibold text-[#E8EAED]">
+      <div className="text-2xl font-mono font-bold text-[#E8EAED] tracking-tight">
         {formatValue(value)}
       </div>
-      <div className="flex items-center gap-2 mt-1">
-        <span className="text-xs font-mono" style={{ color: statusColor }}>
+      <div className="flex items-center gap-2 mt-1.5">
+        <span className="text-xs font-mono font-semibold" style={{ color: statusColor }}>
           {arrow} {changePercent != null ? `${changePercent > 0 ? '+' : ''}${changePercent.toFixed(1)}%` : '--'}
         </span>
-        <span className="text-[10px] text-[#5A6A7A] font-mono">vs baseline</span>
+        <span className="text-[9px] text-[#5A6A7A] font-mono">vs Feb</span>
       </div>
+      {wowChange != null && (
+        <div className="flex items-center gap-1 mt-0.5">
+          <span className="text-[10px] font-mono" style={{ color: wowColor }}>
+            {wowArrow} {wowChange > 0 ? '+' : ''}{wowChange.toFixed(1)}%
+          </span>
+          <span className="text-[9px] text-[#5A6A7A] font-mono">WoW</span>
+        </div>
+      )}
       <Sparkline data={trend} color={statusColor} />
     </div>
   );

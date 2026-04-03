@@ -13,9 +13,16 @@ import {
   YAxis,
   Tooltip,
   ReferenceLine,
+  ReferenceArea,
   CartesianGrid,
   Legend,
 } from 'recharts';
+
+export interface EventAnnotation {
+  xValue: string;
+  label: string;
+  color: string;
+}
 
 interface BaseChartProps {
   title: string;
@@ -23,6 +30,7 @@ interface BaseChartProps {
   data: Record<string, unknown>[];
   xKey: string;
   baseline?: { value: number; label: string };
+  events?: EventAnnotation[];
   height?: number;
 }
 
@@ -79,8 +87,45 @@ function ChartInfoTooltip({ text }: { text: string }) {
   );
 }
 
+function renderEventAnnotations(events?: EventAnnotation[]) {
+  if (!events) return null;
+  return events.map((evt, i) => (
+    <ReferenceLine
+      key={`evt-${i}`}
+      x={evt.xValue}
+      stroke={evt.color}
+      strokeDasharray="4 3"
+      strokeWidth={1}
+      label={{
+        value: evt.label,
+        position: 'top',
+        fill: evt.color,
+        fontSize: 9,
+        fontFamily: 'monospace',
+      }}
+    />
+  ));
+}
+
+// Conflict zone shading (between conflict start and bottom)
+function renderConflictZone(events?: EventAnnotation[]) {
+  if (!events || events.length < 2) return null;
+  const conflictStart = events.find(e => e.label.toLowerCase().includes('conflict'));
+  const bottom = events.find(e => e.label.toLowerCase().includes('bottom'));
+  if (!conflictStart || !bottom) return null;
+  return (
+    <ReferenceArea
+      x1={conflictStart.xValue}
+      x2={bottom.xValue}
+      fill="#FF4444"
+      fillOpacity={0.04}
+      strokeOpacity={0}
+    />
+  );
+}
+
 export default function REChart(props: ChartProps) {
-  const { title, info, data, xKey, baseline, height = 260 } = props;
+  const { title, info, data, xKey, baseline, events, height = 260 } = props;
 
   const baselineRef = baseline ? (
     <ReferenceLine
@@ -135,10 +180,10 @@ export default function REChart(props: ChartProps) {
               />
             )}
             <Tooltip {...tooltipStyle} />
-            <Legend
-              wrapperStyle={{ fontSize: '10px', fontFamily: 'monospace' }}
-            />
+            <Legend wrapperStyle={{ fontSize: '10px', fontFamily: 'monospace' }} />
+            {renderConflictZone(events)}
             {baselineRef}
+            {renderEventAnnotations(events)}
             {props.yKeys.map((yk, i) => (
               <Line
                 key={yk.key}
@@ -148,8 +193,8 @@ export default function REChart(props: ChartProps) {
                 stroke={yk.color}
                 name={yk.name}
                 strokeWidth={2}
-                dot={{ r: 2, fill: yk.color }}
-                activeDot={{ r: 4 }}
+                dot={{ r: 3, fill: yk.color }}
+                activeDot={{ r: 5 }}
                 connectNulls
               />
             ))}
@@ -164,10 +209,10 @@ export default function REChart(props: ChartProps) {
               tickLine={false}
             />
             <Tooltip {...tooltipStyle} />
-            <Legend
-              wrapperStyle={{ fontSize: '10px', fontFamily: 'monospace' }}
-            />
+            <Legend wrapperStyle={{ fontSize: '10px', fontFamily: 'monospace' }} />
+            {renderConflictZone(events)}
             {baselineRef}
+            {renderEventAnnotations(events)}
             {props.yKeys.map((yk) => (
               <Area
                 key={yk.key}
@@ -192,10 +237,10 @@ export default function REChart(props: ChartProps) {
               tickLine={false}
             />
             <Tooltip {...tooltipStyle} />
-            <Legend
-              wrapperStyle={{ fontSize: '10px', fontFamily: 'monospace' }}
-            />
+            <Legend wrapperStyle={{ fontSize: '10px', fontFamily: 'monospace' }} />
+            {renderConflictZone(events)}
             {baselineRef}
+            {renderEventAnnotations(events)}
             {props.yKeys.map((yk) => (
               <Bar
                 key={yk.key}

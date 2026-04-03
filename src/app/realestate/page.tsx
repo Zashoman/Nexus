@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/realestate/AuthProvider';
 import KPICard from '@/components/realestate/KPICard';
 import REChart from '@/components/realestate/REChart';
+import { EventAnnotation } from '@/components/realestate/REChart';
 import RefreshModal from '@/components/realestate/RefreshModal';
 import { KPIStat, WeeklyData, MonthlyData, Baseline } from '@/types/realestate';
 
-type Tab = 'overview' | 'weekly' | 'monthly' | 'baselines' | 'log' | 'settings';
+type Tab = 'overview' | 'weekly' | 'baselines' | 'log' | 'settings';
 
 export default function RealEstateDashboard() {
   const { user, role, loading, token, signOut } = useAuth();
@@ -32,7 +33,7 @@ export default function RealEstateDashboard() {
       const json = await res.json();
       if (!res.ok) alert(json.error);
       else {
-        alert(`Seeded ${json.weeks_seeded} weeks of historical data!`);
+        alert(`Seeded ${json.weeks_seeded} weeks of data!`);
         fetchData();
       }
     } catch { alert('Seed failed'); }
@@ -46,14 +47,9 @@ export default function RealEstateDashboard() {
       fetch('/api/re/monthly?limit=24'),
       fetch('/api/re/baselines'),
     ]);
-
     const [statsJson, weeklyJson, monthlyJson, baselinesJson] = await Promise.all([
-      statsRes.json(),
-      weeklyRes.json(),
-      monthlyRes.json(),
-      baselinesRes.json(),
+      statsRes.json(), weeklyRes.json(), monthlyRes.json(), baselinesRes.json(),
     ]);
-
     if (statsJson.kpis) setKpis(statsJson.kpis);
     if (statsJson.lastUpdated) setLastUpdated(statsJson.lastUpdated);
     if (weeklyJson.data) setWeeklyData(weeklyJson.data);
@@ -61,9 +57,7 @@ export default function RealEstateDashboard() {
     if (baselinesJson.data) setBaselines(baselinesJson.data);
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading && !kpis.length) {
     return (
@@ -77,7 +71,7 @@ export default function RealEstateDashboard() {
   const isLoggedIn = !!user;
   const baselineMap = new Map(baselines.map(b => [b.metric_key, b.baseline_value]));
 
-  // Prepare chart data (reverse for chronological order)
+  // Prepare chart data (chronological)
   const weeklyChartData = [...weeklyData].reverse().map(w => ({
     week: new Date(w.week_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     total_transactions: w.total_transactions,
@@ -91,12 +85,23 @@ export default function RealEstateDashboard() {
     damac_share_price: w.damac_share_price,
     listing_inventory: w.listing_inventory,
     offplan_pct: w.total_transactions && w.offplan_transactions
-      ? ((w.offplan_transactions / w.total_transactions) * 100).toFixed(1)
+      ? +((w.offplan_transactions / w.total_transactions) * 100).toFixed(1)
       : null,
     cash_pct: w.total_transactions && w.cash_transactions
-      ? ((w.cash_transactions / w.total_transactions) * 100).toFixed(1)
+      ? +((w.cash_transactions / w.total_transactions) * 100).toFixed(1)
       : null,
   }));
+
+  // Event annotations — key dates on timeline
+  const events: EventAnnotation[] = [];
+  if (weeklyChartData.length > 0) {
+    const conflictDate = weeklyChartData.find(d => d.week === 'Mar 8');
+    const bottomDate = weeklyChartData.find(d => d.week === 'Mar 15');
+    const supportDate = weeklyChartData.find(d => d.week === 'Mar 22');
+    if (conflictDate) events.push({ xValue: 'Mar 8', label: 'CONFLICT', color: '#FF4444' });
+    if (bottomDate) events.push({ xValue: 'Mar 15', label: 'DFM BOTTOM', color: '#FF8C00' });
+    if (supportDate) events.push({ xValue: 'Mar 22', label: 'GOVT SUPPORT', color: '#00CC66' });
+  }
 
   const tabs: { key: Tab; label: string; ownerOnly?: boolean }[] = [
     { key: 'overview', label: 'Overview' },
@@ -116,150 +121,131 @@ export default function RealEstateDashboard() {
           </h1>
           {lastUpdated && (
             <span className="text-[10px] font-mono text-[#5A6A7A]">
-              Last Updated: {new Date(lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              Updated: {new Date(lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </span>
           )}
+          <span className="text-[10px] font-mono text-[#5A6A7A]/50">
+            Feb 1 – Apr 3, 2026
+          </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {isOwner && (
-            <button
-              onClick={handleSeed}
-              disabled={seeding}
-              className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#00CC66] border border-[#00CC66]/30 rounded-sm hover:bg-[#00CC66]/10 disabled:opacity-50"
-            >
-              {seeding ? 'Seeding...' : 'Load History'}
+            <button onClick={handleSeed} disabled={seeding}
+              className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#00CC66] border border-[#00CC66]/30 rounded-sm hover:bg-[#00CC66]/10 disabled:opacity-50">
+              {seeding ? 'Loading...' : 'Load History'}
             </button>
           )}
           {isOwner && (
-            <button
-              onClick={() => setRefreshOpen(true)}
-              className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#4488FF] border border-[#4488FF]/30 rounded-sm hover:bg-[#4488FF]/10"
-            >
+            <button onClick={() => setRefreshOpen(true)}
+              className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#4488FF] border border-[#4488FF]/30 rounded-sm hover:bg-[#4488FF]/10">
               Refresh
             </button>
           )}
           {isLoggedIn ? (
             <>
-              <span className="text-[10px] font-mono text-[#5A6A7A]">
-                {user!.email} ({role})
-              </span>
-              <button
-                onClick={signOut}
-                className="text-[10px] font-mono text-[#FF4444] hover:text-[#FF6666]"
-              >
-                Logout
-              </button>
+              <span className="text-[10px] font-mono text-[#5A6A7A]">{user!.email}</span>
+              <button onClick={signOut} className="text-[10px] font-mono text-[#FF4444] hover:text-[#FF6666]">Logout</button>
             </>
           ) : (
-            <a
-              href="/realestate/login"
-              className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF]"
-            >
-              Owner Login
-            </a>
+            <a href="/realestate/login" className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF]">Owner Login</a>
           )}
         </div>
       </header>
 
-      {/* Tabs */}
-      <div className="flex-shrink-0 bg-[#0D1117] border-b border-[#1E2A3A] flex items-center gap-0 px-4 overflow-x-auto">
-        {tabs.filter(t => !t.ownerOnly || isOwner).map(t => (
-          <button
-            key={t.key}
-            onClick={() => {
-              if (t.key === 'weekly') router.push('/realestate/input/weekly');
-              else if (t.key === 'monthly') router.push('/realestate/input/monthly');
-              else if (t.key === 'baselines') router.push('/realestate/baselines');
-              else if (t.key === 'log') router.push('/realestate/log');
-              else if (t.key === 'settings') router.push('/realestate/settings');
-              else setActiveTab(t.key);
-            }}
-            className={`px-4 py-2.5 text-xs font-mono uppercase tracking-wider border-b-2 transition-colors ${
-              activeTab === t.key
-                ? 'text-[#4488FF] border-[#4488FF]'
-                : 'text-[#5A6A7A] border-transparent hover:text-[#8899AA]'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs — only show if owner */}
+      {isOwner && (
+        <div className="flex-shrink-0 bg-[#0D1117] border-b border-[#1E2A3A] flex items-center gap-0 px-4 overflow-x-auto">
+          {tabs.filter(t => !t.ownerOnly || isOwner).map(t => (
+            <button
+              key={t.key}
+              onClick={() => {
+                if (t.key === 'weekly') router.push('/realestate/input/weekly');
+                else if (t.key === 'baselines') router.push('/realestate/baselines');
+                else if (t.key === 'log') router.push('/realestate/log');
+                else if (t.key === 'settings') router.push('/realestate/settings');
+                else setActiveTab(t.key);
+              }}
+              className={`px-4 py-2.5 text-xs font-mono uppercase tracking-wider border-b-2 transition-colors ${
+                activeTab === t.key ? 'text-[#4488FF] border-[#4488FF]' : 'text-[#5A6A7A] border-transparent hover:text-[#8899AA]'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {activeTab === 'overview' && (
           <>
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+            {/* KPI Cards — 2 rows of 4 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {kpis.map(stat => (
                 <KPICard key={stat.key} stat={stat} />
               ))}
             </div>
 
-            {/* Weekly Charts */}
+            {/* Charts with event annotations */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <REChart
                 type="line"
                 title="Total DLD Transactions"
-                info="Weekly property transactions registered with Dubai Land Department. Includes sales, mortgages, and gifts. Amber line = pre-conflict average."
+                info="Weekly property transactions registered with Dubai Land Department. Amber line = pre-conflict Feb baseline."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[{ key: 'total_transactions', color: '#4488FF', name: 'Total Tx' }]}
-                baseline={{ value: baselineMap.get('total_transactions') ?? 7000, label: 'Baseline' }}
+                baseline={{ value: baselineMap.get('total_transactions') ?? 4400, label: 'Baseline' }}
+                events={events}
               />
               <REChart
                 type="area"
                 title="Off-Plan vs Secondary Split"
-                info="Composition of transactions between off-plan (under construction) and secondary (ready/resale). A shift away from off-plan signals cooling speculative demand."
+                info="Off-plan (under construction) vs secondary (ready/resale). A shift away from off-plan signals cooling speculative demand."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[
                   { key: 'offplan_transactions', color: '#4488FF', name: 'Off-Plan' },
                   { key: 'secondary_transactions', color: '#00CC66', name: 'Secondary' },
                 ]}
+                events={events}
               />
               <REChart
                 type="line"
-                title="Off-Plan Percentage"
-                info="Off-plan share of total transactions. Pre-conflict was ~60-65%. A drop below 40% is a crisis signal — means investors are pulling back."
+                title="Off-Plan %"
+                info="Off-plan share of total transactions. Pre-conflict ~65-70%. Drop below 40% = crisis signal."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[{ key: 'offplan_pct', color: '#FFB020', name: 'Off-Plan %' }]}
-                baseline={{ value: 60, label: '60% baseline' }}
+                baseline={{ value: 65, label: '65% pre-conflict' }}
+                events={events}
               />
               <REChart
                 type="line"
-                title="Mortgage vs Cash Transactions"
-                info="Mortgage (bank-financed) vs cash purchases. Dubai RE is heavily cash-driven (~80%). Divergence signals changing buyer profile."
+                title="Mortgage vs Cash"
+                info="Mortgage (bank-financed) vs cash purchases. Dubai RE ~75-80% cash. Mortgage drops = credit tightening."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[
                   { key: 'mortgage_registrations', color: '#4488FF', name: 'Mortgage' },
                   { key: 'cash_transactions', color: '#FF8C00', name: 'Cash' },
                 ]}
+                events={events}
               />
               <REChart
                 type="line"
-                title="Cash Transaction Share %"
-                info="Percentage of transactions paid in cash. Rising cash share during a downturn = distressed/urgent sales. Normal range: 75-82%."
-                data={weeklyChartData}
-                xKey="week"
-                yKeys={[{ key: 'cash_pct', color: '#FF4444', name: 'Cash %' }]}
-                baseline={{ value: 80, label: '80% baseline' }}
-              />
-              <REChart
-                type="line"
-                title="Total Value (AED Billions)"
-                info="Total weekly transaction value in AED billions. Tracks capital flow. A drop in value faster than volume = falling prices."
+                title="Transaction Value (AED B)"
+                info="Weekly transaction value in AED billions. Value dropping faster than volume = falling prices."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[{ key: 'total_value_aed_billions', color: '#00CC66', name: 'Value (B)' }]}
-                baseline={{ value: baselineMap.get('total_value_aed_billions') ?? 20, label: 'Baseline' }}
+                baseline={{ value: baselineMap.get('total_value_aed_billions') ?? 17.2, label: 'Baseline' }}
+                events={events}
               />
               <REChart
                 type="line"
                 title="DFM RE Index + Emaar"
-                info="DFM Real Estate Index (left axis) and Emaar share price (right axis). Leading indicators — stock market reprices faster than physical RE."
+                info="DFM Real Estate Index (left) and Emaar share price (right). Leading indicators — stock reprices faster than physical RE."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[
@@ -267,26 +253,38 @@ export default function RealEstateDashboard() {
                   { key: 'emaar_share_price', color: '#FFB020', name: 'Emaar (AED)' },
                 ]}
                 dualAxis
-                baseline={{ value: baselineMap.get('dfm_re_index') ?? 5200, label: 'DFM Baseline' }}
+                baseline={{ value: baselineMap.get('dfm_re_index') ?? 16200, label: 'Feb baseline' }}
+                events={events}
+              />
+              <REChart
+                type="line"
+                title="Cash Share %"
+                info="Cash as % of total transactions. Rising during downturn = distressed/urgent sales."
+                data={weeklyChartData}
+                xKey="week"
+                yKeys={[{ key: 'cash_pct', color: '#FF4444', name: 'Cash %' }]}
+                baseline={{ value: 76, label: '76% Feb avg' }}
+                events={events}
               />
               <REChart
                 type="line"
                 title="Listing Inventory"
-                info="Active listings on Bayut and Property Finder. Rising inventory = more sellers entering market, potential supply glut ahead."
+                info="Active listings on Bayut + Property Finder. Rising = more sellers entering market, supply glut risk."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[{ key: 'listing_inventory', color: '#FF8C00', name: 'Listings' }]}
-                baseline={{ value: baselineMap.get('listing_inventory') ?? 40000, label: 'Baseline' }}
+                baseline={{ value: baselineMap.get('listing_inventory') ?? 88000, label: 'Feb baseline' }}
+                events={events}
               />
             </div>
 
             {/* Data Sources */}
-            <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-4 mt-4">
-              <h3 className="text-[10px] uppercase tracking-wider text-[#5A6A7A] font-mono mb-2">Data Sources</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-[10px] font-mono text-[#5A6A7A]">
-                <div><span className="text-[#8899AA]">DLD Transactions:</span> Dubai REST / transactions.dubailand.gov.ae</div>
-                <div><span className="text-[#8899AA]">DFM RE / Emaar:</span> dfm.ae / Google Finance</div>
-                <div><span className="text-[#8899AA]">Listing Inventory:</span> bayut.com / propertyfinder.ae</div>
+            <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-[10px] font-mono text-[#5A6A7A]">
+                <span><span className="text-[#8899AA]">DLD:</span> transactions.dubailand.gov.ae</span>
+                <span><span className="text-[#8899AA]">DFM/Emaar:</span> dfm.ae</span>
+                <span><span className="text-[#8899AA]">Listings:</span> bayut.com / propertyfinder.ae</span>
+                <span><span className="text-[#8899AA]">Analysis:</span> gulfbusiness.com / economymiddleeast.com</span>
               </div>
             </div>
           </>
