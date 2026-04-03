@@ -6,6 +6,7 @@ import { useAuth } from '@/components/realestate/AuthProvider';
 import KPICard from '@/components/realestate/KPICard';
 import REChart from '@/components/realestate/REChart';
 import { EventAnnotation } from '@/components/realestate/REChart';
+import StressGauge from '@/components/realestate/StressGauge';
 import RefreshModal from '@/components/realestate/RefreshModal';
 import { KPIStat, WeeklyData, MonthlyData, Baseline } from '@/types/realestate';
 
@@ -170,6 +171,9 @@ export default function RealEstateDashboard() {
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {activeTab === 'overview' && (
           <>
+            {/* Stress Index */}
+            <StressGauge weeklyData={weeklyData} baselines={baselines} />
+
             {/* KPI Cards — 2 rows of 4 */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {kpis.map(stat => (
