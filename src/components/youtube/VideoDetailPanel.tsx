@@ -39,41 +39,50 @@ function renderAnalysis(text: string) {
   const lines = text.split("\n");
   const elements: React.ReactNode[] = [];
   let key = 0;
+  let prevWasEmpty = false;
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+
+    if (!trimmed) {
+      if (!prevWasEmpty) {
+        elements.push(<div key={key++} className="h-3" />);
+        prevWasEmpty = true;
+      }
+      continue;
+    }
+    prevWasEmpty = false;
 
     if (trimmed.startsWith("# PHASE 1")) {
       elements.push(
-        <div key={key++} className="text-[10px] font-mono text-[#00CC66]/40 uppercase tracking-widest border-b border-[#00CC66]/10 pb-1 mt-4 mb-2">
+        <div key={key++} className="text-[10px] font-mono text-[#00CC66]/40 uppercase tracking-widest border-b border-[#00CC66]/10 pb-1 mt-6 mb-3">
           Phase 1: Content Extraction
         </div>
       );
     } else if (trimmed.startsWith("# PHASE 2")) {
       elements.push(
-        <div key={key++} className="text-[10px] font-mono text-[#FF8C00]/40 uppercase tracking-widest border-b border-[#FF8C00]/10 pb-1 mt-6 mb-2">
+        <div key={key++} className="text-[10px] font-mono text-[#FF8C00]/40 uppercase tracking-widest border-b border-[#FF8C00]/10 pb-1 mt-8 mb-3">
           Phase 2: Critical Analysis
         </div>
       );
     } else if (trimmed.startsWith("## ")) {
       const title = cleanBold(trimmed.replace("## ", ""));
       elements.push(
-        <h4 key={key++} className="text-[15px] font-semibold text-[#E8EAED] mt-5 mb-2">
+        <h4 key={key++} className="text-[16px] font-bold text-[#E8EAED] mt-6 mb-3">
           {title}
         </h4>
       );
     } else if (trimmed.startsWith("# ")) {
       const title = cleanBold(trimmed.replace("# ", ""));
       elements.push(
-        <h3 key={key++} className="text-[16px] font-bold text-[#E8EAED] mt-6 mb-2">
+        <h3 key={key++} className="text-[17px] font-bold text-[#E8EAED] mt-7 mb-3">
           {title}
         </h3>
       );
     } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
       const bulletText = cleanBold(trimmed.substring(2));
       elements.push(
-        <div key={key++} className="text-[13px] text-[#E8EAED]/80 leading-relaxed flex gap-2 ml-2 mb-1">
+        <div key={key++} className="text-[13px] text-[#E8EAED]/80 leading-relaxed flex gap-2 ml-2 mb-1.5">
           <span className="text-[#00CC66] flex-shrink-0 mt-0.5">{">"}</span>
           <span>{bulletText}</span>
         </div>
@@ -81,20 +90,37 @@ function renderAnalysis(text: string) {
     } else if (trimmed.match(new RegExp("^\\d+\\."))) {
       const numText = cleanBold(trimmed);
       elements.push(
-        <p key={key++} className="text-[13px] text-[#E8EAED]/80 leading-relaxed ml-2 mb-1">
+        <p key={key++} className="text-[13px] text-[#E8EAED]/80 leading-relaxed ml-2 mb-1.5">
           {numText}
         </p>
       );
     } else {
-      elements.push(
-        <p key={key++} className="text-[13px] text-[#E8EAED]/90 leading-relaxed mb-1">
-          {cleanBold(trimmed)}
-        </p>
-      );
+      const isSubHeading =
+        trimmed.length < 80 &&
+        !trimmed.endsWith(".") &&
+        !trimmed.endsWith(",") &&
+        !trimmed.endsWith(":") &&
+        !trimmed.startsWith("(") &&
+        i + 1 < lines.length &&
+        lines[i + 1].trim().length > 80;
+
+      if (isSubHeading) {
+        elements.push(
+          <h5 key={key++} className="text-[14px] font-bold text-[#E8EAED] mt-4 mb-1">
+            {cleanBold(trimmed)}
+          </h5>
+        );
+      } else {
+        elements.push(
+          <p key={key++} className="text-[13px] text-[#E8EAED]/90 leading-relaxed mb-2">
+            {cleanBold(trimmed)}
+          </p>
+        );
+      }
     }
   }
 
-  return <div className="space-y-0.5">{elements}</div>;
+  return <div>{elements}</div>;
 }
 
 export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelProps) {
