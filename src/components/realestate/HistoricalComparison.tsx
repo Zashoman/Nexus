@@ -70,59 +70,68 @@ export default function HistoricalComparison() {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full p-3 flex items-center justify-between text-left"
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono uppercase tracking-wider text-[#5A6A7A]">
-            Historical Crisis Comparison
-          </span>
-          <span className="text-[9px] font-mono text-[#5A6A7A]/60">
-            2008 GFC · 2014 Oil · 2020 COVID · 2026 Current
-          </span>
-        </div>
-        <span className="text-[10px] font-mono text-[#4488FF]">
-          {expanded ? 'Collapse' : 'Expand'}
+    <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[11px] font-mono uppercase tracking-wider text-[#E8EAED]">
+          Historical Crisis Comparison
         </span>
-      </button>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF]"
+        >
+          {expanded ? 'Less detail' : 'Full detail'}
+        </button>
+      </div>
 
-      {expanded && (
-        <div className="px-3 pb-3 space-y-3">
-          {/* Summary bars — peak-to-trough comparison */}
-          <div className="space-y-2">
-            <div className="text-[9px] font-mono uppercase text-[#5A6A7A] tracking-wider">DFM RE Index Peak-to-Trough Decline</div>
-            {CRISES.map(c => {
-              const pct = parseInt(c.dfmDrop.replace(/[^0-9]/g, '')) || 0;
-              return (
-                <div key={c.name} className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono w-24 flex-shrink-0" style={{ color: c.color }}>{c.name}</span>
-                  <div className="flex-1 h-4 bg-[#0B0E11] rounded-sm overflow-hidden relative">
-                    <div
-                      className="h-full rounded-sm flex items-center justify-end pr-1.5"
-                      style={{ width: `${Math.min(100, pct)}%`, backgroundColor: c.color, opacity: 0.7 }}
-                    >
-                      <span className="text-[9px] font-mono text-white font-semibold">{c.dfmDrop}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Recovery time comparison */}
-          <div className="space-y-2">
-            <div className="text-[9px] font-mono uppercase text-[#5A6A7A] tracking-wider">Time to Bottom</div>
-            {CRISES.map(c => (
+      {/* Always visible: DFM decline bars */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+        {/* Left: DFM decline bars */}
+        <div className="space-y-1.5">
+          <div className="text-[9px] font-mono uppercase text-[#5A6A7A] tracking-wider mb-1">DFM RE Index Peak-to-Trough</div>
+          {CRISES.map(c => {
+            const pct = parseInt(c.dfmDrop.replace(/[^0-9]/g, '')) || 0;
+            return (
               <div key={c.name} className="flex items-center gap-2">
                 <span className="text-[10px] font-mono w-24 flex-shrink-0" style={{ color: c.color }}>{c.name}</span>
-                <span className="text-[10px] font-mono text-[#E8EAED]">{c.timeToBottom}</span>
-                <span className="text-[9px] font-mono text-[#5A6A7A]">→ Recovery: {c.recoveryTime}</span>
+                <div className="flex-1 h-5 bg-[#0B0E11] rounded-sm overflow-hidden">
+                  <div
+                    className="h-full rounded-sm flex items-center justify-end pr-2"
+                    style={{ width: `${Math.min(100, pct)}%`, backgroundColor: c.color, opacity: 0.7 }}
+                  >
+                    <span className="text-[9px] font-mono text-white font-bold">{c.dfmDrop}</span>
+                  </div>
+                </div>
+                <span className="text-[9px] font-mono text-[#5A6A7A] w-20 flex-shrink-0">{c.timeToBottom}</span>
               </div>
-            ))}
-          </div>
+            );
+          })}
+        </div>
 
+        {/* Right: Key insight + recovery */}
+        <div className="space-y-2">
+          <div className="text-[9px] font-mono uppercase text-[#5A6A7A] tracking-wider mb-1">Recovery Timeline</div>
+          {CRISES.map(c => (
+            <div key={c.name} className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: c.color }} />
+              <span className="text-[10px] font-mono text-[#8899AA] flex-shrink-0 w-20">{c.name}</span>
+              <span className="text-[10px] font-mono text-[#E8EAED]">{c.recoveryTime}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Always visible: Key insight */}
+      <div className="bg-[#0B0E11] rounded-sm p-2.5 border-l-2 border-[#4488FF] mt-3">
+        <p className="text-[10px] font-mono text-[#8899AA] leading-relaxed">
+          <span className="text-[#E8EAED] font-semibold">2026 vs history:</span> DFM crashed 35% in 14 days — faster than 2008 (took months).
+          But physical prices only down 5-10%. The difference: 87% cash buyers today vs heavily leveraged in 2008.
+          Transaction market behaving like COVID (V-shaped) not 2008 (structural collapse).
+        </p>
+      </div>
+
+      {expanded && (
+        <div className="mt-3 pt-3 border-t border-[#1E2A3A] space-y-3">
           {/* Detail table */}
           <div className="overflow-x-auto mt-2">
             <table className="w-full text-[10px] font-mono">
