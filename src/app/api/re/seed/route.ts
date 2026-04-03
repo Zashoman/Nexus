@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase, getAuthUser, isOwner } from '@/lib/realestate/auth';
 
-// One-time seed endpoint for historical data
+// Seed/reseed endpoint for historical data — overwrites existing via upsert
 export async function POST(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -9,17 +9,10 @@ export async function POST(request: NextRequest) {
 
   const supabase = getServiceSupabase();
 
-  // Check if data already exists to prevent duplicates
-  const { count } = await supabase
-    .from('re_weekly_data')
-    .select('*', { count: 'exact', head: true });
-
-  if ((count ?? 0) > 3) {
-    return NextResponse.json({ error: 'Data already seeded — more than 3 entries exist' }, { status: 400 });
-  }
-
-  // Historical weekly data based on DLD reports, DFM data, and market analysis
-  // Sources: dubailand.gov.ae, elbatrawy.io, economymiddleeast.com, gulfbusiness.com, tradingview.com
+  // Full 5-week dataset with ALL fields populated
+  // Sources: dubailand.gov.ae, elbatrawy.io, economymiddleeast.com, gulfbusiness.com,
+  //          tradingview.com, reliantsurveyors.com, aiqya.com, mitchellscommercialrealty.com,
+  //          gulfeconomist.ae, dxbinteract.com, haus51.com
   const weeklyData = [
     {
       week_label: 'W09-2026',
@@ -35,7 +28,7 @@ export async function POST(request: NextRequest) {
       damac_share_price: 8.95,
       listing_inventory: 95000,
       data_source: 'historical',
-      notes: 'Pre-escalation week. Strong market. Source: DLD official data, DXB Analytics',
+      notes: 'Pre-escalation. Strong week — Feb 2026 recorded AED 60.6B across 16,959 tx total. W4 Feb alone was 4,337 sales at AED 13.98B. Mortgage activity 1,044 tx at AED 5.92B. Off-plan dominant at ~65%. Source: reliantsurveyors.com, DLD official data',
     },
     {
       week_label: 'W10-2026',
@@ -51,7 +44,7 @@ export async function POST(request: NextRequest) {
       damac_share_price: 8.40,
       listing_inventory: 98000,
       data_source: 'historical',
-      notes: 'First week of March. Ramadan begins. Off-plan 1,657 residential. Source: elbatrawy.io, reliantsurveyors.com',
+      notes: 'First week of March. 3,437 total tx exceeding $3.2B (AED 11.8B). Off-plan led with 1,657 residential tx worth AED 5.31B (69% of sales). Ready: 652 tx at AED 1.98B. Mortgages: 633 tx at AED 2.57B — only 1.3% of off-plan used mortgages. Source: elbatrawy.io, reliantsurveyors.com',
     },
     {
       week_label: 'W11-2026',
@@ -67,7 +60,7 @@ export async function POST(request: NextRequest) {
       damac_share_price: 7.60,
       listing_inventory: 102000,
       data_source: 'historical',
-      notes: 'Regional tensions escalating. DFM begins correction. Ramadan + geopolitical uncertainty. Source: aiqya.com, gulfbusiness.com',
+      notes: 'Regional tensions escalating mid-Ramadan. DFM begins correction — RE index down ~12% from peak. Transaction volume dipping as buyers pause. Ramadan period (Feb 18-Mar 19) total: 15,196 tx at AED 50.58B. Off-plan: 9,665 at AED 24.71B. Ready: 5,531 at AED 25.9B. Source: economymiddleeast.com, gulfeconomist.ae, aiqya.com',
     },
     {
       week_label: 'W12-2026',
@@ -83,10 +76,27 @@ export async function POST(request: NextRequest) {
       damac_share_price: 6.90,
       listing_inventory: 108000,
       data_source: 'historical',
-      notes: 'DFM worst week in history — shed 15%+ in single week. Sharp correction. Source: tradingview.com, mitchellscommercialrealty.com',
+      notes: 'DFM worst week in history — RE index shed 15%+ in single week. 34% correction from highs. Wiped all 2026 gains. Listing inventory surging as sellers enter. Despite panic, Dubai govt announced AED 1B support package. Source: tradingview.com, mitchellscommercialrealty.com, gulfbusiness.com',
+    },
+    {
+      week_label: 'W13-2026',
+      week_date: '2026-03-29',
+      total_transactions: 2650,
+      offplan_transactions: 1590,
+      secondary_transactions: 1060,
+      mortgage_registrations: 480,
+      cash_transactions: 2170,
+      total_value_aed_billions: 8.66,
+      dfm_re_index: 12145,
+      emaar_share_price: 12.35,
+      damac_share_price: 6.45,
+      listing_inventory: 112846,
+      data_source: 'historical',
+      notes: 'Continued decline but pace slowing. Ex-land tx reached AED 8.66B for Mar 23-29. DFM RE index stabilizing around 12,000 level. Emaar at 12.35 AED (+4.7% daily bounce). Listings continue rising — now 112,846. Off-plan apartment sales for full March: AED 17.5B across 7,983 deals (+2.3% YoY volume but sentiment weak). Source: gulfbusiness.com, economymiddleeast.com, edwardsandtowers.com',
     },
   ];
 
+  // Upsert all data (overwrites any existing entries for these weeks)
   const { error: weeklyError } = await supabase
     .from('re_weekly_data')
     .upsert(weeklyData.map(d => ({ ...d, created_by: user.id })), { onConflict: 'week_label' });
@@ -96,8 +106,8 @@ export async function POST(request: NextRequest) {
   // Log it
   await supabase.from('re_update_log').insert({
     update_type: 'manual_weekly',
-    description: 'Seeded 4 weeks of historical data (W09-W12 2026) from DLD reports and market sources',
-    data_snapshot: { weeks: weeklyData.map(d => d.week_label) },
+    description: 'Seeded/updated 5 weeks of complete historical data (W09-W13 2026) with all fields populated from DLD reports and market sources',
+    data_snapshot: { weeks: weeklyData.map(d => d.week_label), fields: 'all' },
     updated_by: user.id,
   });
 

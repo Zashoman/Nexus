@@ -121,7 +121,7 @@ export default function RealEstateDashboard() {
           )}
         </div>
         <div className="flex items-center gap-3">
-          {isOwner && weeklyData.length < 3 && (
+          {isOwner && (
             <button
               onClick={handleSeed}
               disabled={seeding}
