@@ -20,6 +20,24 @@ export default function RealEstateDashboard() {
   const [baselines, setBaselines] = useState<Baseline[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [refreshOpen, setRefreshOpen] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+
+  const handleSeed = async () => {
+    setSeeding(true);
+    try {
+      const res = await fetch('/api/re/seed', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) alert(json.error);
+      else {
+        alert(`Seeded ${json.weeks_seeded} weeks of historical data!`);
+        fetchData();
+      }
+    } catch { alert('Seed failed'); }
+    finally { setSeeding(false); }
+  };
 
   const fetchData = useCallback(async () => {
     const [statsRes, weeklyRes, monthlyRes, baselinesRes] = await Promise.all([
@@ -114,6 +132,15 @@ export default function RealEstateDashboard() {
           )}
         </div>
         <div className="flex items-center gap-3">
+          {isOwner && weeklyData.length < 3 && (
+            <button
+              onClick={handleSeed}
+              disabled={seeding}
+              className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#00CC66] border border-[#00CC66]/30 rounded-sm hover:bg-[#00CC66]/10 disabled:opacity-50"
+            >
+              {seeding ? 'Seeding...' : 'Load History'}
+            </button>
+          )}
           {isOwner && (
             <button
               onClick={() => setRefreshOpen(true)}
@@ -185,6 +212,7 @@ export default function RealEstateDashboard() {
               <REChart
                 type="line"
                 title="Total DLD Transactions"
+                info="Weekly property transactions registered with Dubai Land Department. Includes sales, mortgages, and gifts. Amber line = pre-conflict average."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[{ key: 'total_transactions', color: '#4488FF', name: 'Total Tx' }]}
@@ -193,6 +221,7 @@ export default function RealEstateDashboard() {
               <REChart
                 type="area"
                 title="Off-Plan vs Secondary Split"
+                info="Composition of transactions between off-plan (under construction) and secondary (ready/resale). A shift away from off-plan signals cooling speculative demand."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[
@@ -203,6 +232,7 @@ export default function RealEstateDashboard() {
               <REChart
                 type="line"
                 title="Off-Plan Percentage"
+                info="Off-plan share of total transactions. Pre-conflict was ~60-65%. A drop below 40% is a crisis signal — means investors are pulling back."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[{ key: 'offplan_pct', color: '#FFB020', name: 'Off-Plan %' }]}
@@ -211,6 +241,7 @@ export default function RealEstateDashboard() {
               <REChart
                 type="line"
                 title="Mortgage vs Cash Transactions"
+                info="Mortgage (bank-financed) vs cash purchases. Dubai RE is heavily cash-driven (~80%). Divergence signals changing buyer profile."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[
@@ -221,6 +252,7 @@ export default function RealEstateDashboard() {
               <REChart
                 type="line"
                 title="Cash Transaction Share %"
+                info="Percentage of transactions paid in cash. Rising cash share during a downturn = distressed/urgent sales. Normal range: 75-82%."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[{ key: 'cash_pct', color: '#FF4444', name: 'Cash %' }]}
@@ -229,6 +261,7 @@ export default function RealEstateDashboard() {
               <REChart
                 type="line"
                 title="Total Value (AED Billions)"
+                info="Total weekly transaction value in AED billions. Tracks capital flow. A drop in value faster than volume = falling prices."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[{ key: 'total_value_aed_billions', color: '#00CC66', name: 'Value (B)' }]}
@@ -237,6 +270,7 @@ export default function RealEstateDashboard() {
               <REChart
                 type="line"
                 title="DFM RE Index + Emaar"
+                info="DFM Real Estate Index (left axis) and Emaar share price (right axis). Leading indicators — stock market reprices faster than physical RE."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[
@@ -249,6 +283,7 @@ export default function RealEstateDashboard() {
               <REChart
                 type="line"
                 title="Listing Inventory"
+                info="Active listings on Bayut and Property Finder. Rising inventory = more sellers entering market, potential supply glut ahead."
                 data={weeklyChartData}
                 xKey="week"
                 yKeys={[{ key: 'listing_inventory', color: '#FF8C00', name: 'Listings' }]}
@@ -264,6 +299,7 @@ export default function RealEstateDashboard() {
               <REChart
                 type="bar"
                 title="DEWA New Connections"
+                info="Monthly new electricity/water connections. Leading indicator of real occupancy and move-ins. Source: dewa.gov.ae"
                 data={monthlyChartData}
                 xKey="month"
                 yKeys={[{ key: 'dewa_new_connections', color: '#4488FF', name: 'DEWA' }]}
@@ -272,6 +308,7 @@ export default function RealEstateDashboard() {
               <REChart
                 type="line"
                 title="Airport Passengers (Millions)"
+                info="Monthly passenger throughput at Dubai airports. Proxy for tourism and expat movement. Source: dubaiairports.ae"
                 data={monthlyChartData}
                 xKey="month"
                 yKeys={[{ key: 'airport_passengers_millions', color: '#00CC66', name: 'Passengers (M)' }]}
@@ -280,6 +317,7 @@ export default function RealEstateDashboard() {
               <REChart
                 type="line"
                 title="Mo'asher Price Index"
+                info="Official Dubai RE price index by DXBinteract. Tracks actual transacted prices, not listings. Lagging indicator. Source: dxbinteract.com"
                 data={monthlyChartData}
                 xKey="month"
                 yKeys={[{ key: 'moasher_price_index', color: '#FFB020', name: "Mo'asher" }]}
@@ -287,6 +325,7 @@ export default function RealEstateDashboard() {
               <REChart
                 type="line"
                 title="Average Price per Sqft"
+                info="Average transacted price per square foot for apartments vs villas. Tracks actual pricing trends."
                 data={monthlyChartData}
                 xKey="month"
                 yKeys={[

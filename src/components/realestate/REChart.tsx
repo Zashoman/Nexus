@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   ResponsiveContainer,
   LineChart,
@@ -18,6 +19,7 @@ import {
 
 interface BaseChartProps {
   title: string;
+  info?: string;
   data: Record<string, unknown>[];
   xKey: string;
   baseline?: { value: number; label: string };
@@ -54,8 +56,31 @@ const tooltipStyle = {
   labelStyle: { color: '#5A6A7A', fontSize: '10px' },
 };
 
+function ChartInfoTooltip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span
+      className="relative inline-flex ml-2 cursor-help"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+      onClick={() => setShow(!show)}
+    >
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" className="text-[#5A6A7A] hover:text-[#8899AA] transition-colors">
+        <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M8 7v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="8" cy="5" r="0.75" fill="currentColor" />
+      </svg>
+      {show && (
+        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-[#1A2332] border border-[#1E2A3A] rounded-sm shadow-lg">
+          <p className="text-[10px] font-mono text-[#8899AA] leading-relaxed whitespace-normal">{text}</p>
+        </div>
+      )}
+    </span>
+  );
+}
+
 export default function REChart(props: ChartProps) {
-  const { title, data, xKey, baseline, height = 260 } = props;
+  const { title, info, data, xKey, baseline, height = 260 } = props;
 
   const baselineRef = baseline ? (
     <ReferenceLine
@@ -85,8 +110,9 @@ export default function REChart(props: ChartProps) {
 
   return (
     <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-4">
-      <h3 className="text-xs uppercase tracking-wider text-[#5A6A7A] font-mono mb-3">
+      <h3 className="text-xs uppercase tracking-wider text-[#5A6A7A] font-mono mb-3 flex items-center">
         {title}
+        {info && <ChartInfoTooltip text={info} />}
       </h3>
       <ResponsiveContainer width="100%" height={height}>
         {props.type === 'line' ? (
