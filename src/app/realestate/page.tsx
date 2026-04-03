@@ -16,7 +16,7 @@ export default function RealEstateDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [kpis, setKpis] = useState<KPIStat[]>([]);
   const [weeklyData, setWeeklyData] = useState<WeeklyData[]>([]);
-  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+  const [, setMonthlyData] = useState<MonthlyData[]>([]);
   const [baselines, setBaselines] = useState<Baseline[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [refreshOpen, setRefreshOpen] = useState(false);
@@ -79,7 +79,7 @@ export default function RealEstateDashboard() {
 
   // Prepare chart data (reverse for chronological order)
   const weeklyChartData = [...weeklyData].reverse().map(w => ({
-    week: w.week_label,
+    week: new Date(w.week_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     total_transactions: w.total_transactions,
     offplan_transactions: w.offplan_transactions,
     secondary_transactions: w.secondary_transactions,
@@ -98,20 +98,9 @@ export default function RealEstateDashboard() {
       : null,
   }));
 
-  const monthlyChartData = [...monthlyData].reverse().map(m => ({
-    month: m.month_label,
-    dewa_new_connections: m.dewa_new_connections,
-    airport_passengers_millions: m.airport_passengers_millions,
-    moasher_price_index: m.moasher_price_index,
-    avg_price_psf_apartment: m.avg_price_psf_apartment,
-    avg_price_psf_villa: m.avg_price_psf_villa,
-    rental_index: m.rental_index,
-  }));
-
   const tabs: { key: Tab; label: string; ownerOnly?: boolean }[] = [
     { key: 'overview', label: 'Overview' },
     { key: 'weekly', label: 'Weekly Input', ownerOnly: true },
-    { key: 'monthly', label: 'Monthly Input', ownerOnly: true },
     { key: 'baselines', label: 'Baselines', ownerOnly: true },
     { key: 'log', label: 'Log', ownerOnly: true },
     { key: 'settings', label: 'Settings', ownerOnly: true },
@@ -291,50 +280,6 @@ export default function RealEstateDashboard() {
               />
             </div>
 
-            {/* Monthly Charts */}
-            <div className="pt-2">
-              <h2 className="text-xs uppercase tracking-wider text-[#5A6A7A] font-mono mb-3">Monthly Indicators</h2>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <REChart
-                type="bar"
-                title="DEWA New Connections"
-                info="Monthly new electricity/water connections. Leading indicator of real occupancy and move-ins. Source: dewa.gov.ae"
-                data={monthlyChartData}
-                xKey="month"
-                yKeys={[{ key: 'dewa_new_connections', color: '#4488FF', name: 'DEWA' }]}
-                baseline={{ value: baselineMap.get('dewa_new_connections') ?? 13000, label: 'Baseline' }}
-              />
-              <REChart
-                type="line"
-                title="Airport Passengers (Millions)"
-                info="Monthly passenger throughput at Dubai airports. Proxy for tourism and expat movement. Source: dubaiairports.ae"
-                data={monthlyChartData}
-                xKey="month"
-                yKeys={[{ key: 'airport_passengers_millions', color: '#00CC66', name: 'Passengers (M)' }]}
-                baseline={{ value: baselineMap.get('airport_passengers_millions') ?? 8.5, label: 'Baseline' }}
-              />
-              <REChart
-                type="line"
-                title="Mo'asher Price Index"
-                info="Official Dubai RE price index by DXBinteract. Tracks actual transacted prices, not listings. Lagging indicator. Source: dxbinteract.com"
-                data={monthlyChartData}
-                xKey="month"
-                yKeys={[{ key: 'moasher_price_index', color: '#FFB020', name: "Mo'asher" }]}
-              />
-              <REChart
-                type="line"
-                title="Average Price per Sqft"
-                info="Average transacted price per square foot for apartments vs villas. Tracks actual pricing trends."
-                data={monthlyChartData}
-                xKey="month"
-                yKeys={[
-                  { key: 'avg_price_psf_apartment', color: '#4488FF', name: 'Apartment' },
-                  { key: 'avg_price_psf_villa', color: '#FF8C00', name: 'Villa' },
-                ]}
-              />
-            </div>
-
             {/* Data Sources */}
             <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-4 mt-4">
               <h3 className="text-[10px] uppercase tracking-wider text-[#5A6A7A] font-mono mb-2">Data Sources</h3>
@@ -342,9 +287,6 @@ export default function RealEstateDashboard() {
                 <div><span className="text-[#8899AA]">DLD Transactions:</span> Dubai REST / transactions.dubailand.gov.ae</div>
                 <div><span className="text-[#8899AA]">DFM RE / Emaar:</span> dfm.ae / Google Finance</div>
                 <div><span className="text-[#8899AA]">Listing Inventory:</span> bayut.com / propertyfinder.ae</div>
-                <div><span className="text-[#8899AA]">DEWA Connections:</span> dewa.gov.ae monthly reports</div>
-                <div><span className="text-[#8899AA]">Airport Passengers:</span> dubaiairports.ae statistics</div>
-                <div><span className="text-[#8899AA]">Mo&apos;asher Index:</span> dxbinteract.com</div>
               </div>
             </div>
           </>

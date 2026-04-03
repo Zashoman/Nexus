@@ -71,7 +71,7 @@ function ChartInfoTooltip({ text }: { text: string }) {
         <circle cx="8" cy="5" r="0.75" fill="currentColor" />
       </svg>
       {show && (
-        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-[#1A2332] border border-[#1E2A3A] rounded-sm shadow-lg">
+        <div className="absolute z-50 top-full left-0 mt-2 w-64 p-2 bg-[#1A2332] border border-[#1E2A3A] rounded-sm shadow-lg">
           <p className="text-[10px] font-mono text-[#8899AA] leading-relaxed whitespace-normal">{text}</p>
         </div>
       )}
