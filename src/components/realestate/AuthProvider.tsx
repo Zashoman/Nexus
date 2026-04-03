@@ -38,21 +38,24 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<'owner' | 'viewer' | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchRole = async (userId: string) => {
-    const { data } = await supabase
-      .from('re_users')
-      .select('role')
-      .eq('id', userId)
-      .single();
-    setRole(data?.role ?? null);
+  const fetchRole = async (token: string) => {
+    try {
+      const res = await fetch('/api/re/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setRole(data?.role ?? null);
+    } catch {
+      setRole(null);
+    }
   };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchRole(session.user.id);
+      if (session?.access_token) {
+        fetchRole(session.access_token);
       }
       setLoading(false);
     });
@@ -60,8 +63,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchRole(session.user.id);
+      if (session?.access_token) {
+        fetchRole(session.access_token);
       } else {
         setRole(null);
       }
