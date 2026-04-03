@@ -118,6 +118,23 @@ export default function RootLayout({
             </svg>
           </a>
 
+          <a
+            href="/telegram"
+            title="Telegram Intelligence"
+            className="w-8 h-8 flex items-center justify-center text-[#29B6F6] hover:text-[#4FC3F7] transition-colors rounded-sm hover:bg-[#29B6F6]/10"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              stroke="none"
+            >
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+            </svg>
+          </a>
+
         </nav>
 
         {/* Main Content */}
