@@ -118,29 +118,6 @@ export default function RootLayout({
             </svg>
           </a>
 
-          <a
-            href="/realestate"
-            title="Dubai RE Monitor"
-            className="w-8 h-8 flex items-center justify-center text-[#00CC66] hover:text-[#33DD88] transition-colors rounded-sm hover:bg-[#00CC66]/10"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 21V8l9-5 9 5v13" />
-              <path d="M9 21V14h6v7" />
-              <path d="M3 21h18" />
-              <path d="M18 8v4" />
-              <path d="M18 12l2-1" />
-            </svg>
-          </a>
         </nav>
 
         {/* Main Content */}
