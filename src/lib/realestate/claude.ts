@@ -20,7 +20,7 @@ export async function autoRefreshData(): Promise<{
     max_tokens: 1024,
     tools: [
       {
-        type: 'web_search' as 'web_search_20250305',
+        type: 'web_search_20250305',
         name: 'web_search',
       },
     ],
