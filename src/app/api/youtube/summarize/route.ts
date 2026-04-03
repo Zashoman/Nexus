@@ -29,37 +29,40 @@ export async function POST(req: NextRequest) {
   if (mode === 'full' && video.full_summary) {
     return NextResponse.json({ summary: video.full_summary });
   }
-  if (mode === 'mini' && video.mini_summary) {
+  if (mode === 'mini' && video.mini_summary && video.mini_summary.length > 50) {
     return NextResponse.json({ summary: video.mini_summary });
   }
 
-  // Fetch transcript from a free transcript API
+  // Try to get transcript from YouTube page directly (no API key needed)
   let transcript = '';
   try {
-    const transcriptRes = await fetch(
-      `https://yt-api.p.rapidapi.com/video/transcript?videoId=${video_id}`,
-      {
-        headers: {
-          'X-RapidAPI-Key': process.env.RAPIDAPI_KEY || '',
-          'X-RapidAPI-Host': 'yt-api.p.rapidapi.com',
-        },
-        signal: AbortSignal.timeout(15000),
-      }
-    );
+    const pageRes = await fetch(`https://www.youtube.com/watch?v=${video_id}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(10000),
+    });
+    const html = await pageRes.text();
 
-    if (transcriptRes.ok) {
-      const data = await transcriptRes.json();
-      if (data.subtitles) {
-        transcript = data.subtitles.map((s: { text: string }) => s.text).join(' ');
+    // Extract captions URL from the page
+    const captionMatch = html.match(/"captionTracks":\[.*?"baseUrl":"(.*?)"/);
+    if (captionMatch) {
+      const captionUrl = captionMatch[1].replace(/\\u0026/g, '&');
+      const captionRes = await fetch(captionUrl, { signal: AbortSignal.timeout(10000) });
+      const captionXml = await captionRes.text();
+
+      // Extract text from caption XML
+      const textMatches = captionXml.matchAll(/<text[^>]*>(.*?)<\/text>/g);
+      const texts: string[] = [];
+      for (const m of textMatches) {
+        texts.push(m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"'));
       }
+      transcript = texts.join(' ');
     }
   } catch {
     // Transcript fetch failed — use description as fallback
   }
 
-  // Fallback to description if no transcript
   const content = transcript.length > 100 ? transcript : (video.description || video.title);
-  const contentSlice = content.slice(0, 6000);
+  const isTranscript = transcript.length > 100;
 
   if (mode === 'mini') {
     try {
@@ -68,7 +71,7 @@ export async function POST(req: NextRequest) {
         max_tokens: 200,
         messages: [{
           role: 'user',
-          content: `Summarize this YouTube video in 2-3 sentences. Be direct and factual.\n\nTitle: ${video.title}\nChannel: ${video.channel_name}\nContent: ${contentSlice.slice(0, 1500)}`,
+          content: `Summarize this YouTube video in 2-3 sentences. Be direct and factual. Focus on what the creator is arguing or presenting.\n\nTitle: ${video.title}\nChannel: ${video.channel_name}\n${isTranscript ? 'Transcript' : 'Description'}: ${content.slice(0, 3000)}`,
         }],
       });
 
@@ -87,37 +90,7 @@ export async function POST(req: NextRequest) {
       max_tokens: 1500,
       messages: [{
         role: 'user',
-        content: `You are summarizing a YouTube video for a tech investor and entrepreneur. Create a detailed summary.
-
-Title: ${video.title}
-Channel: ${video.channel_name}
-Category: ${video.category}
-Content/Transcript: ${contentSlice}
-
-Write a 600-800 word summary using this EXACT format:
-
-OVERVIEW: [2-3 sentences — what this video covers and the creator's main argument]
-
-KEY ARGUMENTS:
-- [Main point 1 with supporting detail]
-- [Main point 2 with supporting detail]
-- [Main point 3 with supporting detail]
-- [Main point 4 if applicable]
-- [Main point 5 if applicable]
-
-DETAILED SUMMARY: [400-500 words covering the full content of the video in a flowing narrative. Include specific examples, data points, and arguments made by the creator. Do not pad — if the source content is thin, write a shorter summary.]
-
-NOTABLE QUOTES/CLAIMS:
-- [Specific claim, prediction, or notable statement 1]
-- [Specific claim, prediction, or notable statement 2]
-- [Specific claim, prediction, or notable statement 3]
-
-BOTTOM LINE: [1-2 sentences — is this worth watching in full? Who should watch it?]
-
-RULES:
-- Only summarize what is actually in the content. Never fabricate claims or data.
-- If working from a description rather than a full transcript, note this and keep it shorter.
-- Be analytical, not promotional. If the creator makes weak arguments, note that.`,
+        content: `You are summarizing a YouTube video for a tech investor and entrepreneur. Create a detailed summary.\n\nTitle: ${video.title}\nChannel: ${video.channel_name}\nCategory: ${video.category}\nSource: ${isTranscript ? 'Full transcript' : 'Video description only (transcript unavailable)'}\nContent: ${content.slice(0, 8000)}\n\nWrite a 600-800 word summary using this EXACT format:\n\nOVERVIEW: [2-3 sentences — what this video covers and the creator's main argument]\n\nKEY ARGUMENTS:\n- [Main point 1 with supporting detail]\n- [Main point 2 with supporting detail]\n- [Main point 3 with supporting detail]\n- [Main point 4 if applicable]\n- [Main point 5 if applicable]\n\nDETAILED SUMMARY: [400-500 words covering the full content of the video in a flowing narrative. Include specific examples, data points, and arguments made by the creator. Do not pad — if the source content is thin, write a shorter summary.]\n\nNOTABLE QUOTES/CLAIMS:\n- [Specific claim, prediction, or notable statement 1]\n- [Specific claim, prediction, or notable statement 2]\n- [Specific claim, prediction, or notable statement 3]\n\nBOTTOM LINE: [1-2 sentences — is this worth watching in full? Who should watch it?]\n\nRULES:\n- Only summarize what is actually in the content. Never fabricate claims or data.\n- ${isTranscript ? 'You have the full transcript — provide a thorough analysis.' : 'Working from description only — keep it concise and note that full transcript was unavailable.'}\n- Be analytical, not promotional. If the creator makes weak arguments, note that.`,
       }],
     });
 
