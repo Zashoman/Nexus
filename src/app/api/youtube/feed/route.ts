@@ -25,16 +25,16 @@ export async function GET() {
     try {
       const feed = await parser.parseURL(channel.rss_url);
 
-      // Only include videos from the last 3 days
-      const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+      // Only include videos from the last 7 days
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
       for (const item of (feed.items || []).slice(0, 10)) {
         const videoId = item.id?.split(':').pop() || '';
         if (!videoId) continue;
 
-        // Skip videos older than 3 days
+        // Skip videos older than 7 days
         const pubDate = item.isoDate || item.pubDate;
-        if (pubDate && new Date(pubDate).getTime() < threeDaysAgo) continue;
+        if (pubDate && new Date(pubDate).getTime() < sevenDaysAgo) continue;
 
         // Check if already exists
         const { data: existing } = await db
@@ -70,8 +70,8 @@ export async function GET() {
     }
   }
 
-  // Return only recent videos (last 3 days)
-  const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  // Return only recent videos (last 7 days)
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data: videos } = await db
     .from('intel_youtube_videos')
     .select('*')
