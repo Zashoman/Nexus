@@ -10,7 +10,6 @@ const SUPADATA_KEY = process.env.SUPADATA_API_KEY;
 const YT_API_KEY = process.env.YOUTUBE_API_KEY;
 
 async function getVideoContent(videoId: string): Promise<{ content: string; isTranscript: boolean }> {
-  // Method 1: Supadata API — paid, reliable transcript service
   if (SUPADATA_KEY) {
     try {
       const res = await fetch(
@@ -31,7 +30,6 @@ async function getVideoContent(videoId: string): Promise<{ content: string; isTr
     }
   }
 
-  // Method 2: YouTube Data API — get full description, tags, duration
   if (YT_API_KEY) {
     try {
       const res = await fetch(
@@ -44,17 +42,9 @@ async function getVideoContent(videoId: string): Promise<{ content: string; isTr
           const snippet = data.items[0].snippet;
           const details = data.items[0].contentDetails;
           const parts: string[] = [];
-
-          if (snippet.description) {
-            parts.push(`Description: ${snippet.description}`);
-          }
-          if (snippet.tags && snippet.tags.length > 0) {
-            parts.push(`Tags: ${snippet.tags.join(', ')}`);
-          }
-          if (details && details.duration) {
-            parts.push(`Duration: ${details.duration}`);
-          }
-
+          if (snippet.description) parts.push(`Description: ${snippet.description}`);
+          if (snippet.tags && snippet.tags.length > 0) parts.push(`Tags: ${snippet.tags.join(', ')}`);
+          if (details && details.duration) parts.push(`Duration: ${details.duration}`);
           const content = parts.join('\n\n');
           if (content.length > 50) return { content, isTranscript: false };
         }
@@ -105,14 +95,14 @@ export async function POST(req: NextRequest) {
     try {
       const response = await anthropic.messages.create({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 200,
+        max_tokens: 400,
         messages: [{
           role: 'user',
-          content: `Summarize this YouTube video in 2-3 sentences. Be direct and factual. Focus on what the creator is arguing or presenting.
+          content: `Summarize this YouTube video in 4-6 sentences. Be direct and factual. Cover the main argument, key supporting points, and the conclusion or call to action. Include any specific numbers, predictions, or data points mentioned.
 
 Title: ${video.title}
 Channel: ${video.channel_name}
-${isTranscript ? 'Transcript' : 'Video Info'}: ${content.slice(0, 3000)}`,
+${isTranscript ? 'Transcript' : 'Video Info'}: ${content.slice(0, 4000)}`,
         }],
       });
 
