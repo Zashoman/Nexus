@@ -92,16 +92,7 @@ export default function RealEstateDashboard() {
       : null,
   }));
 
-  // Event annotations — key dates on timeline
   const events: EventAnnotation[] = [];
-  if (weeklyChartData.length > 0) {
-    const conflictDate = weeklyChartData.find(d => d.week === 'Mar 8');
-    const bottomDate = weeklyChartData.find(d => d.week === 'Mar 15');
-    const supportDate = weeklyChartData.find(d => d.week === 'Mar 22');
-    if (conflictDate) events.push({ xValue: 'Mar 8', label: 'CONFLICT', color: '#FF4444' });
-    if (bottomDate) events.push({ xValue: 'Mar 15', label: 'DFM BOTTOM', color: '#FF8C00' });
-    if (supportDate) events.push({ xValue: 'Mar 22', label: 'GOVT SUPPORT', color: '#00CC66' });
-  }
 
   const tabs: { key: Tab; label: string; ownerOnly?: boolean }[] = [
     { key: 'overview', label: 'Overview' },
