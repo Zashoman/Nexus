@@ -7,6 +7,7 @@ import KPICard from '@/components/realestate/KPICard';
 import REChart from '@/components/realestate/REChart';
 import { EventAnnotation } from '@/components/realestate/REChart';
 import StressGauge from '@/components/realestate/StressGauge';
+import HistoricalComparison from '@/components/realestate/HistoricalComparison';
 import RefreshModal from '@/components/realestate/RefreshModal';
 import { KPIStat, WeeklyData, MonthlyData, Baseline } from '@/types/realestate';
 
@@ -181,7 +182,10 @@ export default function RealEstateDashboard() {
               ))}
             </div>
 
-            {/* Charts with event annotations */}
+            {/* Historical comparison */}
+            <HistoricalComparison />
+
+            {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <REChart
                 type="line"
