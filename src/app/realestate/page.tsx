@@ -44,14 +44,10 @@ export default function RealEstateDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/realestate/login');
-      return;
-    }
-    if (user) fetchData();
-  }, [user, loading, router, fetchData]);
+    fetchData();
+  }, [fetchData]);
 
-  if (loading) {
+  if (loading && !kpis.length) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-sm font-mono text-[#5A6A7A]">Loading...</div>
@@ -59,9 +55,8 @@ export default function RealEstateDashboard() {
     );
   }
 
-  if (!user) return null;
-
   const isOwner = role === 'owner';
+  const isLoggedIn = !!user;
   const baselineMap = new Map(baselines.map(b => [b.metric_key, b.baseline_value]));
 
   // Prepare chart data (reverse for chronological order)
@@ -100,7 +95,7 @@ export default function RealEstateDashboard() {
     { key: 'weekly', label: 'Weekly Input', ownerOnly: true },
     { key: 'monthly', label: 'Monthly Input', ownerOnly: true },
     { key: 'baselines', label: 'Baselines', ownerOnly: true },
-    { key: 'log', label: 'Log' },
+    { key: 'log', label: 'Log', ownerOnly: true },
     { key: 'settings', label: 'Settings', ownerOnly: true },
   ];
 
@@ -127,15 +122,26 @@ export default function RealEstateDashboard() {
               Refresh
             </button>
           )}
-          <span className="text-[10px] font-mono text-[#5A6A7A]">
-            {user.email} ({role})
-          </span>
-          <button
-            onClick={signOut}
-            className="text-[10px] font-mono text-[#FF4444] hover:text-[#FF6666]"
-          >
-            Logout
-          </button>
+          {isLoggedIn ? (
+            <>
+              <span className="text-[10px] font-mono text-[#5A6A7A]">
+                {user!.email} ({role})
+              </span>
+              <button
+                onClick={signOut}
+                className="text-[10px] font-mono text-[#FF4444] hover:text-[#FF6666]"
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <a
+              href="/realestate/login"
+              className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF]"
+            >
+              Owner Login
+            </a>
+          )}
         </div>
       </header>
 
