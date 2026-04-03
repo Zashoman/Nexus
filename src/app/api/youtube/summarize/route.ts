@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import Anthropic from '@anthropic-ai/sdk';
+import { YoutubeTranscript } from 'youtube-transcript';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
+
+async function getTranscript(videoId: string): Promise<string> {
+  try {
+    const items = await YoutubeTranscript.fetchTranscript(videoId);
+    return items.map((item: { text: string }) => item.text).join(' ');
+  } catch {
+    return '';
+  }
+}
 
 export async function POST(req: NextRequest) {
   const { video_id, mode } = await req.json() as { video_id: string; mode: 'mini' | 'full' };
@@ -25,7 +35,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Video not found' }, { status: 404 });
   }
 
-  // Return cached summary if exists
   if (mode === 'full' && video.full_summary) {
     return NextResponse.json({ summary: video.full_summary });
   }
@@ -33,34 +42,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ summary: video.mini_summary });
   }
 
-  // Try to get transcript from YouTube page directly (no API key needed)
-  let transcript = '';
-  try {
-    const pageRes = await fetch(`https://www.youtube.com/watch?v=${video_id}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(10000),
-    });
-    const html = await pageRes.text();
-
-    // Extract captions URL from the page
-    const captionMatch = html.match(/"captionTracks":\[.*?"baseUrl":"(.*?)"/);
-    if (captionMatch) {
-      const captionUrl = captionMatch[1].replace(/\\u0026/g, '&');
-      const captionRes = await fetch(captionUrl, { signal: AbortSignal.timeout(10000) });
-      const captionXml = await captionRes.text();
-
-      // Extract text from caption XML
-      const textMatches = captionXml.matchAll(/<text[^>]*>(.*?)<\/text>/g);
-      const texts: string[] = [];
-      for (const m of textMatches) {
-        texts.push(m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"'));
-      }
-      transcript = texts.join(' ');
-    }
-  } catch {
-    // Transcript fetch failed — use description as fallback
-  }
-
+  // Fetch transcript
+  const transcript = await getTranscript(video_id);
   const content = transcript.length > 100 ? transcript : (video.description || video.title);
   const isTranscript = transcript.length > 100;
 
@@ -83,14 +66,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Full summary mode
   try {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1500,
       messages: [{
         role: 'user',
-        content: `You are summarizing a YouTube video for a tech investor and entrepreneur. Create a detailed summary.\n\nTitle: ${video.title}\nChannel: ${video.channel_name}\nCategory: ${video.category}\nSource: ${isTranscript ? 'Full transcript' : 'Video description only (transcript unavailable)'}\nContent: ${content.slice(0, 8000)}\n\nWrite a 600-800 word summary using this EXACT format:\n\nOVERVIEW: [2-3 sentences — what this video covers and the creator's main argument]\n\nKEY ARGUMENTS:\n- [Main point 1 with supporting detail]\n- [Main point 2 with supporting detail]\n- [Main point 3 with supporting detail]\n- [Main point 4 if applicable]\n- [Main point 5 if applicable]\n\nDETAILED SUMMARY: [400-500 words covering the full content of the video in a flowing narrative. Include specific examples, data points, and arguments made by the creator. Do not pad — if the source content is thin, write a shorter summary.]\n\nNOTABLE QUOTES/CLAIMS:\n- [Specific claim, prediction, or notable statement 1]\n- [Specific claim, prediction, or notable statement 2]\n- [Specific claim, prediction, or notable statement 3]\n\nBOTTOM LINE: [1-2 sentences — is this worth watching in full? Who should watch it?]\n\nRULES:\n- Only summarize what is actually in the content. Never fabricate claims or data.\n- ${isTranscript ? 'You have the full transcript — provide a thorough analysis.' : 'Working from description only — keep it concise and note that full transcript was unavailable.'}\n- Be analytical, not promotional. If the creator makes weak arguments, note that.`,
+        content: `You are summarizing a YouTube video for a tech investor and entrepreneur. Create a detailed summary.\n\nTitle: ${video.title}\nChannel: ${video.channel_name}\nCategory: ${video.category}\nSource: ${isTranscript ? 'Full transcript' : 'Video description only (transcript unavailable)'}\nContent: ${content.slice(0, 8000)}\n\nWrite a 600-800 word summary using this EXACT format:\n\nOVERVIEW: [2-3 sentences \u2014 what this video covers and the creator's main argument]\n\nKEY ARGUMENTS:\n- [Main point 1 with supporting detail]\n- [Main point 2 with supporting detail]\n- [Main point 3 with supporting detail]\n- [Main point 4 if applicable]\n- [Main point 5 if applicable]\n\nDETAILED SUMMARY: [400-500 words covering the full content of the video in a flowing narrative. Include specific examples, data points, and arguments made by the creator. Do not pad \u2014 if the source content is thin, write a shorter summary.]\n\nNOTABLE QUOTES/CLAIMS:\n- [Specific claim, prediction, or notable statement 1]\n- [Specific claim, prediction, or notable statement 2]\n- [Specific claim, prediction, or notable statement 3]\n\nBOTTOM LINE: [1-2 sentences \u2014 is this worth watching in full? Who should watch it?]\n\nRULES:\n- Only summarize what is actually in the content. Never fabricate claims or data.\n- ${isTranscript ? 'You have the full transcript \u2014 provide a thorough analysis.' : 'Working from description only \u2014 keep it concise and note that full transcript was unavailable.'}\n- Be analytical, not promotional. If the creator makes weak arguments, note that.`,
       }],
     });
 
