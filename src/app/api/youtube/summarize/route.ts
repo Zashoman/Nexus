@@ -117,41 +117,86 @@ ${isTranscript ? 'Transcript' : 'Video Info'}: ${content.slice(0, 4000)}`,
   try {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1500,
+      max_tokens: 5000,
       messages: [{
         role: 'user',
-        content: `You are summarizing a YouTube video for a tech investor and entrepreneur. Create a detailed summary.
+        content: `Analyze the following video transcript. This analysis has two phases: first extract the content in depth (approximately 70% of your response), then critically evaluate it (approximately 30%). Phase 1 should be comprehensive and detailed — the reader should feel like they watched the entire video. Phase 2 should be sharp and concise.
 
 Title: ${video.title}
 Channel: ${video.channel_name}
 Category: ${video.category}
-Source: ${isTranscript ? 'Full transcript' : 'Video description and metadata'}
-Content: ${content.slice(0, 12000)}
+${isTranscript ? 'TRANSCRIPT' : 'VIDEO DESCRIPTION'}:
+${content.slice(0, 15000)}
 
-Write a 600-800 word summary using this EXACT format:
+---
 
-OVERVIEW: [2-3 sentences — what this video covers and the creator's main argument]
+# PHASE 1: CONTENT EXTRACTION
 
-KEY ARGUMENTS:
-- [Main point 1 with supporting detail]
-- [Main point 2 with supporting detail]
-- [Main point 3 with supporting detail]
-- [Main point 4 if applicable]
-- [Main point 5 if applicable]
+## MAIN THESIS
 
-DETAILED SUMMARY: [400-500 words covering the full content of the video in a flowing narrative. Include specific examples, data points, and arguments made by the creator.]
+What is the speaker's central argument or prediction? Explain this in two full paragraphs. The first paragraph should state the thesis clearly — what the speaker believes is happening or going to happen, and the core reasoning behind it. The second paragraph should explain WHY the speaker holds this view — what evidence, experience, or worldview drives their conviction. Include any framing language the speaker uses to position their argument. The goal is that someone reading this section understands the full thesis as well as if they heard the speaker explain it themselves.
 
-NOTABLE QUOTES/CLAIMS:
-- [Specific claim, prediction, or notable statement 1]
-- [Specific claim, prediction, or notable statement 2]
-- [Specific claim, prediction, or notable statement 3]
+## KEY NARRATIVES
 
-BOTTOM LINE: [1-2 sentences — is this worth watching in full? Who should watch it?]
+What are the 3-5 major narratives or themes the speaker builds their argument around? For each narrative, write 2-3 paragraphs that explain:
+- What the narrative is and how the speaker frames it
+- The logic chain — what causes what, and how does this narrative connect to the main thesis?
+- What evidence or examples the speaker provides to support this narrative
+- How this narrative interacts with or reinforces the other narratives
+
+These should read like mini-essays, not bullet points.
+
+## SUPPORTING POINTS
+
+List the 8-20 most important supporting arguments, insights, or claims the speaker makes. For each point:
+- State the point clearly in one sentence
+- Follow with 1-2 sentences of context explaining why the speaker raised it, how it connects to the broader thesis, and any nuance or caveats they added
+
+Flag which points are the strongest pillars of the argument versus secondary observations. Order them by importance to the overall thesis.
+
+## DATA POINTS & SPECIFIC CLAIMS
+
+Extract every specific number, statistic, date, price, percentage, name, company, historical reference, or verifiable factual claim the speaker makes. Present these as a clean list. If the speaker attributes data to a specific source, note that source.
+
+## ACTIONABLE IDEAS & RECOMMENDATIONS
+
+What specific actions, trades, investments, strategies, or decisions does the speaker recommend or imply? For each, note the timeframe (if given), the reasoning behind it, and any conditions or caveats. If the speaker names specific tickers, assets, sectors, or strategies, list them explicitly.
+
+---
+
+# PHASE 2: CRITICAL ANALYSIS
+
+Step outside the speaker's framing entirely. Be the skeptical analyst in the room.
+
+## FACT CHECK
+
+Take the most important data points and specific claims from Phase 1 and evaluate them. Rate each:
+- **VERIFIED** — confirmed by credible sources within your knowledge
+- **PARTIALLY TRUE** — directionally correct but specific numbers or framing may be misleading
+- **UNVERIFIED** — cannot confirm, or claim is too vague to check
+- **FALSE** — contradicted by credible evidence
+
+For any claim rated less than VERIFIED, explain what the actual data shows. Note: this fact check is based on training data, not real-time search. Flag any claims that would require real-time data to verify.
+
+## STRONGEST ARGUMENTS
+
+Which 2-3 arguments from this video are most compelling? Why?
+
+## WEAKEST ARGUMENTS
+
+Which 2-3 arguments are the weakest, most speculative, or most likely to age poorly? What would need to be true for these arguments to hold?
+
+## OVERALL ASSESSMENT
+
+One paragraph. How credible is this analysis overall? What is the speaker's track record? What biases should the viewer be aware of? Would you recommend this video to a serious investor?
+
+---
 
 RULES:
-- Only summarize what is actually in the content. Never fabricate claims or data.
-- ${isTranscript ? 'You have the full transcript — provide a thorough analysis.' : 'Working from description and metadata — analyze what the video covers based on available info.'}
-- Be analytical, not promotional. If the creator makes weak arguments, note that.`,
+- Only analyze what is ACTUALLY in the provided content. Never fabricate claims, data, or quotes.
+- ${isTranscript ? 'You have the full transcript — provide a thorough, comprehensive analysis.' : 'Working from description only — note that transcript was unavailable and keep analysis proportional to available content.'}
+- Be analytical and objective. If the speaker makes weak arguments, say so clearly.
+- Use direct quotes from the transcript where possible to support your analysis.`,
       }],
     });
 
