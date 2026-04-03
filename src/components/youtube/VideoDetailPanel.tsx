@@ -151,36 +151,36 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
   return (
     <div className="flex-1 bg-[#141820] overflow-y-auto border-l border-[#1E2A3A]">
       {onClose && (
-        <button onClick={onClose} className="lg:hidden absolute top-2 right-2 text-[#5A6A7A] hover:text-[#E8EAED] text-lg px-2 cursor-pointer">✕</button>
+        <button onClick={onClose} className="lg:hidden absolute top-2 right-2 text-[#5A6A7A] hover:text-[#E8EAED] text-lg px-2 cursor-pointer">&#10005;</button>
       )}
 
       <div className="p-4 space-y-4">
-        {/* Thumbnail */}
-        {video.thumbnail_url && (
-          <div className="w-full aspect-video bg-[#0B0E11] rounded-sm overflow-hidden">
-            <img src={video.thumbnail_url.replace('mqdefault', 'hqdefault')} alt="" className="w-full h-full object-cover" />
-          </div>
-        )}
-
         {/* Title */}
         <h2 className="text-lg font-semibold text-[#E8EAED] leading-tight">{video.title}</h2>
 
-        {/* Meta */}
-        <div className="flex items-center gap-3 text-xs font-mono">
-          <span className="text-[#FF4444] font-bold">{video.channel_name}</span>
-          <span className="text-[#5A6A7A] capitalize">{video.category}</span>
-          {video.published_at && <span className="text-[#5A6A7A]">{timeAgo(video.published_at)}</span>}
+        {/* Meta + small thumbnail row */}
+        <div className="flex items-start gap-3">
+          {video.thumbnail_url && (
+            <div className="flex-shrink-0 w-[140px] h-[79px] bg-[#0B0E11] rounded-sm overflow-hidden">
+              <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" />
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-3 text-xs font-mono">
+              <span className="text-[#FF4444] font-bold">{video.channel_name}</span>
+              <span className="text-[#5A6A7A] capitalize">{video.category}</span>
+              {video.published_at && <span className="text-[#5A6A7A]">{timeAgo(video.published_at)}</span>}
+            </div>
+            <a
+              href={video.video_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono bg-[#FF4444]/10 text-[#FF4444] rounded-sm hover:bg-[#FF4444]/20 transition-colors"
+            >
+              &#9654; Watch on YouTube
+            </a>
+          </div>
         </div>
-
-        {/* Watch button */}
-        <a
-          href={video.video_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono bg-[#FF4444]/10 text-[#FF4444] rounded-sm hover:bg-[#FF4444]/20 transition-colors"
-        >
-          ▶ Watch on YouTube
-        </a>
 
         {/* Mini Summary */}
         <div className="space-y-1">
