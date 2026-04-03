@@ -6,19 +6,55 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
 
-async function getTranscript(videoId: string): Promise<string> {
-  // Method 1: Try youtube-transcript package
+const YT_API_KEY = process.env.YOUTUBE_API_KEY;
+
+async function getVideoContent(videoId: string): Promise<{ content: string; isTranscript: boolean }> {
+  // Method 1: Try youtube-transcript package for full transcript
   try {
     const { YoutubeTranscript } = await import('youtube-transcript');
     const items = await YoutubeTranscript.fetchTranscript(videoId);
     if (items && items.length > 0) {
-      return items.map((item: { text: string }) => item.text).join(' ');
+      const transcript = items.map((item: { text: string }) => item.text).join(' ');
+      if (transcript.length > 100) return { content: transcript, isTranscript: true };
     }
   } catch {
     // Failed, try next method
   }
 
-  // Method 2: Try Invidious instances for captions
+  // Method 2: YouTube Data API — get full description, tags, duration
+  if (YT_API_KEY) {
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet,contentDetails&key=${YT_API_KEY}`,
+        { signal: AbortSignal.timeout(10000) }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.items && data.items.length > 0) {
+          const snippet = data.items[0].snippet;
+          const details = data.items[0].contentDetails;
+          const parts: string[] = [];
+
+          if (snippet.description) {
+            parts.push(`Description: ${snippet.description}`);
+          }
+          if (snippet.tags && snippet.tags.length > 0) {
+            parts.push(`Tags: ${snippet.tags.join(', ')}`);
+          }
+          if (details && details.duration) {
+            parts.push(`Duration: ${details.duration}`);
+          }
+
+          const content = parts.join('\n\n');
+          if (content.length > 50) return { content, isTranscript: false };
+        }
+      }
+    } catch {
+      // Failed, try next method
+    }
+  }
+
+  // Method 3: Invidious fallback
   const invidiousInstances = [
     'https://vid.puffyan.us',
     'https://invidious.lunar.icu',
@@ -28,57 +64,13 @@ async function getTranscript(videoId: string): Promise<string> {
   for (const instance of invidiousInstances) {
     try {
       const res = await fetch(
-        `${instance}/api/v1/captions/${videoId}`,
-        { signal: AbortSignal.timeout(8000) }
-      );
-      if (res.ok) {
-        const captions = await res.json();
-        if (captions && captions.captions && captions.captions.length > 0) {
-          const enCaption = captions.captions.find(
-            (c: { language_code: string }) => c.language_code === 'en' || c.language_code === 'en-US'
-          ) || captions.captions[0];
-
-          if (enCaption && enCaption.url) {
-            const captionUrl = enCaption.url.startsWith('http')
-              ? enCaption.url
-              : `${instance}${enCaption.url}`;
-            const captionRes = await fetch(`${captionUrl}&fmt=vtt`, {
-              signal: AbortSignal.timeout(8000),
-            });
-            if (captionRes.ok) {
-              const vtt = await captionRes.text();
-              const lines = vtt.split('\n');
-              const textLines = lines.filter(
-                (line: string) =>
-                  line.trim() &&
-                  !line.includes('-->') &&
-                  !line.startsWith('WEBVTT') &&
-                  !line.match(/^\d+$/) &&
-                  !line.startsWith('Kind:') &&
-                  !line.startsWith('Language:')
-              );
-              const transcript = textLines.join(' ').replace(/<[^>]*>/g, '').trim();
-              if (transcript.length > 100) return transcript;
-            }
-          }
-        }
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  // Method 3: Try getting full description from Invidious
-  for (const instance of invidiousInstances) {
-    try {
-      const res = await fetch(
         `${instance}/api/v1/videos/${videoId}`,
         { signal: AbortSignal.timeout(8000) }
       );
       if (res.ok) {
         const data = await res.json();
         if (data.description && data.description.length > 50) {
-          return `[Video Description] ${data.description}`;
+          return { content: `Description: ${data.description}`, isTranscript: false };
         }
       }
     } catch {
@@ -86,7 +78,7 @@ async function getTranscript(videoId: string): Promise<string> {
     }
   }
 
-  return '';
+  return { content: '', isTranscript: false };
 }
 
 export async function POST(req: NextRequest) {
@@ -115,9 +107,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ summary: video.mini_summary });
   }
 
-  const transcript = await getTranscript(video_id);
-  const content = transcript.length > 100 ? transcript : (video.description || '');
-  const isTranscript = transcript.length > 100 && !transcript.startsWith('[Video Description]');
+  const { content, isTranscript } = await getVideoContent(video_id);
   const hasContent = content.length > 50;
 
   if (!hasContent) {
@@ -136,7 +126,7 @@ export async function POST(req: NextRequest) {
 
 Title: ${video.title}
 Channel: ${video.channel_name}
-${isTranscript ? 'Transcript' : 'Description'}: ${content.slice(0, 3000)}`,
+${isTranscript ? 'Transcript' : 'Video Info'}: ${content.slice(0, 3000)}`,
         }],
       });
 
@@ -159,7 +149,7 @@ ${isTranscript ? 'Transcript' : 'Description'}: ${content.slice(0, 3000)}`,
 Title: ${video.title}
 Channel: ${video.channel_name}
 Category: ${video.category}
-Source: ${isTranscript ? 'Full transcript' : 'Video description (transcript unavailable)'}
+Source: ${isTranscript ? 'Full transcript' : 'Video description and metadata'}
 Content: ${content.slice(0, 8000)}
 
 Write a 600-800 word summary using this EXACT format:
@@ -184,7 +174,7 @@ BOTTOM LINE: [1-2 sentences — is this worth watching in full? Who should watch
 
 RULES:
 - Only summarize what is actually in the content. Never fabricate claims or data.
-- ${isTranscript ? 'You have the full transcript — provide a thorough analysis.' : 'Working from description only — keep it concise and note that full transcript was unavailable.'}
+- ${isTranscript ? 'You have the full transcript — provide a thorough analysis.' : 'Working from description and metadata — analyze what the video covers based on available info. Note if transcript was unavailable.'}
 - Be analytical, not promotional. If the creator makes weak arguments, note that.`,
       }],
     });
