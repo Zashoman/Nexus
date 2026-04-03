@@ -6,19 +6,29 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 });
 
+const SUPADATA_KEY = process.env.SUPADATA_API_KEY;
 const YT_API_KEY = process.env.YOUTUBE_API_KEY;
 
 async function getVideoContent(videoId: string): Promise<{ content: string; isTranscript: boolean }> {
-  // Method 1: Try youtube-transcript package for full transcript
-  try {
-    const { YoutubeTranscript } = await import('youtube-transcript');
-    const items = await YoutubeTranscript.fetchTranscript(videoId);
-    if (items && items.length > 0) {
-      const transcript = items.map((item: { text: string }) => item.text).join(' ');
-      if (transcript.length > 100) return { content: transcript, isTranscript: true };
+  // Method 1: Supadata API — paid, reliable transcript service
+  if (SUPADATA_KEY) {
+    try {
+      const res = await fetch(
+        `https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}&text=true`,
+        {
+          headers: { 'x-api-key': SUPADATA_KEY },
+          signal: AbortSignal.timeout(30000),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.content && data.content.length > 100) {
+          return { content: data.content, isTranscript: true };
+        }
+      }
+    } catch {
+      // Failed, try next method
     }
-  } catch {
-    // Failed, try next method
   }
 
   // Method 2: YouTube Data API — get full description, tags, duration
@@ -50,31 +60,7 @@ async function getVideoContent(videoId: string): Promise<{ content: string; isTr
         }
       }
     } catch {
-      // Failed, try next method
-    }
-  }
-
-  // Method 3: Invidious fallback
-  const invidiousInstances = [
-    'https://vid.puffyan.us',
-    'https://invidious.lunar.icu',
-    'https://inv.tux.pizza',
-  ];
-
-  for (const instance of invidiousInstances) {
-    try {
-      const res = await fetch(
-        `${instance}/api/v1/videos/${videoId}`,
-        { signal: AbortSignal.timeout(8000) }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (data.description && data.description.length > 50) {
-          return { content: `Description: ${data.description}`, isTranscript: false };
-        }
-      }
-    } catch {
-      continue;
+      // Failed
     }
   }
 
@@ -150,7 +136,7 @@ Title: ${video.title}
 Channel: ${video.channel_name}
 Category: ${video.category}
 Source: ${isTranscript ? 'Full transcript' : 'Video description and metadata'}
-Content: ${content.slice(0, 8000)}
+Content: ${content.slice(0, 12000)}
 
 Write a 600-800 word summary using this EXACT format:
 
@@ -163,7 +149,7 @@ KEY ARGUMENTS:
 - [Main point 4 if applicable]
 - [Main point 5 if applicable]
 
-DETAILED SUMMARY: [400-500 words covering the full content of the video in a flowing narrative. Include specific examples, data points, and arguments made by the creator. Do not pad — if the source content is thin, write a shorter summary.]
+DETAILED SUMMARY: [400-500 words covering the full content of the video in a flowing narrative. Include specific examples, data points, and arguments made by the creator.]
 
 NOTABLE QUOTES/CLAIMS:
 - [Specific claim, prediction, or notable statement 1]
@@ -174,7 +160,7 @@ BOTTOM LINE: [1-2 sentences — is this worth watching in full? Who should watch
 
 RULES:
 - Only summarize what is actually in the content. Never fabricate claims or data.
-- ${isTranscript ? 'You have the full transcript — provide a thorough analysis.' : 'Working from description and metadata — analyze what the video covers based on available info. Note if transcript was unavailable.'}
+- ${isTranscript ? 'You have the full transcript — provide a thorough analysis.' : 'Working from description and metadata — analyze what the video covers based on available info.'}
 - Be analytical, not promotional. If the creator makes weak arguments, note that.`,
       }],
     });
