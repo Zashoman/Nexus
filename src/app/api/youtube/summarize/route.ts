@@ -14,7 +14,7 @@ async function getVideoContent(videoId: string): Promise<{ content: string; isTr
   if (SUPADATA_KEY) {
     try {
       const res = await fetch(
-        `https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}&text=true`,
+        `https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}&lang=en&text=true`,
         {
           headers: { 'x-api-key': SUPADATA_KEY },
           signal: AbortSignal.timeout(30000),
