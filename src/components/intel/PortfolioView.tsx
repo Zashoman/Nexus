@@ -46,6 +46,7 @@ export default function PortfolioView() {
   const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [news, setNews] = useState<Record<string, CompanyNews[]>>({});
+  const [earnings, setEarnings] = useState<Record<string, { date: string; estimate: number | null }>>({});
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -74,6 +75,7 @@ export default function PortfolioView() {
       setWatchlist(watchData.watchlist || []);
       setQuotes(stockData.quotes || {});
       setNews(stockData.news || {});
+      setEarnings(stockData.earnings || {});
     } catch {
       // Silent
     } finally {
@@ -119,6 +121,7 @@ export default function PortfolioView() {
   const selectedEntry = watchlist.find((w: WatchlistEntry) => w.symbol === selectedSymbol);
   const selectedQuote = selectedSymbol ? quotes[selectedSymbol] : null;
   const selectedNews = selectedSymbol ? (news[selectedSymbol] || []) : [];
+  const selectedEarnings = selectedSymbol ? earnings[selectedSymbol] : null;
 
   if (loading) {
     return (
@@ -220,6 +223,15 @@ export default function PortfolioView() {
                     <span className="text-[#5A6A7A]">Low</span><span className="text-[#8899AA] text-right">{selectedQuote.low.toFixed(2)}</span>
                     <span className="text-[#5A6A7A]">Prev Close</span><span className="text-[#8899AA] text-right">{selectedQuote.prevClose.toFixed(2)}</span>
                   </div>
+                </div>
+              )}
+              {selectedEarnings && (
+                <div className="bg-[#FF8C00]/5 border border-[#FF8C00]/20 rounded-sm p-2">
+                  <h4 className="text-[10px] font-mono text-[#FF8C00] uppercase tracking-wider mb-1">Next Earnings</h4>
+                  <p className="text-[13px] font-mono text-[#E8EAED]">{selectedEarnings.date}</p>
+                  {selectedEarnings.estimate != null && (
+                    <p className="text-[10px] font-mono text-[#5A6A7A]">EPS Est: ${selectedEarnings.estimate.toFixed(2)}</p>
+                  )}
                 </div>
               )}
               {selectedEntry.keywords.length > 0 && (
