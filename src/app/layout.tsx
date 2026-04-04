@@ -135,29 +135,6 @@ export default function RootLayout({
             </svg>
           </a>
 
-          <div className="w-6 border-t border-[#1E2A3A]" />
-
-          <a
-            href="/intel?tab=portfolio"
-            title="Portfolio"
-            className="w-8 h-8 flex items-center justify-center text-[#00CC66] hover:text-[#33DD88] transition-colors rounded-sm hover:bg-[#00CC66]/10"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-              <polyline points="16 7 22 7 22 13" />
-            </svg>
-          </a>
-
-          <a
-            href="/realestate"
-            title="Real Estate Tracker"
-            className="w-8 h-8 flex items-center justify-center text-[#8899AA] hover:text-[#AABBCC] transition-colors rounded-sm hover:bg-[#8899AA]/10"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-          </a>
 
         </nav>
 
