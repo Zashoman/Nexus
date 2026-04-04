@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { IntelItem, IntelBeliefEvidence, RatingValue } from '@/types/intel';
 import RatingButtons from './RatingButtons';
 
@@ -106,6 +106,88 @@ function renderStructuredSummary(text: string) {
       )}
     </div>
   );
+}
+
+function cleanBold(text: string): string {
+  return text.replace(new RegExp("\\*\\*([^*]+)\\*\\*", "g"), "$1");
+}
+
+function renderDeepAnalysis(text: string) {
+  const lines = text.split("\n");
+  const elements: React.ReactNode[] = [];
+  let key = 0;
+  let prevWasEmpty = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+
+    if (!trimmed) {
+      if (!prevWasEmpty) {
+        elements.push(<div key={key++} className="h-3" />);
+        prevWasEmpty = true;
+      }
+      continue;
+    }
+    prevWasEmpty = false;
+
+    if (trimmed.startsWith("## ") || trimmed.startsWith("### ")) {
+      const title = cleanBold(trimmed.replace(/^#{2,3}\s+/, ""));
+      // Remove numbered prefixes like "1. " or "4. "
+      const cleanTitle = title.replace(/^\d+\.\s*/, "");
+      elements.push(
+        <h4 key={key++} className="text-[15px] font-bold text-[#E8EAED] mt-5 mb-2">
+          {cleanTitle}
+        </h4>
+      );
+    } else if (trimmed.startsWith("# ")) {
+      const title = cleanBold(trimmed.replace("# ", ""));
+      elements.push(
+        <h3 key={key++} className="text-[16px] font-bold text-[#E8EAED] mt-6 mb-2">
+          {title}
+        </h3>
+      );
+    } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      const bulletText = cleanBold(trimmed.substring(2));
+      elements.push(
+        <div key={key++} className="text-[13px] text-[#E8EAED]/80 leading-relaxed flex gap-2 ml-2 mb-1.5">
+          <span className="text-[#4488FF] flex-shrink-0 mt-0.5">{">"}</span>
+          <span>{bulletText}</span>
+        </div>
+      );
+    } else if (trimmed.match(new RegExp("^\\d+\\."))) {
+      const numText = cleanBold(trimmed);
+      elements.push(
+        <p key={key++} className="text-[13px] text-[#E8EAED]/80 leading-relaxed ml-2 mb-1.5">
+          {numText}
+        </p>
+      );
+    } else {
+      // Detect sub-headings (short lines followed by longer content)
+      const isSubHeading =
+        trimmed.length < 80 &&
+        !trimmed.endsWith(".") &&
+        !trimmed.endsWith(",") &&
+        !trimmed.startsWith("(") &&
+        i + 1 < lines.length &&
+        lines[i + 1].trim().length > 80;
+
+      if (isSubHeading) {
+        elements.push(
+          <h5 key={key++} className="text-[14px] font-bold text-[#E8EAED] mt-4 mb-1">
+            {cleanBold(trimmed)}
+          </h5>
+        );
+      } else {
+        elements.push(
+          <p key={key++} className="text-[13px] text-[#E8EAED]/90 leading-relaxed mb-2">
+            {cleanBold(trimmed)}
+          </p>
+        );
+      }
+    }
+  }
+
+  return <div>{elements}</div>;
 }
 
 export default function DetailPanel({ item, onClose }: DetailPanelProps) {
@@ -294,9 +376,7 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
           {deepAnalysis && (
             <div>
               <h4 className="text-[12px] font-mono text-[#4488FF] uppercase tracking-wider mb-3">Deep Analysis</h4>
-              <div className="text-[13px] text-[#E8EAED]/90 leading-relaxed whitespace-pre-wrap">
-                {deepAnalysis}
-              </div>
+              {renderDeepAnalysis(deepAnalysis)}
             </div>
           )}
         </div>
