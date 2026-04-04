@@ -97,6 +97,26 @@ export default function ItemCard({ item, isSelected, onClick, currentRating, onR
         </span>
         <span className="text-[#1E2A3A]">|</span>
         <span className="text-[10px] font-mono text-[#5A6A7A]">{timeFormatted}</span>
+        <span className="ml-auto flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={handleStar}
+            className={`px-1 py-0.5 text-[10px] rounded-sm font-mono transition-all cursor-pointer ${
+              isStarred
+                ? 'text-[#FFD700]'
+                : 'text-[#5A6A7A] hover:text-[#FFD700]'
+            }`}
+            title={isStarred ? 'Unstar' : 'Star for weekly synthesis'}
+          >
+            {isStarred ? '\u2605' : '\u2606'}
+          </button>
+          <button
+            onClick={handleDismiss}
+            className="px-1 py-0.5 text-[10px] rounded-sm font-mono text-[#5A6A7A] hover:text-[#FF4444] transition-all cursor-pointer"
+            title="Dismiss from feed"
+          >
+            X
+          </button>
+        </span>
         <span className="text-[10px] font-mono text-[#5A6A7A] ml-auto">{timeAgo(time)}</span>
       </div>
 
@@ -110,35 +130,13 @@ export default function ItemCard({ item, isSelected, onClick, currentRating, onR
         </p>
       )}
 
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1 overflow-hidden">
-          {item.group_source_count && item.group_source_count > 1 && (
-            <span className="text-[10px] font-mono text-[#8899AA] bg-[#8899AA]/10 px-1.5 py-0 rounded-sm">
-              {item.group_source_count} sources
-            </span>
-          )}
+      {item.group_source_count && item.group_source_count > 1 && (
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] font-mono text-[#8899AA] bg-[#8899AA]/10 px-1.5 py-0 rounded-sm">
+            {item.group_source_count} sources
+          </span>
         </div>
-        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={handleStar}
-            className={`px-1.5 py-0.5 text-[10px] rounded-sm font-mono transition-all cursor-pointer ${
-              isStarred
-                ? 'bg-[#FFD700]/20 text-[#FFD700] ring-1 ring-[#FFD700]/50'
-                : 'text-[#5A6A7A] hover:text-[#FFD700] hover:bg-[#FFD700]/10'
-            }`}
-            title={isStarred ? 'Unstar' : 'Star for weekly synthesis'}
-          >
-            {isStarred ? '\u2605' : '\u2606'}
-          </button>
-          <button
-            onClick={handleDismiss}
-            className="px-1.5 py-0.5 text-[10px] rounded-sm font-mono text-[#5A6A7A] hover:text-[#FF4444] hover:bg-[#FF4444]/10 transition-all cursor-pointer"
-            title="Dismiss from feed"
-          >
-            X
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
