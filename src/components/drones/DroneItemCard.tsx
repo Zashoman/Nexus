@@ -82,6 +82,11 @@ export default function DroneItemCard({ item, isSelected, onClick, currentRating
         <span className="text-[#1E2A3A]">|</span>
         <span className="text-[10px] font-mono text-[#5A6A7A]">{timeFormatted}</span>
         <span className="text-[10px] font-mono text-[#5A6A7A] ml-auto">{timeAgo(time)}</span>
+        <button
+          onClick={(e) => { e.stopPropagation(); }}
+          className="text-[#5A6A7A] hover:text-[#FF4444] text-[10px] cursor-pointer ml-1"
+          title="Dismiss"
+        >X</button>
       </div>
 
       <h3 className="text-sm font-medium text-[#E8EAED] leading-tight mb-1 line-clamp-2">
