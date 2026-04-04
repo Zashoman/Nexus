@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import RSSParser from 'rss-parser';
 
@@ -129,4 +129,17 @@ export async function GET() {
     channels: channels || [],
     new_videos: newVideos,
   });
+}
+
+export async function DELETE(req: NextRequest) {
+  const db = getServiceSupabase();
+  const { searchParams } = new URL(req.url);
+  const videoId = searchParams.get("video_id");
+
+  if (!videoId) {
+    return NextResponse.json({ error: "video_id required" }, { status: 400 });
+  }
+
+  await db.from("intel_youtube_videos").delete().eq("video_id", videoId);
+  return NextResponse.json({ success: true });
 }
