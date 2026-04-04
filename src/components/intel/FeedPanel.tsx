@@ -94,6 +94,19 @@ export default function FeedPanel({
     setRatings((prev) => ({ ...prev, [itemId]: rating }));
   }
 
+  async function handleDismiss(itemId: string) {
+    try {
+      await fetch('/api/intel/items', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: itemId, is_dismissed: true }),
+      });
+      setItems((prev) => prev.filter((item) => item.id !== itemId));
+    } catch {
+      // silent
+    }
+  }
+
   function loadMore() {
     const nextPage = page + 1;
     setPage(nextPage);
@@ -130,6 +143,7 @@ export default function FeedPanel({
               onClick={() => onSelectItem(item)}
               currentRating={ratings[item.id] || null}
               onRate={(rating) => handleRate(item.id, rating)}
+              onDismiss={() => handleDismiss(item.id)}
             />
           ))}
 
