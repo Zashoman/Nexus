@@ -97,18 +97,7 @@ export default function ItemCard({ item, isSelected, onClick, currentRating, onR
         </span>
         <span className="text-[#1E2A3A]">|</span>
         <span className="text-[10px] font-mono text-[#5A6A7A]">{timeFormatted}</span>
-        <span className="ml-auto flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={handleStar}
-            className={`px-1 py-0.5 text-[10px] rounded-sm font-mono transition-all cursor-pointer ${
-              isStarred
-                ? 'text-[#FFD700]'
-                : 'text-[#5A6A7A] hover:text-[#FFD700]'
-            }`}
-            title={isStarred ? 'Unstar' : 'Star for weekly synthesis'}
-          >
-            {isStarred ? '\u2605' : '\u2606'}
-          </button>
+        <span className="ml-auto" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={handleDismiss}
             className="px-1 py-0.5 text-[10px] rounded-sm font-mono text-[#5A6A7A] hover:text-[#FF4444] transition-all cursor-pointer"
