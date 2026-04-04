@@ -55,6 +55,11 @@ export default function MessageCard({ message, isSelected, onClick }: MessageCar
         <span className="text-[10px] font-mono text-[#5A6A7A] ml-auto">
           {timeAgo(message.ingested_at)}
         </span>
+        <button
+          onClick={(e) => { e.stopPropagation(); }}
+          className="text-[#5A6A7A] hover:text-[#FF4444] text-[10px] cursor-pointer ml-1"
+          title="Dismiss"
+        >X</button>
       </div>
       <p className="text-[13px] text-[#E8EAED]/90 leading-relaxed">
         {preview}
