@@ -17,6 +17,7 @@ interface VideoCardProps {
   video: Video;
   isSelected: boolean;
   onClick: () => void;
+  onRemove: () => void;
 }
 
 function timeAgo(dateStr: string): string {
@@ -29,7 +30,7 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-export default function VideoCard({ video, isSelected, onClick }: VideoCardProps) {
+export default function VideoCard({ video, isSelected, onClick, onRemove }: VideoCardProps) {
   return (
     <div
       onClick={onClick}
@@ -56,9 +57,16 @@ export default function VideoCard({ video, isSelected, onClick }: VideoCardProps
           <div className="flex items-center gap-2 mb-0.5">
             <span className="text-[10px] font-mono text-[#FF4444] font-bold">{video.channel_name}</span>
             <span className="text-[10px] font-mono text-[#5A6A7A] capitalize">{video.category}</span>
-            {video.published_at && (
-              <span className="text-[10px] font-mono text-[#5A6A7A] ml-auto">{timeAgo(video.published_at)}</span>
-            )}
+            <span className="ml-auto flex items-center gap-2">
+              {video.published_at && (
+                <span className="text-[10px] font-mono text-[#5A6A7A]">{timeAgo(video.published_at)}</span>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); onRemove(); }}
+                className="text-[#5A6A7A] hover:text-[#FF4444] text-[10px] cursor-pointer"
+                title="Remove from feed"
+              >X</button>
+            </span>
           </div>
 
           {/* Title */}
