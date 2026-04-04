@@ -15,9 +15,18 @@ const TIER_COLORS: Record<number, string> = {
   3: 'text-[#888888]',
 };
 
+interface RedTeamReport {
+  id: string;
+  vulnerability_rating: string;
+  report_text: string;
+  created_at: string;
+}
+
 export default function BeliefCard({ belief, onEdit, onRetire }: BeliefCardProps) {
   const [evidence, setEvidence] = useState<IntelBeliefEvidence[]>([]);
   const [showAll, setShowAll] = useState(false);
+  const [redTeamReport, setRedTeamReport] = useState<RedTeamReport | null>(null);
+  const [redTeamLoading, setRedTeamLoading] = useState(false);
 
   useEffect(() => {
     fetchEvidence();
@@ -32,6 +41,30 @@ export default function BeliefCard({ belief, onEdit, onRetire }: BeliefCardProps
       // Silent
     }
   }
+
+  async function handleRedTeam() {
+    if (redTeamLoading) return;
+    setRedTeamLoading(true);
+    try {
+      const res = await fetch('/api/intel/red-team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ belief_id: belief.id }),
+      });
+      const data = await res.json();
+      if (data.report) setRedTeamReport(data.report);
+    } catch {
+      // Silent
+    } finally {
+      setRedTeamLoading(false);
+    }
+  }
+
+  const velocity = belief.evidence_velocity;
+  const velocityIcon = velocity === 'accelerating' ? '\u25B2' : velocity === 'decelerating' ? '\u25BC' : '\u2014';
+  const velocityColor = velocity === 'accelerating' ? 'text-[#00CC66]' : velocity === 'decelerating' ? 'text-[#FF8C00]' : 'text-[#5A6A7A]';
+  const count30d = belief.evidence_count_30d || 0;
+  const countPrior = belief.evidence_count_prior_30d || 0;
 
   const change = belief.current_confidence - belief.initial_confidence;
   const changeColor =
@@ -80,7 +113,7 @@ export default function BeliefCard({ belief, onEdit, onRetire }: BeliefCardProps
         </div>
       </div>
 
-      {/* Evidence count */}
+      {/* Evidence count + velocity */}
       <div className="flex items-center gap-4 text-xs font-mono text-[#8899AA]">
         <span>
           Evidence For:{' '}
@@ -90,6 +123,11 @@ export default function BeliefCard({ belief, onEdit, onRetire }: BeliefCardProps
           Evidence Against:{' '}
           <span className="text-[#FF4444]">{belief.evidence_against}</span>
         </span>
+        {velocity && (
+          <span className={`${velocityColor} ml-auto`} title={`${count30d} items last 30d vs ${countPrior} prior 30d`}>
+            {velocityIcon} {velocity}
+          </span>
+        )}
       </div>
 
       {/* Recent evidence */}
@@ -133,6 +171,22 @@ export default function BeliefCard({ belief, onEdit, onRetire }: BeliefCardProps
         </div>
       )}
 
+      {/* Red Team Report */}
+      {redTeamReport && (
+        <div className="bg-[#FF4444]/5 border border-[#FF4444]/20 rounded-sm p-3 space-y-1">
+          <div className="flex items-center gap-2">
+            <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-sm ${
+              redTeamReport.vulnerability_rating === 'fortress' ? 'bg-[#00CC66]/10 text-[#00CC66]' :
+              redTeamReport.vulnerability_rating === 'sturdy' ? 'bg-[#4488FF]/10 text-[#4488FF]' :
+              redTeamReport.vulnerability_rating === 'exposed' ? 'bg-[#FF8C00]/10 text-[#FF8C00]' :
+              'bg-[#FF4444]/10 text-[#FF4444]'
+            }`}>{redTeamReport.vulnerability_rating.toUpperCase()}</span>
+            <span className="text-[9px] font-mono text-[#5A6A7A]">Red Team Analysis</span>
+          </div>
+          <p className="text-[12px] text-[#E8EAED]/80 leading-relaxed whitespace-pre-wrap">{redTeamReport.report_text}</p>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex items-center gap-2 pt-1 border-t border-[#1E2A3A]">
         <button
@@ -140,6 +194,18 @@ export default function BeliefCard({ belief, onEdit, onRetire }: BeliefCardProps
           className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF] cursor-pointer"
         >
           Edit
+        </button>
+        <button
+          onClick={handleRedTeam}
+          disabled={redTeamLoading || belief.evidence_for + belief.evidence_against < 3}
+          className={`text-[10px] font-mono cursor-pointer ${
+            belief.evidence_for + belief.evidence_against < 3
+              ? 'text-[#333] cursor-not-allowed'
+              : 'text-[#FF4444] hover:text-[#FF6666]'
+          }`}
+          title={belief.evidence_for + belief.evidence_against < 3 ? 'Need 3+ evidence items' : 'Red Team this belief'}
+        >
+          {redTeamLoading ? 'Analyzing...' : 'Red Team'}
         </button>
         <button
           onClick={() => onRetire(belief.id)}
