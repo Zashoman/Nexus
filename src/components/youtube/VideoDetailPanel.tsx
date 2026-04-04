@@ -128,6 +128,7 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
   const [fullSummary, setFullSummary] = useState<string | null>(null);
   const [miniLoading, setMiniLoading] = useState(false);
   const [fullLoading, setFullLoading] = useState(false);
+  const [isStarred, setIsStarred] = useState(false);
 
   useEffect(() => {
     if (!video) return;
@@ -135,6 +136,7 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
     setFullSummary(video.full_summary || null);
     setMiniLoading(false);
     setFullLoading(false);
+    setIsStarred(false);
   }, [video?.video_id]);
 
   async function generateMini() {
@@ -190,7 +192,18 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
       )}
 
       <div className="p-4 space-y-4">
-        <h2 className="text-lg font-semibold text-[#E8EAED] leading-tight">{video.title}</h2>
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-lg font-semibold text-[#E8EAED] leading-tight">{video.title}</h2>
+          <button
+            onClick={() => setIsStarred(!isStarred)}
+            className={`flex-shrink-0 px-1.5 py-0.5 text-sm cursor-pointer transition-all ${
+              isStarred ? 'text-[#FFD700]' : 'text-[#5A6A7A] hover:text-[#FFD700]'
+            }`}
+            title={isStarred ? 'Starred for weekly synthesis' : 'Star for weekly synthesis'}
+          >
+            {isStarred ? '\u2605' : '\u2606'}
+          </button>
+        </div>
 
         <div className="flex items-start gap-3">
           {video.thumbnail_url && (
