@@ -116,12 +116,16 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
+  const [deepAnalysis, setDeepAnalysis] = useState<string | null>(null);
+  const [deepLoading, setDeepLoading] = useState(false);
 
   useEffect(() => {
     if (!item) return;
     setBeliefEvidence([]);
     setFeedback('');
     setAiSummary(item.ai_summary || null);
+    setDeepAnalysis(((item.metadata as Record<string, unknown>)?.deep_analysis as string) || null);
+    setDeepLoading(false);
     setIsStarred(item.rating === 'starred');
 
     if (!item.ai_summary) {
@@ -245,8 +249,57 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-[13px] font-mono text-[#4488FF] hover:text-[#6699FF] transition-colors"
         >
-          Open Source →
+          Open Source -&gt;
         </a>
+
+        <div className="space-y-2 pt-3 border-t border-[#1E2A3A]">
+          {!deepAnalysis && !deepLoading && (
+            <button
+              onClick={async () => {
+                setDeepLoading(true);
+                try {
+                  const res = await fetch('/api/intel/deep-analysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ item_id: item.id }),
+                  });
+                  const data = await res.json();
+                  if (data.analysis) setDeepAnalysis(data.analysis);
+                } catch {
+                  // silent
+                } finally {
+                  setDeepLoading(false);
+                }
+              }}
+              className="w-full py-3 px-4 text-sm font-mono font-semibold text-[#0B0E11] rounded cursor-pointer transition-all duration-200 bg-[#4488FF] hover:bg-[#5599FF] active:bg-[#3377EE]"
+            >
+              Deep Analysis - Full Article Breakdown
+            </button>
+          )}
+          {deepLoading && (
+            <div className="bg-[#141820] border border-[#4488FF]/20 rounded-sm p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-[#4488FF] rounded-full animate-pulse" />
+                <p className="text-[11px] font-mono text-[#4488FF]">Analyzing article...</p>
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
+                <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-5/6" />
+                <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
+                <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-4/5" />
+              </div>
+              <p className="text-[9px] font-mono text-[#5A6A7A]">This may take 15-30 seconds</p>
+            </div>
+          )}
+          {deepAnalysis && (
+            <div>
+              <h4 className="text-[12px] font-mono text-[#4488FF] uppercase tracking-wider mb-3">Deep Analysis</h4>
+              <div className="text-[13px] text-[#E8EAED]/90 leading-relaxed whitespace-pre-wrap">
+                {deepAnalysis}
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="pt-2 border-t border-[#1E2A3A]">
           <h4 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-2">
