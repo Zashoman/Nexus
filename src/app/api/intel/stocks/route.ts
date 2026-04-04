@@ -105,6 +105,7 @@ export async function GET() {
 
   const quotes: Record<string, Quote> = {};
   const news: Record<string, CompanyNews[]> = {};
+  const earnings: Record<string, { date: string; estimate: number | null }> = {};
 
   if (!FINNHUB_KEY) {
     return NextResponse.json({ quotes, news, error: 'No Finnhub API key configured' });
@@ -149,10 +150,26 @@ export async function GET() {
         );
         news[entry.symbol] = filtered.slice(0, 15);
       }
+
+      // Fetch upcoming earnings
+      const earningsFromDate = new Date().toISOString().split('T')[0];
+      const earningsToDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const earningsRes = await fetch(
+        `https://finnhub.io/api/v1/calendar/earnings?symbol=${entry.symbol}&from=${earningsFromDate}&to=${earningsToDate}&token=${FINNHUB_KEY}`,
+        { signal: AbortSignal.timeout(10000) }
+      );
+      const earningsData = await earningsRes.json();
+      if (earningsData.earningsCalendar && earningsData.earningsCalendar.length > 0) {
+        const next = earningsData.earningsCalendar[0];
+        earnings[entry.symbol] = {
+          date: next.date,
+          estimate: next.epsEstimate || null,
+        };
+      }
     } catch {
       // Skip failed symbols
     }
   }
 
-  return NextResponse.json({ quotes, news });
+  return NextResponse.json({ quotes, news, earnings });
 }
