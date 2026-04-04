@@ -114,6 +114,10 @@ export interface IntelBelief {
   status: BeliefStatus;
   created_at: string;
   updated_at: string;
+  evidence_count_30d?: number;
+  evidence_count_prior_30d?: number;
+  evidence_velocity?: 'accelerating' | 'stable' | 'decelerating';
+  velocity_updated_at?: string;
 }
 
 export interface IntelBeliefEvidence {
