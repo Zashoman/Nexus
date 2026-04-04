@@ -133,6 +133,8 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
     if (!video) return;
     setMiniSummary(video.mini_summary || null);
     setFullSummary(video.full_summary || null);
+    setMiniLoading(false);
+    setFullLoading(false);
   }, [video?.video_id]);
 
   async function generateMini() {
