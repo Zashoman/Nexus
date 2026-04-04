@@ -38,6 +38,12 @@ export default function CategoryTabs({ activeTab, onTabChange }: CategoryTabsPro
           {tab.label}
         </button>
       ))}
+      <a
+        href="/realestate"
+        className="px-4 py-2 text-xs font-mono whitespace-nowrap border-b-2 border-transparent text-[#8899AA] hover:text-[#AABBCC] hover:bg-[#141820]/50 transition-colors"
+      >
+        Real Estate
+      </a>
     </div>
   );
 }
