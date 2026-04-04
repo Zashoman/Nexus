@@ -115,12 +115,14 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
   const [feedback, setFeedback] = useState('');
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [isStarred, setIsStarred] = useState(false);
 
   useEffect(() => {
     if (!item) return;
     setBeliefEvidence([]);
     setFeedback('');
     setAiSummary(item.ai_summary || null);
+    setIsStarred(item.rating === 'starred');
 
     if (!item.ai_summary) {
       setSummaryLoading(true);
@@ -165,9 +167,28 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
       )}
 
       <div className="p-4 space-y-4">
-        <h2 className="text-lg font-semibold text-[#E8EAED] leading-tight">
-          {item.title}
-        </h2>
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-lg font-semibold text-[#E8EAED] leading-tight">
+            {item.title}
+          </h2>
+          <button
+            onClick={async () => {
+              const newStarred = !isStarred;
+              setIsStarred(newStarred);
+              await fetch('/api/intel/rate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ item_id: item.id, rating: newStarred ? 'starred' : 'signal' }),
+              });
+            }}
+            className={`flex-shrink-0 px-1.5 py-0.5 text-sm cursor-pointer transition-all ${
+              isStarred ? 'text-[#FFD700]' : 'text-[#5A6A7A] hover:text-[#FFD700]'
+            }`}
+            title={isStarred ? 'Starred for weekly synthesis' : 'Star for weekly synthesis'}
+          >
+            {isStarred ? '\u2605' : '\u2606'}
+          </button>
+        </div>
 
         <div className="flex items-center gap-3 text-xs font-mono">
           <span className="text-[#8899AA]">{item.source_name}</span>
