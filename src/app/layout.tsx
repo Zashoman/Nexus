@@ -135,6 +135,13 @@ export default function RootLayout({
             </svg>
           </a>
 
+          <a
+            href="/ft"
+            title="Financial Times"
+            className="w-8 h-8 flex items-center justify-center text-[#FCD0B1] hover:text-[#FDDCC4] transition-colors rounded-sm hover:bg-[#FCD0B1]/10"
+          >
+            <span className="text-[11px] font-mono font-bold">FT</span>
+          </a>
 
         </nav>
 
