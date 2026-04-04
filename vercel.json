@@ -7,6 +7,18 @@
     {
       "path": "/api/intel/synthesis",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/intel/weekly-synthesis",
+      "schedule": "0 7 * * 0"
+    },
+    {
+      "path": "/api/intel/monthly-synthesis",
+      "schedule": "0 7 1 * *"
+    },
+    {
+      "path": "/api/intel/velocity",
+      "schedule": "0 8 * * 0"
     }
   ]
 }
