@@ -8,19 +8,26 @@ export async function GET(req: NextRequest) {
   const category = searchParams.get('category');
   const impact_level = searchParams.get('impact_level');
   const include_filtered = searchParams.get('include_filtered') === 'true';
+  const archive = searchParams.get('archive') === 'true';
   const page = parseInt(searchParams.get('page') || '1');
   const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
   const offset = (page - 1) * limit;
 
-  // Only show items from the last 2 days
   const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
   let query = db
     .from('intel_items')
     .select('*', { count: 'exact' })
-    .or(`published_at.gte.${cutoff},and(published_at.is.null,ingested_at.gte.${cutoff})`)
-    .order('published_at', { ascending: false })
+    .order(archive ? 'dismissed_at' : 'published_at', { ascending: false })
     .range(offset, offset + limit - 1);
+
+  // Archive mode shows dismissed items, normal mode hides them
+  if (archive) {
+    query = query.eq('is_dismissed', true);
+  } else {
+    query = query.or('is_dismissed.eq.false,is_dismissed.is.null');
+    query = query.or(`published_at.gte.${cutoff},and(published_at.is.null,ingested_at.gte.${cutoff})`);
+  }
 
   if (category) {
     query = query.eq('category', category);
@@ -38,20 +45,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Get ratings for these items
   const itemIds = (items || []).map((i) => i.id);
   const { data: ratings } = await db
     .from('intel_ratings')
     .select('item_id, rating')
     .in('item_id', itemIds.length > 0 ? itemIds : ['__none__']);
 
-  // Get group info
   const { data: groups } = await db
     .from('intel_item_groups')
     .select('*')
     .overlaps('grouped_item_ids', itemIds.length > 0 ? itemIds : ['__none__']);
 
-  // Merge data
   const ratingsMap = new Map(
     (ratings || []).map((r) => [r.item_id, r.rating])
   );
@@ -68,7 +72,6 @@ export async function GET(req: NextRequest) {
     group_source_count: groupsMap.get(item.id) || null,
   }));
 
-  // Filter out non-primary grouped items
   const groupedNonPrimary = new Set<string>();
   for (const group of groups || []) {
     for (const id of group.grouped_item_ids) {
@@ -82,7 +85,6 @@ export async function GET(req: NextRequest) {
     (item) => !groupedNonPrimary.has(item.id)
   );
 
-  // Stats
   const { count: totalCount } = await db
     .from('intel_items')
     .select('*', { count: 'exact', head: true });
@@ -90,13 +92,15 @@ export async function GET(req: NextRequest) {
   const { count: filteredCount } = await db
     .from('intel_items')
     .select('*', { count: 'exact', head: true })
-    .eq('is_filtered_out', false);
+    .eq('is_filtered_out', false)
+    .or('is_dismissed.eq.false,is_dismissed.is.null');
 
   const { count: highPriorityCount } = await db
     .from('intel_items')
     .select('*', { count: 'exact', head: true })
     .in('impact_level', ['high', 'critical'])
-    .eq('is_filtered_out', false);
+    .eq('is_filtered_out', false)
+    .or('is_dismissed.eq.false,is_dismissed.is.null');
 
   return NextResponse.json({
     items: finalItems,
@@ -109,4 +113,33 @@ export async function GET(req: NextRequest) {
       high_priority: highPriorityCount || 0,
     },
   });
+}
+
+// Dismiss/archive an item
+export async function PATCH(req: NextRequest) {
+  const db = getServiceSupabase();
+  const body = await req.json();
+  const { item_id, is_dismissed } = body as { item_id: string; is_dismissed: boolean };
+
+  if (!item_id) {
+    return NextResponse.json({ error: 'item_id required' }, { status: 400 });
+  }
+
+  const updates: Record<string, unknown> = { is_dismissed };
+  if (is_dismissed) {
+    updates.dismissed_at = new Date().toISOString();
+  } else {
+    updates.dismissed_at = null;
+  }
+
+  const { error } = await db
+    .from('intel_items')
+    .update(updates)
+    .eq('id', item_id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }
