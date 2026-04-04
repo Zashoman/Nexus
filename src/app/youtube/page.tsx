@@ -48,11 +48,8 @@ export default function YouTubePage() {
       const data = await res.json();
       setVideos(data.videos || []);
       setChannels(data.channels || []);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* silent */ }
+    finally { setLoading(false); }
   }
 
   async function addChannel() {
@@ -76,7 +73,7 @@ export default function YouTubePage() {
 
   async function removeVideo(videoId: string) {
     try {
-      await fetch('/api/youtube/feed?video_id=' + videoId, { method: 'DELETE' });
+      await fetch(`/api/youtube/feed?video_id=${videoId}`, { method: "DELETE" });
       setVideos((prev) => prev.filter((v: Video) => v.video_id !== videoId));
       if (selectedVideo?.video_id === videoId) {
         setSelectedVideo(null);
@@ -98,23 +95,25 @@ export default function YouTubePage() {
 
   return (
     <div className="flex flex-col h-screen bg-[#0B0E11] text-[#E8EAED]">
+      {/* Header */}
       <div className="border-b border-[#1E2A3A] bg-[#0D1117] px-4 py-1.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xs font-mono text-[#FF4444] font-bold uppercase tracking-wider">YouTube Intelligence</h1>
-          <span className="text-[10px] font-mono text-[#5A6A7A]">{channels.length} channels - {videos.length} videos</span>
+          <span className="text-[10px] font-mono text-[#5A6A7A]">{channels.length} channels · {videos.length} videos</span>
         </div>
         <button
           onClick={() => setShowAddChannel(!showAddChannel)}
           className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF] cursor-pointer"
         >
-          {showAddChannel ? 'X Cancel' : '+ Add Channel'}
+          {showAddChannel ? '✕ Cancel' : '+ Add Channel'}
         </button>
       </div>
 
+      {/* Add Channel Form */}
       {showAddChannel && (
         <div className="px-4 py-2 bg-[#141820] border-b border-[#1E2A3A] space-y-2">
           <p className="text-[10px] font-mono text-[#5A6A7A]">
-            To find the channel ID: go to the YouTube channel, View Page Source, search for channelId
+            To find the channel ID: go to the YouTube channel → View Page Source → search for &quot;channelId&quot;
           </p>
           <div className="flex gap-2">
             <input type="text" value={addForm.channel_id} onChange={(e) => setAddForm({ ...addForm, channel_id: e.target.value })} placeholder="Channel ID (e.g. UCRvqjQP...)" className="flex-1 bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]" />
@@ -127,9 +126,12 @@ export default function YouTubePage() {
         </div>
       )}
 
+      {/* Category Tabs */}
       <YouTubeTabs activeTab={activeTab} categories={categories} onTabChange={setActiveTab} />
 
+      {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
+        {/* Video Feed */}
         <div className="flex-1 overflow-y-auto bg-[#0B0E11] min-w-0 lg:max-w-[500px]">
           {loading ? (
             <div className="flex items-center justify-center h-40">
@@ -155,10 +157,12 @@ export default function YouTubePage() {
           )}
         </div>
 
+        {/* Detail Panel — desktop */}
         <div className="hidden lg:flex flex-1">
           <VideoDetailPanel video={selectedVideo} />
         </div>
 
+        {/* Detail Panel — mobile overlay */}
         {mobileDetailOpen && selectedVideo && (
           <div className="fixed inset-0 z-40 bg-[#0B0E11] lg:hidden overflow-y-auto">
             <VideoDetailPanel
