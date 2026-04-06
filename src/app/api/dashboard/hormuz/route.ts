@@ -25,30 +25,75 @@ export async function GET() {
 export async function POST() {
   const db = getServiceSupabase();
 
-  // Category 2: Market data
-  const [brent, wti, gold, vix] = await Promise.all([
+  // Fetch market data
+  const [brent, wti, gold, ita, spy] = await Promise.all([
     fetchFinnhubQuote('BNO'),
     fetchFinnhubQuote('USO'),
     fetchFinnhubQuote('GLD'),
-    fetchFinnhubQuote('VIX'),
+    fetchFinnhubQuote('ITA'),
+    fetchFinnhubQuote('SPY'),
   ]);
 
   const hyOas = await fetchFRED('BAMLH0A0HYM2');
 
-  // Category 2 scoring (max 10)
+  // Category 2: Energy Markets (max 10) - more granular scoring
   let cat2Score = 0;
-  if (brent && brent.c > 80) cat2Score += 2;
-  if (brent && wti && (brent.c - wti.c) > 5) cat2Score += 2;
-  if (brent && brent.dp > 3) cat2Score += 2;
-  const cat2Detail = { brent: brent?.c, wti: wti?.c, spread: brent && wti ? +(brent.c - wti.c).toFixed(2) : null };
+  const brentPrice = brent?.c || 0;
+  if (brentPrice > 150) cat2Score += 10;
+  else if (brentPrice > 130) cat2Score += 8;
+  else if (brentPrice > 110) cat2Score += 6;
+  else if (brentPrice > 95) cat2Score += 4;
+  else if (brentPrice > 80) cat2Score += 2;
 
-  // Category 4: Market stress (max 10)
+  // Brent-WTI spread widening
+  const wtiPrice = wti?.c || 0;
+  if (brentPrice > 0 && wtiPrice > 0) {
+    const spread = brentPrice - wtiPrice;
+    if (spread > 5) cat2Score = Math.min(cat2Score + 2, 10);
+  }
+
+  const cat2Detail = {
+    brent: brentPrice,
+    wti: wtiPrice,
+    spread: brentPrice > 0 && wtiPrice > 0 ? +(brentPrice - wtiPrice).toFixed(2) : null,
+    brent_change: brent?.dp || 0,
+  };
+
+  // Category 4: Market Stress (max 10) - use actual market proxies
   let cat4Score = 0;
-  if (vix && vix.c > 25) cat4Score += 2;
-  if (vix && vix.c > 35) cat4Score += 1;
-  if (gold && gold.dp > 1) cat4Score += 2;
-  if (hyOas && hyOas > 5) cat4Score += 2;
-  const cat4Detail = { vix: vix?.c, gold: gold?.c, hy_oas: hyOas };
+
+  // Gold trend as fear indicator
+  const goldChg = gold?.dp || 0;
+  if (goldChg > 5) cat4Score += 3;
+  else if (goldChg > 2) cat4Score += 2;
+  else if (goldChg > 0) cat4Score += 1;
+
+  // Credit spreads from FRED
+  if (hyOas) {
+    if (hyOas > 8) cat4Score += 3;
+    else if (hyOas > 5) cat4Score += 2;
+    else if (hyOas > 4) cat4Score += 1;
+  }
+
+  // Defense outperforming SPY
+  if (ita && spy) {
+    const defenseOutperform = (ita.dp || 0) - (spy.dp || 0);
+    if (defenseOutperform > 2) cat4Score += 2;
+    else if (defenseOutperform > 0) cat4Score += 1;
+  }
+
+  // Oil rising sharply
+  if (brent && (brent.dp || 0) > 3) cat4Score += 2;
+
+  cat4Score = Math.min(cat4Score, 10);
+
+  const cat4Detail = {
+    gold: gold?.c,
+    gold_change: goldChg,
+    hy_oas: hyOas,
+    ita_vs_spy: ita && spy ? +((ita.dp || 0) - (spy.dp || 0)).toFixed(2) : null,
+    defense: ita?.c,
+  };
 
   // Categories 1, 3, 5: News-based (use AI)
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -63,7 +108,7 @@ export async function POST() {
   let cat3Score = 0;
   let cat5Score = 0;
   let scenarioA = 10, scenarioB = 30, scenarioC = 40, scenarioD = 20;
-  let aiAssessment = 'No recent Hormuz-related intelligence available.';
+  let aiAssessment = 'No recent Hormuz-related intelligence available for assessment.';
 
   if (hormuzItems && hormuzItems.length > 0) {
     const newsContext = hormuzItems.map((i) => `- ${i.title} (${i.source_name})`).join('\n');
@@ -82,11 +127,10 @@ ${newsContext}
 Return this exact JSON structure:
 {"cat1_score": 0-12, "cat3_score": 0-10, "cat5_score": 0-8, "scenario_a_pct": 0-100, "scenario_b_pct": 0-100, "scenario_c_pct": 0-100, "scenario_d_pct": 0-100, "assessment": "1-2 sentence summary"}
 
-Scoring guide:
-- cat1 (Physical Disruption, max 12): tanker incidents, mine reports, insurance withdrawal
-- cat3 (Geopolitical Escalation, max 10): military actions, diplomacy status, allied responses
-- cat5 (Scenario Assessment, max 8): based on all evidence
-- Scenarios: A=extended closure, B=partial resolution, C=quick resolution, D=wider conflict. Must sum to 100.`,
+cat1 (Physical Disruption, max 12): tanker incidents, mine reports, insurance withdrawal
+cat3 (Geopolitical Escalation, max 10): military actions, diplomacy status, allied responses
+cat5 (Scenario Assessment, max 8): based on all evidence
+Scenarios: A=extended closure, B=partial resolution, C=quick resolution, D=wider conflict. Must sum to 100.`,
         }],
       });
 

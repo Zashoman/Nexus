@@ -7,22 +7,48 @@ export async function GET() {
   const cached = await getCached(cacheKey);
 
   try {
-    const [vix, wti, gold, ita, spy] = await Promise.all([
-      fetchFinnhubQuote('VIX'),
-      fetchFinnhubQuote('USO'),
+    const [gold, ita, spy, wti] = await Promise.all([
       fetchFinnhubQuote('GLD'),
       fetchFinnhubQuote('ITA'),
       fetchFinnhubQuote('SPY'),
+      fetchFinnhubQuote('USO'),
     ]);
 
-    // Composite risk score
-    let riskScore = 0;
-    if (vix && vix.c > 25) riskScore++;
-    if (wti && wti.c > 90) riskScore++;
-    if (gold && gold.dp > 0) riskScore++; // Gold rising
-    if (ita && spy && ita.dp > spy.dp) riskScore++; // Defense outperforming
+    // Geopolitical Risk Score (0-16)
+    let geoScore = 0;
 
-    const riskLevel = riskScore <= 1 ? 'low' : riskScore <= 2 ? 'moderate' : 'elevated';
+    // Gold vs SPY (safe haven demand)
+    const goldChg = gold?.dp || 0;
+    const spyChg = spy?.dp || 0;
+    const goldVsSpy = goldChg - spyChg;
+    if (goldVsSpy > 2) geoScore += 3;
+    else if (goldVsSpy > 0) geoScore += 2;
+    else if (goldVsSpy > -1) geoScore += 1;
+
+    // Defense ETF vs SPY
+    const itaChg = ita?.dp || 0;
+    const defenseVsSpy = itaChg - spyChg;
+    if (defenseVsSpy > 2) geoScore += 3;
+    else if (defenseVsSpy > 0) geoScore += 2;
+    else if (defenseVsSpy > -1) geoScore += 1;
+
+    // Oil change (supply disruption pricing)
+    const oilChg = wti?.dp || 0;
+    if (oilChg > 5) geoScore += 3;
+    else if (oilChg > 2) geoScore += 2;
+    else if (oilChg > 0) geoScore += 1;
+
+    // Gold level as fear indicator
+    if (goldChg > 3) geoScore += 4;
+    else if (goldChg > 1) geoScore += 2;
+    else if (goldChg > 0) geoScore += 1;
+
+    geoScore = Math.min(geoScore, 16);
+
+    let riskLevel = 'calm';
+    if (geoScore >= 12) riskLevel = 'crisis';
+    else if (geoScore >= 8) riskLevel = 'elevated';
+    else if (geoScore >= 4) riskLevel = 'alert';
 
     // Get recent geopolitical intel items
     const db = getServiceSupabase();
@@ -30,13 +56,12 @@ export async function GET() {
     const { data: geoItems } = await db
       .from('intel_items')
       .select('id, title, source_name, source_tier, impact_level, published_at, original_url')
-      .eq('category', 'geopolitics')
+      .or('category.eq.geopolitics,category.eq.cybersecurity_ai')
       .in('impact_level', ['high', 'critical'])
       .gte('ingested_at', weekAgo)
       .order('published_at', { ascending: false })
       .limit(10);
 
-    // Get active geopolitical beliefs
     const { data: beliefs } = await db
       .from('intel_beliefs')
       .select('*')
@@ -44,13 +69,14 @@ export async function GET() {
 
     const result = {
       proxies: {
-        vix: vix ? { price: vix.c, change: vix.d, changePct: vix.dp } : null,
-        wti: wti ? { price: wti.c, change: wti.d, changePct: wti.dp } : null,
         gold: gold ? { price: gold.c, change: gold.d, changePct: gold.dp } : null,
+        wti: wti ? { price: wti.c, change: wti.d, changePct: wti.dp } : null,
         defense: ita ? { price: ita.c, change: ita.d, changePct: ita.dp } : null,
+        spy: spy ? { price: spy.c, change: spy.d, changePct: spy.dp } : null,
       },
-      risk_score: riskScore,
+      risk_score: geoScore,
       risk_level: riskLevel,
+      max_score: 16,
       intel_items: geoItems || [],
       beliefs: beliefs || [],
       updated_at: new Date().toISOString(),

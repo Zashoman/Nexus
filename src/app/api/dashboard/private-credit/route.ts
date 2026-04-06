@@ -89,7 +89,13 @@ export async function POST() {
     .gte('ingested_at', weekAgo);
 
   const newsCount = creditNews?.length || 0;
-  const newsScore = newsCount >= 3 ? 5 : newsCount >= 1 ? 2 : 0;
+  // Score based on article count with proper gradation
+  let newsScore = 0;
+  if (newsCount >= 16) newsScore = 5;
+  else if (newsCount >= 11) newsScore = 4;
+  else if (newsCount >= 6) newsScore = 3;
+  else if (newsCount >= 3) newsScore = 2;
+  else if (newsCount >= 1) newsScore = 1;
 
   const hyScore = scoreHYOAS(hyOas);
   const cccBbScore = scoreCCCBBSpread(cccBbSpread);
