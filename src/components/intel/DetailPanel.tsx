@@ -162,18 +162,21 @@ function renderDeepAnalysis(text: string) {
         </p>
       );
     } else {
-      // Detect sub-headings (short lines followed by longer content)
+      // Detect sub-headings: Title Case lines or short lines before longer content
+      const words = trimmed.split(" ");
+      const capitalizedWords = words.filter((w: string) => w.length > 0 && w[0] === w[0].toUpperCase() && w[0] !== w[0].toLowerCase());
+      const isTitleCase = words.length > 3 && capitalizedWords.length >= words.length * 0.6;
+
       const isSubHeading =
-        trimmed.length < 80 &&
+        trimmed.length < 100 &&
         !trimmed.endsWith(".") &&
         !trimmed.endsWith(",") &&
         !trimmed.startsWith("(") &&
-        i + 1 < lines.length &&
-        lines[i + 1].trim().length > 80;
+        ((i + 1 < lines.length && lines[i + 1].trim().length > 40) || isTitleCase);
 
-      if (isSubHeading) {
+      if (isSubHeading && trimmed.length < 100) {
         elements.push(
-          <h5 key={key++} className="text-[14px] font-bold text-[#E8EAED] mt-4 mb-1">
+          <h5 key={key++} className="text-[16px] font-bold text-[#E8EAED] mt-5 mb-2">
             {cleanBold(trimmed)}
           </h5>
         );
