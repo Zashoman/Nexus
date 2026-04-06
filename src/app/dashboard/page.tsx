@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import ScoreChart from "@/components/dashboard/ScoreChart";
 
 const TABS = [
   { key: "calendar", label: "Economic Calendar" },
@@ -239,6 +240,24 @@ export default function DashboardPage() {
               </button>
             </div>
 
+            {/* Score History Chart */}
+            {ddData && ((ddData as Record<string, unknown[]>).scores as Array<Record<string, unknown>>)?.length > 0 && (
+              <ScoreChart
+                data={((ddData as Record<string, unknown[]>).scores as Array<Record<string, unknown>>).map((s) => ({
+                  date: s.scored_at as string,
+                  score: s.total_score as number,
+                  level: s.threat_level as string,
+                }))}
+                maxScore={20}
+                thresholds={[
+                  { value: 0, color: "#00CC66", label: "Low" },
+                  { value: 5, color: "#FF8C00", label: "Elevated" },
+                  { value: 10, color: "#FF4444", label: "High" },
+                  { value: 15, color: "#FF0000", label: "Critical" },
+                ]}
+              />
+            )}
+
             {ddData && (ddData as Record<string, Record<string, unknown>>).latest && (
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                 {[
@@ -304,6 +323,24 @@ export default function DashboardPage() {
               </button>
             </div>
 
+            {/* Score History Chart */}
+            {hormuzData && ((hormuzData as Record<string, unknown[]>).scores as Array<Record<string, unknown>>)?.length > 0 && (
+              <ScoreChart
+                data={((hormuzData as Record<string, unknown[]>).scores as Array<Record<string, unknown>>).map((s) => ({
+                  date: s.scored_at as string,
+                  score: s.total_score as number,
+                  level: s.risk_level as string,
+                }))}
+                maxScore={50}
+                thresholds={[
+                  { value: 0, color: "#00CC66", label: "Hold" },
+                  { value: 16, color: "#FFD700", label: "Monitor" },
+                  { value: 26, color: "#FF8C00", label: "Reduce" },
+                  { value: 36, color: "#FF0000", label: "Sell Now" },
+                ]}
+              />
+            )}
+
             {hormuzData && (hormuzData as Record<string, Record<string, unknown>>).latest && (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
@@ -360,6 +397,24 @@ export default function DashboardPage() {
                 {loading ? "Scoring..." : "Rescore Now"}
               </button>
             </div>
+
+            {/* Score History Chart */}
+            {creditData && ((creditData as Record<string, unknown[]>).scores as Array<Record<string, unknown>>)?.length > 0 && (
+              <ScoreChart
+                data={((creditData as Record<string, unknown[]>).scores as Array<Record<string, unknown>>).map((s) => ({
+                  date: s.scored_at as string,
+                  score: s.total_score as number,
+                  level: s.stress_level as string,
+                }))}
+                maxScore={25}
+                thresholds={[
+                  { value: 0, color: "#00CC66", label: "Calm" },
+                  { value: 6, color: "#FFD700", label: "Watchful" },
+                  { value: 11, color: "#FF8C00", label: "Stressed" },
+                  { value: 18, color: "#FF0000", label: "Crisis" },
+                ]}
+              />
+            )}
 
             {creditData && (creditData as Record<string, Record<string, unknown>>).latest && (
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
