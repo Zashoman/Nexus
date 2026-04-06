@@ -146,7 +146,7 @@ export default function RootLayout({
           <div className="w-6 border-t border-[#1E2A3A]" />
 
           <a
-            href="/realestate/feedback"
+            href="/feedback"
             title="Feedback Database"
             className="w-8 h-8 flex items-center justify-center text-[#8899AA] hover:text-[#E8EAED] transition-colors rounded-sm hover:bg-[#8899AA]/10"
           >

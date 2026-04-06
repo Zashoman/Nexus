@@ -134,7 +134,7 @@ export default function RealEstateDashboard() {
               Refresh
             </button>
           )}
-          <a href="/realestate/feedback"
+          <a href="/feedback"
             className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#8899AA] border border-[#1E2A3A] rounded-sm hover:bg-[#1A2332] hover:text-[#E8EAED]">
             Database
           </a>
