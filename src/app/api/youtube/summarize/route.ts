@@ -120,7 +120,7 @@ ${isTranscript ? 'Transcript' : 'Video Info'}: ${content.slice(0, 4000)}`,
       max_tokens: 5000,
       messages: [{
         role: 'user',
-        content: `Analyze the following video transcript. This analysis has two phases: first extract the content in depth (approximately 70% of your response), then critically evaluate it (approximately 30%). Phase 1 should be comprehensive and detailed — the reader should feel like they watched the entire video. Phase 2 should be sharp and concise.
+        content: `Analyze this video. Write approximately 850 words total. Be comprehensive but efficient — the reader should feel like they watched the video.
 
 Title: ${video.title}
 Channel: ${video.channel_name}
@@ -130,73 +130,37 @@ ${content.slice(0, 15000)}
 
 ---
 
-# PHASE 1: CONTENT EXTRACTION
+## THESIS (2-3 sentences)
+State the speaker's central argument. What do they believe is happening or will happen, and why?
 
-## MAIN THESIS
+## KEY POINTS (bulk of the summary — ~500 words)
+Cover the 4-6 most important arguments, narratives, or insights from the video. For each:
+- Explain the point clearly with context and reasoning
+- Include specific data, numbers, names, or examples the speaker uses
+- Connect it to the broader thesis
 
-What is the speaker's central argument or prediction? Explain this in two full paragraphs. The first paragraph should state the thesis clearly — what the speaker believes is happening or going to happen, and the core reasoning behind it. The second paragraph should explain WHY the speaker holds this view — what evidence, experience, or worldview drives their conviction. Include any framing language the speaker uses to position their argument. The goal is that someone reading this section understands the full thesis as well as if they heard the speaker explain it themselves.
+Write this as flowing paragraphs, not bullet lists. The reader should understand the full logic chain and evidence presented.
 
-## KEY NARRATIVES
+## DATA & CLAIMS
+List every specific number, statistic, date, price, percentage, company name, or verifiable claim. Keep this tight — one line per data point.
 
-What are the 3-5 major narratives or themes the speaker builds their argument around? For each narrative, write 2-3 paragraphs that explain:
-- What the narrative is and how the speaker frames it
-- The logic chain — what causes what, and how does this narrative connect to the main thesis?
-- What evidence or examples the speaker provides to support this narrative
-- How this narrative interacts with or reinforces the other narratives
+## CRITICAL TAKE (~150 words)
+Step outside the speaker's framing:
+- Which 1-2 arguments are strongest and why?
+- Which 1-2 are weakest or most speculative?
+- One-line overall credibility assessment
 
-These should read like mini-essays, not bullet points.
-
-## SUPPORTING POINTS
-
-List the 8-20 most important supporting arguments, insights, or claims the speaker makes. For each point:
-- State the point clearly in one sentence
-- Follow with 1-2 sentences of context explaining why the speaker raised it, how it connects to the broader thesis, and any nuance or caveats they added
-
-Flag which points are the strongest pillars of the argument versus secondary observations. Order them by importance to the overall thesis.
-
-## DATA POINTS & SPECIFIC CLAIMS
-
-Extract every specific number, statistic, date, price, percentage, name, company, historical reference, or verifiable factual claim the speaker makes. Present these as a clean list. If the speaker attributes data to a specific source, note that source.
-
-## ACTIONABLE IDEAS & RECOMMENDATIONS
-
-What specific actions, trades, investments, strategies, or decisions does the speaker recommend or imply? For each, note the timeframe (if given), the reasoning behind it, and any conditions or caveats. If the speaker names specific tickers, assets, sectors, or strategies, list them explicitly.
-
----
-
-# PHASE 2: CRITICAL ANALYSIS
-
-Step outside the speaker's framing entirely. Be the skeptical analyst in the room.
-
-## FACT CHECK
-
-Take the most important data points and specific claims from Phase 1 and evaluate them. Rate each:
-- **VERIFIED** — confirmed by credible sources within your knowledge
-- **PARTIALLY TRUE** — directionally correct but specific numbers or framing may be misleading
-- **UNVERIFIED** — cannot confirm, or claim is too vague to check
-- **FALSE** — contradicted by credible evidence
-
-For any claim rated less than VERIFIED, explain what the actual data shows. Note: this fact check is based on training data, not real-time search. Flag any claims that would require real-time data to verify.
-
-## STRONGEST ARGUMENTS
-
-Which 2-3 arguments from this video are most compelling? Why?
-
-## WEAKEST ARGUMENTS
-
-Which 2-3 arguments are the weakest, most speculative, or most likely to age poorly? What would need to be true for these arguments to hold?
-
-## OVERALL ASSESSMENT
-
-One paragraph. How credible is this analysis overall? What is the speaker's track record? What biases should the viewer be aware of? Would you recommend this video to a serious investor?
+## ACTIONABLE TAKEAWAYS
+2-4 specific actions, trades, strategies, or decisions the speaker recommends or implies. Include timeframes and caveats if given.
 
 ---
 
 RULES:
-- Only analyze what is ACTUALLY in the provided content. Never fabricate claims, data, or quotes.
-- ${isTranscript ? 'You have the full transcript — provide a thorough, comprehensive analysis.' : 'Working from description only — note that transcript was unavailable and keep analysis proportional to available content.'}
-- Be analytical and objective. If the speaker makes weak arguments, say so clearly.
-- Use direct quotes from the transcript where possible to support your analysis.`,
+- Target ~850 words. No padding, no filler.
+- Only analyze what is ACTUALLY in the content. Never fabricate.
+- ${isTranscript ? 'Full transcript available — be thorough.' : 'Working from description only — note this and keep proportional.'}
+- Use direct quotes where they strengthen the analysis.
+- Be analytical and objective. Call out weak arguments clearly.`,
       }],
     });
 
