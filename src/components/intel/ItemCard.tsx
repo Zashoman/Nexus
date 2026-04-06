@@ -97,16 +97,14 @@ export default function ItemCard({ item, isSelected, onClick, currentRating, onR
         </span>
         <span className="text-[#1E2A3A]">|</span>
         <span className="text-[10px] font-mono text-[#5A6A7A]">{timeFormatted}</span>
-        <span className="ml-auto" onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={handleDismiss}
-            className="px-1 py-0.5 text-[10px] rounded-sm font-mono text-[#5A6A7A] hover:text-[#FF4444] transition-all cursor-pointer"
-            title="Dismiss from feed"
-          >
-            X
-          </button>
-        </span>
         <span className="text-[10px] font-mono text-[#5A6A7A] ml-auto">{timeAgo(time)}</span>
+        <button
+          onClick={handleDismiss}
+          className="px-1 py-0.5 text-[10px] rounded-sm font-mono text-[#5A6A7A] hover:text-[#FF4444] transition-all cursor-pointer"
+          title="Dismiss from feed"
+        >
+          X
+        </button>
       </div>
 
       <h3 className="text-sm font-medium text-[#E8EAED] leading-tight mb-1 line-clamp-2">

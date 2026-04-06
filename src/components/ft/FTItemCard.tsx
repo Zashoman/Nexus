@@ -22,9 +22,18 @@ function timeAgo(dateStr: string): string {
 export default function FTItemCard({ item, isSelected, onClick, onDismiss }: FTItemCardProps) {
   const time = item.published_at || item.ingested_at;
 
+  function handleClick() {
+    // Open FT article directly in new tab
+    if (item.original_url) {
+      window.open(item.original_url, '_blank', 'noopener');
+    } else {
+      onClick();
+    }
+  }
+
   return (
     <div
-      onClick={onClick}
+      onClick={handleClick}
       className={`px-3 py-2 cursor-pointer transition-colors border-b ${
         isSelected
           ? "bg-[#1A2332] border-[#1E2A3A]"
