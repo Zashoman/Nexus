@@ -195,6 +195,7 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
     (IntelBeliefEvidence & { belief_title?: string })[]
   >([]);
   const [feedback, setFeedback] = useState('');
+  const [feedbackSaved, setFeedbackSaved] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
@@ -393,14 +394,20 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
         </div>
 
         <div className="space-y-1">
+          {feedbackSaved && (
+            <div className="text-[11px] font-mono text-[#00CC66] bg-[#00CC66]/10 px-2 py-1 rounded-sm">
+              Success, added to database
+            </div>
+          )}
           <input
             type="text"
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            placeholder="Quick note — why did you rate this way?"
+            placeholder="Add feedback and press Enter"
             className="w-full bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1.5 text-[13px] text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]"
             onKeyDown={async (e) => {
               if (e.key === 'Enter' && feedback.trim()) {
+                // Save to rating system
                 await fetch('/api/intel/rate', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -410,7 +417,22 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
                     feedback_note: feedback,
                   }),
                 });
+                // Also save to feedback database for browsing/editing
+                await fetch('/api/intel/feedback', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    item_id: item.id,
+                    item_title: item.title,
+                    source_name: item.source_name,
+                    category: item.category,
+                    rating: 'signal',
+                    feedback_note: feedback,
+                  }),
+                });
                 setFeedback('');
+                setFeedbackSaved(true);
+                setTimeout(() => setFeedbackSaved(false), 3000);
               }
             }}
           />

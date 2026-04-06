@@ -134,6 +134,10 @@ export default function RealEstateDashboard() {
               Refresh
             </button>
           )}
+          <a href="/realestate/feedback"
+            className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#8899AA] border border-[#1E2A3A] rounded-sm hover:bg-[#1A2332] hover:text-[#E8EAED]">
+            Database
+          </a>
           {isLoggedIn ? (
             <>
               <span className="text-[10px] font-mono text-[#5A6A7A]">{user!.email}</span>

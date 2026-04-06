@@ -17,6 +17,7 @@ export default function RatingButtons({
   onRate,
 }: RatingButtonsProps) {
   const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   // Use the prop directly — parent owns the state
   const rating = currentRating || null;
@@ -33,6 +34,8 @@ export default function RatingButtons({
       });
       if (res.ok) {
         onRate?.(value);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
       }
     } catch {
       // Silent fail
@@ -86,6 +89,9 @@ export default function RatingButtons({
       >
         ★
       </button>
+      {saved && (
+        <span className="text-[10px] font-mono text-[#00CC66] animate-pulse">Saved</span>
+      )}
     </div>
   );
 }
