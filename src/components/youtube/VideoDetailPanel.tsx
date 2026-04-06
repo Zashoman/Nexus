@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
 interface Video {
   id: string;
@@ -35,8 +35,55 @@ function cleanBold(text: string): string {
   return text.replace(new RegExp("\\*\\*([^*]+)\\*\\*", "g"), "$1");
 }
 
-function renderAnalysis(text: string) {
+// Parse markdown-style sections from the summary
+interface Section {
+  id: string;
+  title: string;
+  content: React.ReactNode;
+}
+
+function parseSections(text: string): Section[] {
+  const sections: Section[] = [];
   const lines = text.split("\n");
+  let currentTitle = "";
+  let currentLines: string[] = [];
+  let sectionIndex = 0;
+
+  function flushSection() {
+    if (currentTitle && currentLines.length > 0) {
+      const id = `section-${sectionIndex++}`;
+      sections.push({
+        id,
+        title: currentTitle,
+        content: renderSectionContent(currentLines),
+      });
+    }
+    currentLines = [];
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Skip phase headers and horizontal rules
+    if (trimmed.startsWith("# PHASE") || trimmed === "---" || trimmed === "RULES:") continue;
+    if (trimmed.startsWith("- Only analyze") || trimmed.startsWith("- You have") || trimmed.startsWith("- Be analytical") || trimmed.startsWith("- Use direct") || trimmed.startsWith("- Target")) continue;
+
+    if (trimmed.startsWith("## ")) {
+      flushSection();
+      currentTitle = cleanBold(trimmed.replace("## ", ""));
+    } else if (trimmed.startsWith("# ")) {
+      flushSection();
+      currentTitle = cleanBold(trimmed.replace("# ", ""));
+    } else {
+      currentLines.push(line);
+    }
+  }
+  flushSection();
+
+  return sections;
+}
+
+function renderSectionContent(lines: string[]): React.ReactNode {
   const elements: React.ReactNode[] = [];
   let key = 0;
   let prevWasEmpty = false;
@@ -45,74 +92,47 @@ function renderAnalysis(text: string) {
     const trimmed = lines[i].trim();
 
     if (!trimmed) {
-      if (!prevWasEmpty) {
-        elements.push(<div key={key++} className="h-3" />);
+      if (!prevWasEmpty && elements.length > 0) {
+        elements.push(<div key={key++} className="h-2" />);
         prevWasEmpty = true;
       }
       continue;
     }
     prevWasEmpty = false;
 
-    if (trimmed.startsWith("# PHASE 1")) {
-      elements.push(
-        <div key={key++} className="text-[10px] font-mono text-[#00CC66]/40 uppercase tracking-widest border-b border-[#00CC66]/10 pb-1 mt-6 mb-3">
-          Phase 1: Content Extraction
-        </div>
-      );
-    } else if (trimmed.startsWith("# PHASE 2")) {
-      elements.push(
-        <div key={key++} className="text-[10px] font-mono text-[#FF8C00]/40 uppercase tracking-widest border-b border-[#FF8C00]/10 pb-1 mt-8 mb-3">
-          Phase 2: Critical Analysis
-        </div>
-      );
-    } else if (trimmed.startsWith("## ")) {
-      const title = cleanBold(trimmed.replace("## ", ""));
-      elements.push(
-        <h4 key={key++} className="text-[16px] font-bold text-[#E8EAED] mt-6 mb-3">
-          {title}
-        </h4>
-      );
-    } else if (trimmed.startsWith("# ")) {
-      const title = cleanBold(trimmed.replace("# ", ""));
-      elements.push(
-        <h3 key={key++} className="text-[17px] font-bold text-[#E8EAED] mt-7 mb-3">
-          {title}
-        </h3>
-      );
-    } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
       const bulletText = cleanBold(trimmed.substring(2));
       elements.push(
-        <div key={key++} className="text-[13px] text-[#E8EAED]/80 leading-relaxed flex gap-2 ml-2 mb-1.5">
-          <span className="text-[#00CC66] flex-shrink-0 mt-0.5">{">"}</span>
-          <span>{bulletText}</span>
+        <div key={key++} className="flex gap-2.5 mb-2">
+          <span className="text-[#4488FF] flex-shrink-0 mt-[3px] text-[10px]">{"\u25B8"}</span>
+          <span className="text-[14px] text-[#C8CACD] leading-[1.65]">{bulletText}</span>
         </div>
       );
     } else if (trimmed.match(new RegExp("^\\d+\\."))) {
-      const numText = cleanBold(trimmed);
       elements.push(
-        <p key={key++} className="text-[13px] text-[#E8EAED]/80 leading-relaxed ml-2 mb-1.5">
-          {numText}
+        <p key={key++} className="text-[14px] text-[#C8CACD] leading-[1.65] mb-2 ml-1">
+          {cleanBold(trimmed)}
         </p>
       );
     } else {
+      // Check if it's a sub-heading (short line followed by content)
       const isSubHeading =
-        trimmed.length < 80 &&
+        trimmed.length < 70 &&
         !trimmed.endsWith(".") &&
         !trimmed.endsWith(",") &&
-        !trimmed.endsWith(":") &&
         !trimmed.startsWith("(") &&
         i + 1 < lines.length &&
-        lines[i + 1].trim().length > 80;
+        lines[i + 1].trim().length > 60;
 
       if (isSubHeading) {
         elements.push(
-          <h5 key={key++} className="text-[14px] font-bold text-[#E8EAED] mt-4 mb-1">
+          <h5 key={key++} className="text-[14px] font-semibold text-[#E8EAED] mt-4 mb-1.5">
             {cleanBold(trimmed)}
           </h5>
         );
       } else {
         elements.push(
-          <p key={key++} className="text-[13px] text-[#E8EAED]/90 leading-relaxed mb-2">
+          <p key={key++} className="text-[14px] text-[#C8CACD] leading-[1.65] mb-3">
             {cleanBold(trimmed)}
           </p>
         );
@@ -123,12 +143,40 @@ function renderAnalysis(text: string) {
   return <div>{elements}</div>;
 }
 
+// Collapsible section component
+function AnalysisSection({ section, defaultOpen }: { section: Section; defaultOpen: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <div className="border-b border-[#1E2A3A]/50 last:border-b-0">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between py-3 text-left group"
+      >
+        <h4 className="text-[13px] font-mono font-semibold text-[#E8EAED] uppercase tracking-wider group-hover:text-[#4488FF] transition-colors">
+          {section.title}
+        </h4>
+        <span className={`text-[#5A6A7A] text-xs transition-transform ${open ? 'rotate-180' : ''}`}>
+          ▾
+        </span>
+      </button>
+      {open && (
+        <div className="pb-5">
+          {section.content}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelProps) {
   const [miniSummary, setMiniSummary] = useState<string | null>(null);
   const [fullSummary, setFullSummary] = useState<string | null>(null);
   const [miniLoading, setMiniLoading] = useState(false);
   const [fullLoading, setFullLoading] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
+  const [readProgress, setReadProgress] = useState(0);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!video) return;
@@ -137,7 +185,19 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
     setMiniLoading(false);
     setFullLoading(false);
     setIsStarred(false);
+    setReadProgress(0);
   }, [video?.video_id]);
+
+  // Reading progress tracker
+  const handleScroll = useCallback(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const scrollTop = el.scrollTop;
+    const scrollHeight = el.scrollHeight - el.clientHeight;
+    if (scrollHeight > 0) {
+      setReadProgress(Math.min(100, (scrollTop / scrollHeight) * 100));
+    }
+  }, []);
 
   async function generateMini() {
     if (!video || miniLoading) return;
@@ -150,11 +210,8 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
       });
       const data = await res.json();
       if (data.summary) setMiniSummary(data.summary);
-    } catch {
-      // silent
-    } finally {
-      setMiniLoading(false);
-    }
+    } catch { /* silent */ }
+    finally { setMiniLoading(false); }
   }
 
   async function generateFull() {
@@ -168,11 +225,8 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
       });
       const data = await res.json();
       if (data.summary) setFullSummary(data.summary);
-    } catch {
-      // silent
-    } finally {
-      setFullLoading(false);
-    }
+    } catch { /* silent */ }
+    finally { setFullLoading(false); }
   }
 
   if (!video) {
@@ -183,110 +237,155 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
     );
   }
 
+  const sections = fullSummary ? parseSections(fullSummary) : [];
+
   return (
-    <div className="flex-1 bg-[#141820] overflow-y-auto border-l border-[#1E2A3A]">
+    <div className="flex-1 bg-[#141820] flex flex-col overflow-hidden border-l border-[#1E2A3A]">
+      {/* Reading progress bar */}
+      {fullSummary && (
+        <div className="h-[2px] bg-[#1E2A3A] flex-shrink-0">
+          <div
+            className="h-full bg-[#4488FF] transition-all duration-150"
+            style={{ width: `${readProgress}%` }}
+          />
+        </div>
+      )}
+
       {onClose && (
-        <button onClick={onClose} className="lg:hidden absolute top-2 right-2 text-[#5A6A7A] hover:text-[#E8EAED] text-lg px-2 cursor-pointer">
+        <button onClick={onClose} className="lg:hidden absolute top-2 right-2 text-[#5A6A7A] hover:text-[#E8EAED] text-lg px-2 cursor-pointer z-10">
           X
         </button>
       )}
 
-      <div className="p-4 space-y-4">
-        <div className="flex items-start justify-between gap-2">
-          <h2 className="text-lg font-semibold text-[#E8EAED] leading-tight">{video.title}</h2>
-          <button
-            onClick={() => setIsStarred(!isStarred)}
-            className={`flex-shrink-0 px-1.5 py-0.5 text-sm cursor-pointer transition-all ${
-              isStarred ? 'text-[#FFD700]' : 'text-[#5A6A7A] hover:text-[#FFD700]'
-            }`}
-            title={isStarred ? 'Starred for weekly synthesis' : 'Star for weekly synthesis'}
-          >
-            {isStarred ? '\u2605' : '\u2606'}
-          </button>
-        </div>
+      <div ref={contentRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
+        {/* Constrained reading width */}
+        <div className="max-w-[620px] mx-auto px-5 py-5 space-y-4">
 
-        <div className="flex items-start gap-3">
-          {video.thumbnail_url && (
-            <div className="flex-shrink-0 w-[140px] h-[79px] bg-[#0B0E11] rounded-sm overflow-hidden">
-              <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" />
-            </div>
-          )}
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-3 text-xs font-mono">
-              <span className="text-[#FF4444] font-bold">{video.channel_name}</span>
-              <span className="text-[#5A6A7A] capitalize">{video.category}</span>
-              {video.published_at && <span className="text-[#5A6A7A]">{timeAgo(video.published_at)}</span>}
-            </div>
-            <a
-              href={video.video_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono bg-[#FF4444]/10 text-[#FF4444] rounded-sm hover:bg-[#FF4444]/20 transition-colors"
+          {/* Header */}
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="text-[18px] font-semibold text-[#E8EAED] leading-snug">{video.title}</h2>
+            <button
+              onClick={() => setIsStarred(!isStarred)}
+              className={`flex-shrink-0 px-1.5 py-0.5 text-sm cursor-pointer transition-all ${
+                isStarred ? 'text-[#FFD700]' : 'text-[#5A6A7A] hover:text-[#FFD700]'
+              }`}
             >
-              Watch on YouTube
-            </a>
+              {isStarred ? '\u2605' : '\u2606'}
+            </button>
           </div>
-        </div>
 
-        <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <h4 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider">Quick Summary</h4>
-            {!miniSummary && !miniLoading && (
-              <button onClick={generateMini} className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF] cursor-pointer">
-                Generate
-              </button>
+          {/* Meta + thumbnail */}
+          <div className="flex items-start gap-3">
+            {video.thumbnail_url && (
+              <div className="flex-shrink-0 w-[120px] h-[68px] bg-[#0B0E11] rounded-sm overflow-hidden">
+                <img src={video.thumbnail_url} alt="" className="w-full h-full object-cover" />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-3 text-xs font-mono">
+                <span className="text-[#FF4444] font-bold">{video.channel_name}</span>
+                <span className="text-[#5A6A7A] capitalize">{video.category}</span>
+                {video.published_at && <span className="text-[#5A6A7A]">{timeAgo(video.published_at)}</span>}
+              </div>
+              <a
+                href={video.video_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono bg-[#FF4444]/10 text-[#FF4444] rounded-sm hover:bg-[#FF4444]/20 transition-colors"
+              >
+                Watch on YouTube
+              </a>
+            </div>
+          </div>
+
+          {/* Quick Summary */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <h4 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider">Quick Summary</h4>
+              {!miniSummary && !miniLoading && (
+                <button onClick={generateMini} className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF] cursor-pointer">
+                  Generate
+                </button>
+              )}
+            </div>
+            {miniLoading ? (
+              <div className="space-y-2 py-1">
+                <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
+                <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-3/4" />
+              </div>
+            ) : miniSummary ? (
+              <p className="text-[14px] text-[#C8CACD] leading-[1.65]">{miniSummary}</p>
+            ) : (
+              <p className="text-[11px] text-[#5A6A7A]">Click Generate for a quick summary</p>
             )}
           </div>
-          {miniLoading ? (
-            <div className="space-y-2 py-1">
-              <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
-              <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-3/4" />
-            </div>
-          ) : miniSummary ? (
-            <p className="text-[13px] text-[#E8EAED]/90 leading-relaxed">{miniSummary}</p>
-          ) : (
-            <p className="text-[11px] text-[#5A6A7A]">Click Generate for a quick summary</p>
-          )}
-        </div>
 
-        <div className="space-y-2 pt-3 border-t border-[#1E2A3A]">
-          {!fullSummary && !fullLoading && (
-            <button
-              onClick={generateFull}
-              className="w-full py-3 px-4 text-sm font-mono font-semibold text-[#0B0E11] rounded cursor-pointer transition-all duration-200 bg-[#00CC66] hover:bg-[#00DD77] active:bg-[#00BB55]"
-            >
-              Deep Analysis - Full Video Synthesis
-            </button>
-          )}
-          {fullLoading && (
-            <div className="bg-[#141820] border border-[#00CC66]/20 rounded-sm p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-[#00CC66] rounded-full animate-pulse" />
-                <p className="text-[11px] font-mono text-[#00CC66]">Analyzing full transcript...</p>
+          {/* Full Analysis */}
+          <div className="space-y-2 pt-3 border-t border-[#1E2A3A]">
+            {!fullSummary && !fullLoading && (
+              <button
+                onClick={generateFull}
+                className="w-full py-3 px-4 text-sm font-mono font-semibold text-[#0B0E11] rounded cursor-pointer transition-all duration-200 bg-[#00CC66] hover:bg-[#00DD77] active:bg-[#00BB55]"
+              >
+                Full Summary
+              </button>
+            )}
+            {fullLoading && (
+              <div className="bg-[#0B0E11] border border-[#00CC66]/20 rounded-sm p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-[#00CC66] rounded-full animate-pulse" />
+                  <p className="text-[11px] font-mono text-[#00CC66]">Analyzing transcript...</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
+                  <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-5/6" />
+                  <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
+                </div>
+                <p className="text-[9px] font-mono text-[#5A6A7A]">15-30 seconds</p>
               </div>
-              <div className="space-y-2">
-                <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
-                <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-5/6" />
-                <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
-                <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-4/5" />
-              </div>
-              <p className="text-[9px] font-mono text-[#5A6A7A]">This may take 15-30 seconds</p>
-            </div>
-          )}
-          {fullSummary && (
-            <div>
-              <h4 className="text-[12px] font-mono text-[#00CC66] uppercase tracking-wider mb-3">Deep Analysis</h4>
-              {renderAnalysis(fullSummary)}
-            </div>
-          )}
-        </div>
+            )}
+            {fullSummary && sections.length > 0 && (
+              <div>
+                {/* Section nav — sticky jump links */}
+                <div className="flex flex-wrap gap-1.5 mb-4 pb-3 border-b border-[#1E2A3A] sticky top-0 bg-[#141820] z-10 pt-1">
+                  {sections.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        const el = document.getElementById(s.id);
+                        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }}
+                      className="px-2 py-1 text-[10px] font-mono text-[#5A6A7A] bg-[#0B0E11] rounded-sm hover:text-[#4488FF] hover:bg-[#4488FF]/10 transition-colors"
+                    >
+                      {s.title}
+                    </button>
+                  ))}
+                </div>
 
-        {video.description && (
-          <div className="pt-2 border-t border-[#1E2A3A]">
-            <h4 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-1">Description</h4>
-            <p className="text-[11px] text-[#5A6A7A] leading-relaxed whitespace-pre-wrap line-clamp-6">{video.description}</p>
+                {/* Collapsible sections */}
+                {sections.map((s, i) => (
+                  <div key={s.id} id={s.id}>
+                    <AnalysisSection section={s} defaultOpen={i < 3} />
+                  </div>
+                ))}
+              </div>
+            )}
+            {fullSummary && sections.length === 0 && (
+              <div>
+                <h4 className="text-[12px] font-mono text-[#00CC66] uppercase tracking-wider mb-3">Analysis</h4>
+                {renderSectionContent(fullSummary.split("\n"))}
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Description */}
+          {video.description && (
+            <div className="pt-2 border-t border-[#1E2A3A]">
+              <h4 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-1">Description</h4>
+              <p className="text-[12px] text-[#5A6A7A] leading-relaxed whitespace-pre-wrap line-clamp-6">{video.description}</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

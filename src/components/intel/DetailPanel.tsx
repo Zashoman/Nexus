@@ -51,25 +51,25 @@ function renderStructuredSummary(text: string) {
   const relevanceMatch = lines.match(/RELEVANCE TO YOU:\s*([^\n]+(?:\n(?!$|\n)[^\n]+)*)/);
 
   if (!thesisMatch) {
-    return <p className="text-[13px] text-[#E8EAED]/90 leading-relaxed whitespace-pre-wrap">{text}</p>;
+    return <p className="text-[14px] text-[#C8CACD] leading-[1.65] whitespace-pre-wrap">{text}</p>;
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {thesisMatch && (
         <div>
-          <h5 className="text-[11px] font-mono text-[#FF8C00] uppercase tracking-wider mb-1.5">Thesis</h5>
-          <p className="text-[13px] text-[#E8EAED]/90 leading-relaxed">{thesisMatch[1].trim()}</p>
+          <h5 className="text-[11px] font-mono text-[#FF8C00] uppercase tracking-wider mb-2">Thesis</h5>
+          <p className="text-[14px] text-[#C8CACD] leading-[1.65]">{thesisMatch[1].trim()}</p>
         </div>
       )}
 
       {pointsMatch && (
         <div>
-          <h5 className="text-[11px] font-mono text-[#4488FF] uppercase tracking-wider mb-1.5">Key Points</h5>
-          <ul className="space-y-1">
+          <h5 className="text-[11px] font-mono text-[#4488FF] uppercase tracking-wider mb-2">Key Points</h5>
+          <ul className="space-y-2">
             {extractBullets(pointsMatch[1]).map((point, i) => (
-              <li key={i} className="text-[13px] text-[#E8EAED]/80 leading-relaxed flex gap-2">
-                <span className="text-[#4488FF] flex-shrink-0">&#8250;</span>
+              <li key={i} className="text-[14px] text-[#C8CACD] leading-[1.65] flex gap-2.5">
+                <span className="text-[#4488FF] flex-shrink-0 text-[10px] mt-[5px]">{"\u25B8"}</span>
                 <span>{point}</span>
               </li>
             ))}
@@ -79,17 +79,17 @@ function renderStructuredSummary(text: string) {
 
       {mattersMatch && (
         <div>
-          <h5 className="text-[11px] font-mono text-[#00CC66] uppercase tracking-wider mb-1.5">Why It Matters</h5>
-          <p className="text-[13px] text-[#E8EAED]/90 leading-relaxed">{mattersMatch[1].trim()}</p>
+          <h5 className="text-[11px] font-mono text-[#00CC66] uppercase tracking-wider mb-2">Why It Matters</h5>
+          <p className="text-[14px] text-[#C8CACD] leading-[1.65]">{mattersMatch[1].trim()}</p>
         </div>
       )}
 
       {dataMatch && (
         <div>
-          <h5 className="text-[11px] font-mono text-[#8899AA] uppercase tracking-wider mb-1.5">Data</h5>
-          <ul className="space-y-1">
+          <h5 className="text-[11px] font-mono text-[#8899AA] uppercase tracking-wider mb-2">Data</h5>
+          <ul className="space-y-1.5">
             {extractBullets(dataMatch[1]).map((point, i) => (
-              <li key={i} className="text-[13px] text-[#8899AA] leading-relaxed flex gap-2">
+              <li key={i} className="text-[14px] text-[#8899AA] leading-[1.65] flex gap-2">
                 <span className="text-[#5A6A7A] font-mono flex-shrink-0">{i + 1}.</span>
                 <span>{point}</span>
               </li>
@@ -99,9 +99,9 @@ function renderStructuredSummary(text: string) {
       )}
 
       {relevanceMatch && (
-        <div className="bg-[#4488FF]/5 border-l-2 border-[#4488FF]/30 px-3 py-2">
-          <h5 className="text-[11px] font-mono text-[#4488FF] uppercase tracking-wider mb-1">Relevance to You</h5>
-          <p className="text-[13px] text-[#E8EAED]/80 leading-relaxed">{relevanceMatch[1].trim()}</p>
+        <div className="bg-[#4488FF]/5 border-l-2 border-[#4488FF]/30 px-3 py-2.5">
+          <h5 className="text-[11px] font-mono text-[#4488FF] uppercase tracking-wider mb-1.5">Relevance to You</h5>
+          <p className="text-[14px] text-[#C8CACD] leading-[1.65]">{relevanceMatch[1].trim()}</p>
         </div>
       )}
     </div>
@@ -149,7 +149,7 @@ function renderDeepAnalysis(text: string) {
     } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
       const bulletText = cleanBold(trimmed.substring(2));
       elements.push(
-        <div key={key++} className="text-[13px] text-[#E8EAED]/80 leading-relaxed flex gap-2 ml-2 mb-1.5">
+        <div key={key++} className="text-[14px] text-[#C8CACD] leading-[1.65] flex gap-2.5 ml-1 mb-2">
           <span className="text-[#4488FF] flex-shrink-0 mt-0.5">{">"}</span>
           <span>{bulletText}</span>
         </div>
@@ -157,7 +157,7 @@ function renderDeepAnalysis(text: string) {
     } else if (trimmed.match(new RegExp("^\\d+\\."))) {
       const numText = cleanBold(trimmed);
       elements.push(
-        <p key={key++} className="text-[13px] text-[#E8EAED]/80 leading-relaxed ml-2 mb-1.5">
+        <p key={key++} className="text-[14px] text-[#C8CACD] leading-[1.65] ml-1 mb-2">
           {numText}
         </p>
       );
@@ -179,7 +179,7 @@ function renderDeepAnalysis(text: string) {
         );
       } else {
         elements.push(
-          <p key={key++} className="text-[13px] text-[#E8EAED]/90 leading-relaxed mb-2">
+          <p key={key++} className="text-[14px] text-[#C8CACD] leading-[1.65] mb-3">
             {cleanBold(trimmed)}
           </p>
         );
@@ -253,7 +253,7 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
         </button>
       )}
 
-      <div className="p-4 space-y-4">
+      <div className="max-w-[620px] mx-auto px-5 py-5 space-y-4">
         <div className="flex items-start justify-between gap-2">
           <h2 className="text-lg font-semibold text-[#E8EAED] leading-tight">
             {item.title}
