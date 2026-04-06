@@ -56,10 +56,46 @@ export default function DashboardPage() {
   const [geoData, setGeoData] = useState<Record<string, unknown> | null>(null);
   const [earningsData, setEarningsData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
+  const [headerScores, setHeaderScores] = useState<Record<string, { score: number; max: number; level: string }>>({});
 
   useEffect(() => {
+    fetchHeaderScores();
     fetchTabData(activeTab);
   }, [activeTab]);
+
+  async function fetchHeaderScores() {
+    try {
+      const [ratesRes, commRes, ddRes, hormuzRes, creditRes, geoRes] = await Promise.all([
+        fetch("/api/dashboard/rates").then(r => r.json()).catch(() => null),
+        fetch("/api/dashboard/commodities").then(r => r.json()).catch(() => null),
+        fetch("/api/dashboard/demand-destruction").then(r => r.json()).catch(() => null),
+        fetch("/api/dashboard/hormuz").then(r => r.json()).catch(() => null),
+        fetch("/api/dashboard/private-credit").then(r => r.json()).catch(() => null),
+        fetch("/api/dashboard/geo").then(r => r.json()).catch(() => null),
+      ]);
+
+      const scores: Record<string, { score: number; max: number; level: string }> = {};
+
+      if (ratesRes?.score != null) scores.rates = { score: ratesRes.score, max: ratesRes.max_score || 20, level: ratesRes.level || "neutral" };
+      if (commRes?.score != null) scores.commodities = { score: commRes.score, max: commRes.max_score || 22, level: commRes.level || "neutral" };
+      if (ddRes?.latest?.total_score != null) scores.demand = { score: ddRes.latest.total_score, max: 20, level: ddRes.latest.threat_level || "low" };
+      if (hormuzRes?.latest?.total_score != null) scores.hormuz = { score: hormuzRes.latest.total_score, max: 50, level: hormuzRes.latest.risk_level || "hold" };
+      if (creditRes?.latest?.total_score != null) scores.credit = { score: creditRes.latest.total_score, max: 25, level: creditRes.latest.stress_level || "calm" };
+      if (geoRes?.risk_score != null) scores.geo = { score: geoRes.risk_score, max: geoRes.max_score || 16, level: geoRes.risk_level || "calm" };
+
+      setHeaderScores(scores);
+
+      // Also populate tab data from the header fetch
+      if (ratesRes && !rates) setRates(ratesRes);
+      if (commRes && !commodities) setCommodities(commRes);
+      if (ddRes && !ddData) setDdData(ddRes);
+      if (hormuzRes && !hormuzData) setHormuzData(hormuzRes);
+      if (creditRes && !creditData) setCreditData(creditRes);
+      if (geoRes && !geoData) setGeoData(geoRes);
+    } catch {
+      // silent
+    }
+  }
 
   async function fetchTabData(tab: string) {
     setLoading(true);
@@ -125,8 +161,43 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col h-screen bg-[#0B0E11] text-[#E8EAED]">
-      <div className="border-b border-[#1E2A3A] bg-[#0D1117] px-4 py-1.5">
-        <h1 className="text-xs font-mono text-[#4488FF] font-bold uppercase tracking-wider">Macro Dashboard</h1>
+      {/* Master Header with all scores */}
+      <div className="border-b border-[#1E2A3A] bg-[#0D1117] px-4 py-2">
+        <div className="flex items-center justify-between mb-1.5">
+          <h1 className="text-xs font-mono text-[#4488FF] font-bold uppercase tracking-wider">Macro Dashboard</h1>
+          {Object.keys(headerScores).length > 0 && (() => {
+            const entries = Object.values(headerScores);
+            const normalized = entries.map(e => (e.score / e.max) * 100);
+            const composite = Math.round(normalized.reduce((a, b) => a + b, 0) / normalized.length);
+            const compLevel = composite >= 66 ? "EXTREME" : composite >= 46 ? "HIGH RISK" : composite >= 26 ? "MODERATE" : "LOW RISK";
+            const compColor = composite >= 66 ? "text-[#FF0000]" : composite >= 46 ? "text-[#FF4444]" : composite >= 26 ? "text-[#FF8C00]" : "text-[#00CC66]";
+            return (
+              <span className={`text-[14px] font-mono font-bold ${compColor}`}>
+                MACRO RISK: {composite} - {compLevel}
+              </span>
+            );
+          })()}
+        </div>
+        <div className="flex items-center gap-3 overflow-x-auto">
+          {[
+            { key: "rates", label: "RATES" },
+            { key: "commodities", label: "COMM" },
+            { key: "demand", label: "DD" },
+            { key: "hormuz", label: "HORMUZ" },
+            { key: "credit", label: "CREDIT" },
+            { key: "geo", label: "GEO" },
+          ].map((item) => {
+            const s = headerScores[item.key];
+            if (!s) return <span key={item.key} className="text-[9px] font-mono text-[#5A6A7A]">{item.label}: --</span>;
+            const pct = (s.score / s.max) * 100;
+            const color = pct >= 60 ? "text-[#FF4444]" : pct >= 40 ? "text-[#FF8C00]" : pct >= 20 ? "text-[#FFD700]" : "text-[#00CC66]";
+            return (
+              <button key={item.key} onClick={() => setActiveTab(item.key)} className={`text-[9px] font-mono ${color} hover:underline cursor-pointer whitespace-nowrap`}>
+                {item.label}: {s.level.toUpperCase().replace("_", " ")} {s.score}/{s.max}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="flex items-center gap-0 border-b border-[#1E2A3A] bg-[#0D1117] overflow-x-auto">
