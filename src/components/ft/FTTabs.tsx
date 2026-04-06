@@ -8,8 +8,10 @@ interface FTTabsProps {
 const TABS = [
   { key: "all", label: "All" },
   { key: "markets", label: "Markets" },
+  { key: "energy", label: "Energy" },
   { key: "commodities", label: "Commodities" },
   { key: "technology", label: "Technology" },
+  { key: "ai", label: "AI" },
   { key: "macro", label: "Macro" },
   { key: "geopolitics", label: "Geopolitics" },
 ];

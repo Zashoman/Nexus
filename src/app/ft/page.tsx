@@ -13,20 +13,35 @@ export default function FTPage() {
   const [loading, setLoading] = useState(true);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
+  // Map tabs to FT source name fragments for filtering
+  const TAB_SOURCE_MAP: Record<string, string[]> = {
+    all: [],
+    markets: ["Markets"],
+    energy: ["Energy"],
+    commodities: ["Commodities"],
+    technology: ["Technology"],
+    ai: ["AI", "Artificial Intelligence"],
+    macro: ["Global Economy", "Emerging Markets"],
+    geopolitics: ["Middle East", "US", "China"],
+  };
+
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch items where source_name starts with "Financial Times"
-      const params = new URLSearchParams({ limit: "50" });
-      if (activeTab !== "all") {
-        params.set("category", activeTab);
-      }
+      const params = new URLSearchParams({ limit: "100" });
       const res = await fetch(`/api/intel/items?${params}`);
       const data = await res.json();
-      // Filter to only FT items client-side
-      const ftItems = (data.items || []).filter((item: IntelItem) =>
+      // Filter to only FT items
+      let ftItems = (data.items || []).filter((item: IntelItem) =>
         item.source_name.startsWith("Financial Times")
       );
+      // Apply tab filter by source name
+      const sourceFragments = TAB_SOURCE_MAP[activeTab];
+      if (sourceFragments && sourceFragments.length > 0) {
+        ftItems = ftItems.filter((item: IntelItem) =>
+          sourceFragments.some((frag: string) => item.source_name.includes(frag))
+        );
+      }
       setItems(ftItems);
     } catch {
       // silent
