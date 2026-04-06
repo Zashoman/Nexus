@@ -9,6 +9,7 @@ interface ItemCardProps {
   currentRating: RatingValue | null;
   onRate: (rating: RatingValue) => void;
   onDismiss: () => void;
+  showRateConfirm?: boolean;
 }
 
 const IMPACT_COLORS: Record<string, string> = {
@@ -40,7 +41,7 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-export default function ItemCard({ item, isSelected, onClick, currentRating, onRate, onDismiss }: ItemCardProps) {
+export default function ItemCard({ item, isSelected, onClick, currentRating, onRate, onDismiss, showRateConfirm }: ItemCardProps) {
   const impactLevel = item.impact_level || 'low';
   const impactClass = IMPACT_COLORS[impactLevel] || IMPACT_COLORS.low;
   const tierColor = TIER_COLORS[item.source_tier] || TIER_COLORS[3];
@@ -117,13 +118,18 @@ export default function ItemCard({ item, isSelected, onClick, currentRating, onR
         </p>
       )}
 
-      {item.group_source_count && item.group_source_count > 1 && (
-        <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1">
+        {item.group_source_count && item.group_source_count > 1 && (
           <span className="text-[10px] font-mono text-[#8899AA] bg-[#8899AA]/10 px-1.5 py-0 rounded-sm">
             {item.group_source_count} sources
           </span>
-        </div>
-      )}
+        )}
+        {showRateConfirm && (
+          <span className="text-[10px] font-mono text-[#00CC66] bg-[#00CC66]/10 px-1.5 py-0 rounded-sm animate-pulse">
+            Feedback saved
+          </span>
+        )}
+      </div>
     </div>
   );
 }

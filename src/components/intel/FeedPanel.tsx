@@ -90,8 +90,23 @@ export default function FeedPanel({
     return () => clearInterval(interval);
   }, [fetchItems]);
 
-  function handleRate(itemId: string, rating: RatingValue) {
+  const [rateFlash, setRateFlash] = useState<string | null>(null);
+
+  async function handleRate(itemId: string, rating: RatingValue) {
     setRatings((prev) => ({ ...prev, [itemId]: rating }));
+    try {
+      const res = await fetch('/api/intel/rate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: itemId, rating }),
+      });
+      if (res.ok) {
+        setRateFlash(itemId);
+        setTimeout(() => setRateFlash(null), 1500);
+      }
+    } catch {
+      // silent
+    }
   }
 
   async function handleDismiss(itemId: string) {
@@ -144,6 +159,7 @@ export default function FeedPanel({
               currentRating={ratings[item.id] || null}
               onRate={(rating) => handleRate(item.id, rating)}
               onDismiss={() => handleDismiss(item.id)}
+              showRateConfirm={rateFlash === item.id}
             />
           ))}
 
