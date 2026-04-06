@@ -144,8 +144,8 @@ function renderSectionContent(lines: string[]): React.ReactNode {
 }
 
 // Collapsible section component
-function AnalysisSection({ section, defaultOpen }: { section: Section; defaultOpen: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
+function AnalysisSection({ section }: { section: Section }) {
+  const [open, setOpen] = useState(true);
 
   return (
     <div className="border-b border-[#1E2A3A]/50 last:border-b-0">
@@ -365,7 +365,7 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
                 {/* Collapsible sections */}
                 {sections.map((s, i) => (
                   <div key={s.id} id={s.id}>
-                    <AnalysisSection section={s} defaultOpen={i < 3} />
+                    <AnalysisSection section={s} />
                   </div>
                 ))}
               </div>
