@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
   const offset = (page - 1) * limit;
 
   const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+  const now = new Date().toISOString();
 
   let query = db
     .from('intel_items')
@@ -27,6 +28,8 @@ export async function GET(req: NextRequest) {
   } else {
     query = query.or('is_dismissed.eq.false,is_dismissed.is.null');
     query = query.or(`published_at.gte.${cutoff},and(published_at.is.null,ingested_at.gte.${cutoff})`);
+    // Exclude items with future published_at dates (e.g. conference announcements)
+    query = query.lte('published_at', now);
   }
 
   if (category) {
