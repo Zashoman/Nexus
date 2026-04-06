@@ -143,6 +143,30 @@ export default function RootLayout({
             <span className="text-[11px] font-mono font-bold">FT</span>
           </a>
 
+          <div className="w-6 border-t border-[#1E2A3A]" />
+
+          <a
+            href="/realestate/feedback"
+            title="Feedback Database"
+            className="w-8 h-8 flex items-center justify-center text-[#8899AA] hover:text-[#E8EAED] transition-colors rounded-sm hover:bg-[#8899AA]/10"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <ellipse cx="12" cy="5" rx="9" ry="3" />
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+              <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
+            </svg>
+          </a>
+
         </nav>
 
         {/* Main Content */}
