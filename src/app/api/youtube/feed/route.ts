@@ -57,7 +57,32 @@ export async function GET() {
 
   for (const channel of channels) {
     try {
-      const feed = await parser.parseURL(channel.rss_url);
+      // Try primary RSS URL, then fallback format
+      let feed;
+      try {
+        feed = await parser.parseURL(channel.rss_url);
+      } catch {
+        // Try alternative URL format
+        const altUrl = channel.rss_url.replace(
+          'https://www.youtube.com/feeds/videos.xml?channel_id=',
+          'https://youtube.com/feeds/videos.xml?channel_id='
+        );
+        try {
+          feed = await parser.parseURL(altUrl);
+        } catch {
+          // Try fetching via a proxy/direct XML
+          const directRes = await fetch(channel.rss_url, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NexusBot/1.0)' },
+            signal: AbortSignal.timeout(15000),
+          });
+          if (directRes.ok) {
+            const xml = await directRes.text();
+            feed = await parser.parseString(xml);
+          } else {
+            throw new Error(`Status code ${directRes.status}`);
+          }
+        }
+      }
       const feedItems = feed.items || [];
 
       for (const item of feedItems.slice(0, 10)) {

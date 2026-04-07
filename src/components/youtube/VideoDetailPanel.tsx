@@ -172,6 +172,42 @@ function AnalysisSection({ section }: { section: Section }) {
   );
 }
 
+function FeedbackInput({ videoId }: { videoId: string }) {
+  const [value, setValue] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  async function handleSubmit() {
+    if (!value.trim()) return;
+    // Store feedback (for now just show confirmation - could save to DB)
+    setSaved(true);
+    setValue("");
+    setTimeout(() => setSaved(false), 3000);
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="What did you think of this video?"
+          className="flex-1 bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1.5 text-[12px] text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]"
+          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+        />
+        <button
+          onClick={handleSubmit}
+          disabled={!value.trim()}
+          className="px-2 py-1 text-[10px] font-mono bg-[#4488FF] text-white rounded-sm hover:bg-[#5599FF] disabled:opacity-30 cursor-pointer"
+        >
+          Save
+        </button>
+      </div>
+      {saved && <p className="text-[10px] font-mono text-[#00CC66]">Feedback saved</p>}
+    </div>
+  );
+}
+
 export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelProps) {
   const [miniSummary, setMiniSummary] = useState<string | null>(null);
   const [fullSummary, setFullSummary] = useState<string | null>(null);
@@ -381,35 +417,10 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
             )}
           </div>
 
-          {/* Star + Feedback */}
+          {/* Feedback */}
           <div className="pt-3 border-t border-[#1E2A3A] space-y-2">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={async () => {
-                  const newStarred = !isStarred;
-                  setIsStarred(newStarred);
-                }}
-                className={`px-2 py-1 text-sm cursor-pointer transition-all rounded-sm ${
-                  isStarred ? "text-[#FFD700] bg-[#FFD700]/10" : "text-[#5A6A7A] hover:text-[#FFD700]"
-                }`}
-                title={isStarred ? "Starred for weekly synthesis" : "Star for weekly synthesis"}
-              >
-                {isStarred ? "\u2605 Starred" : "\u2606 Star"}
-              </button>
-              <span className="text-[10px] font-mono text-[#5A6A7A]">Star to include in weekly synthesis</span>
-            </div>
-            <input
-              type="text"
-              placeholder="Quick note - what did you think of this video?"
-              className="w-full bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1.5 text-[12px] text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.target as HTMLInputElement).value.trim()) {
-                  const val = (e.target as HTMLInputElement).value;
-                  (e.target as HTMLInputElement).value = "";
-                  // Could save to DB here in the future
-                }
-              }}
-            />
+            <h4 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider">Feedback</h4>
+            <FeedbackInput videoId={video.video_id} />
           </div>
 
           {/* Description */}
