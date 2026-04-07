@@ -34,7 +34,7 @@ export default function YouTubePage() {
   const [loading, setLoading] = useState(true);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [showAddChannel, setShowAddChannel] = useState(false);
-  const [addForm, setAddForm] = useState({ channel_id: '', channel_name: '', category: '' });
+  const [addForm, setAddForm] = useState({ handle: '', channel_name: '', category: '' });
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
@@ -53,15 +53,15 @@ export default function YouTubePage() {
   }
 
   async function addChannel() {
-    if (!addForm.channel_id || !addForm.channel_name || !addForm.category) return;
+    if (!addForm.handle || !addForm.category) return;
     setAdding(true);
     try {
       await fetch('/api/youtube/channels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(addForm),
+        body: JSON.stringify({ handle: addForm.handle, channel_name: addForm.channel_name || undefined, category: addForm.category }),
       });
-      setAddForm({ channel_id: '', channel_name: '', category: '' });
+      setAddForm({ handle: '', channel_name: '', category: '' });
       setShowAddChannel(false);
       fetchFeed();
     } catch {
@@ -116,10 +116,10 @@ export default function YouTubePage() {
             To find the channel ID: go to the YouTube channel → View Page Source → search for &quot;channelId&quot;
           </p>
           <div className="flex gap-2">
-            <input type="text" value={addForm.channel_id} onChange={(e) => setAddForm({ ...addForm, channel_id: e.target.value })} placeholder="Channel ID (e.g. UCRvqjQP...)" className="flex-1 bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]" />
+            <input type="text" value={addForm.handle} onChange={(e) => setAddForm({ ...addForm, handle: e.target.value })} placeholder="YouTube handle (e.g. @CaspianReport)" className="flex-1 bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]" />
             <input type="text" value={addForm.channel_name} onChange={(e) => setAddForm({ ...addForm, channel_name: e.target.value })} placeholder="Channel name" className="w-40 bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]" />
             <input type="text" value={addForm.category} onChange={(e) => setAddForm({ ...addForm, category: e.target.value })} placeholder="Category" className="w-28 bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1 text-xs text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#4488FF]" />
-            <button onClick={addChannel} disabled={adding || !addForm.channel_id || !addForm.channel_name || !addForm.category} className="px-3 py-1 text-xs font-mono bg-[#4488FF] text-white rounded-sm hover:bg-[#5599FF] disabled:opacity-50 cursor-pointer">
+            <button onClick={addChannel} disabled={adding || !addForm.handle || !addForm.category} className="px-3 py-1 text-xs font-mono bg-[#4488FF] text-white rounded-sm hover:bg-[#5599FF] disabled:opacity-50 cursor-pointer">
               {adding ? '...' : 'Add'}
             </button>
           </div>

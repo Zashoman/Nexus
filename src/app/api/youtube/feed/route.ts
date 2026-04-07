@@ -129,12 +129,13 @@ export async function GET() {
     }
   }
 
-  // Return recent videos (last 7 days)
+  // Return recent videos (last 7 days), exclude dismissed
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data: videos } = await db
     .from('intel_youtube_videos')
     .select('*')
     .gte('published_at', cutoff)
+    .or('is_dismissed.eq.false,is_dismissed.is.null')
     .order('published_at', { ascending: false })
     .limit(50);
 
@@ -155,6 +156,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "video_id required" }, { status: 400 });
   }
 
-  await db.from("intel_youtube_videos").delete().eq("video_id", videoId);
+  // Mark as dismissed instead of deleting — prevents re-insertion on next fetch
+  await db.from("intel_youtube_videos").update({ is_dismissed: true }).eq("video_id", videoId);
   return NextResponse.json({ success: true });
 }
