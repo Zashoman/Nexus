@@ -5,6 +5,8 @@ import ScoreChart from "@/components/dashboard/ScoreChart";
 import HormuzTab from "@/components/dashboard/HormuzTab";
 import YieldCurveChart from "@/components/dashboard/YieldCurveChart";
 import CreditStressGauge from "@/components/dashboard/CreditStressGauge";
+import InfoTip from "@/components/dashboard/InfoTip";
+import { TOOLTIPS } from "@/lib/dashboard/tooltips";
 
 const TABS = [
   { key: "calendar", label: "Economic Calendar" },
@@ -275,10 +277,10 @@ export default function DashboardPage() {
                       { name: "Fed Funds Rate", val: fed.funds_rate, suffix: "%" },
                       { name: "HY OAS", val: credit.hy_oas as number | null, suffix: "%" },
                       { name: "BBB OAS", val: credit.bbb_oas as number | null, suffix: "%" },
-                      { name: "DXY (UUP)", val: (fx.dxy as Record<string, number> | null)?.price, suffix: "" },
+                      { name: "DXY (UUP)", tip: "DXY", val: (fx.dxy as Record<string, number> | null)?.price, suffix: "" },
                     ].map((row) => (
                       <tr key={row.name} className="border-b border-[#1E2A3A]/50">
-                        <td className="px-3 py-1.5 text-[#8899AA]">{row.name}</td>
+                        <td className="px-3 py-1.5 text-[#8899AA]">{row.name}{TOOLTIPS[(row as Record<string, unknown>).tip as string || row.name] && <InfoTip text={TOOLTIPS[(row as Record<string, unknown>).tip as string || row.name]} />}</td>
                         <td className="px-3 py-1.5 text-right text-[#E8EAED] font-bold">{row.val != null ? fmt(row.val) + row.suffix : "--"}</td>
                       </tr>
                     ))}
@@ -333,7 +335,7 @@ export default function DashboardPage() {
                       if (!q) return null;
                       return (
                         <div key={sym} className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-2.5">
-                          <p className="text-[10px] font-mono text-[#5A6A7A]">{q.name as string}</p>
+                          <p className="text-[10px] font-mono text-[#5A6A7A]">{q.name as string}{TOOLTIPS[q.name as string] && <InfoTip text={TOOLTIPS[q.name as string]} />}</p>
                           <p className="text-[9px] font-mono text-[#5A6A7A]/60">{q.displayNote as string}</p>
                           <p className="text-[18px] font-mono font-bold text-[#E8EAED]">${fmt(q.price as number)}</p>
                           <p className={`text-[11px] font-mono ${chgColor(q.changePct as number)}`}>{chg(q.changePct as number)}</p>
@@ -347,11 +349,11 @@ export default function DashboardPage() {
               {/* Ratios */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
-                  <p className="text-[10px] font-mono text-[#5A6A7A]">Gold/Oil Ratio</p>
+                  <p className="text-[10px] font-mono text-[#5A6A7A]">Gold/Oil Ratio<InfoTip text={TOOLTIPS["Gold/Oil Ratio"]} /></p>
                   <p className="text-[18px] font-mono font-bold text-[#FFD700]">{ratios.gold_oil || "--"}</p>
                 </div>
                 <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
-                  <p className="text-[10px] font-mono text-[#5A6A7A]">Copper/Gold Ratio</p>
+                  <p className="text-[10px] font-mono text-[#5A6A7A]">Copper/Gold Ratio<InfoTip text={TOOLTIPS["Copper/Gold Ratio"]} /></p>
                   <p className="text-[18px] font-mono font-bold text-[#FF8C00]">{ratios.copper_gold || "--"}</p>
                 </div>
               </div>
@@ -402,7 +404,7 @@ export default function DashboardPage() {
                   return (
                     <div key={ind.name} className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-2">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[9px] font-mono text-[#5A6A7A]">{ind.name}</span>
+                        <span className="text-[9px] font-mono text-[#5A6A7A]">{ind.name}{TOOLTIPS[ind.name] && <InfoTip text={TOOLTIPS[ind.name]} />}</span>
                         <span className={`text-[8px] font-mono px-1 py-0 rounded-sm ${signalTextColor} ${signalColor}/15`}>{signalLabel}</span>
                       </div>
                       <p className="text-[14px] font-mono font-bold text-[#E8EAED]">
@@ -529,7 +531,7 @@ export default function DashboardPage() {
                   const s = (latest[ind.score] as number) || 0;
                   return (
                     <div key={ind.name} className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-2">
-                      <p className="text-[9px] font-mono text-[#5A6A7A]">{ind.name}</p>
+                      <p className="text-[9px] font-mono text-[#5A6A7A]">{ind.name}{TOOLTIPS[ind.name + " Score"] && <InfoTip text={TOOLTIPS[ind.name + " Score"]} />}{TOOLTIPS[ind.name] && <InfoTip text={TOOLTIPS[ind.name]} />}</p>
                       <p className="text-[14px] font-mono font-bold text-[#E8EAED]">
                         {latest[ind.value] != null ? fmt(latest[ind.value] as number) : "--"}
                       </p>
@@ -603,7 +605,7 @@ export default function DashboardPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {Object.entries(proxies).map(([key, val]) => (
                   <div key={key} className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
-                    <p className="text-[10px] font-mono text-[#5A6A7A] uppercase">{key}</p>
+                    <p className="text-[10px] font-mono text-[#5A6A7A] uppercase">{key}{TOOLTIPS[key === "gold" ? "Gold" : key === "wti" ? "WTI Crude Oil" : key === "defense" ? "Defense ETF" : key === "spy" ? "SPY" : "VIX"] && <InfoTip text={TOOLTIPS[key === "gold" ? "Gold" : key === "wti" ? "WTI Crude Oil" : key === "defense" ? "Defense ETF" : key === "spy" ? "SPY" : "VIX"]} />}</p>
                     <p className="text-[18px] font-mono font-bold text-[#E8EAED]">{val?.price != null ? fmt(val.price) : "--"}</p>
                     <p className={`text-[11px] font-mono ${chgColor(val?.changePct)}`}>{chg(val?.changePct)}</p>
                   </div>

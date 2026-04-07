@@ -1,6 +1,8 @@
 "use client";
 
 import ScoreChart from "./ScoreChart";
+import InfoTip from "./InfoTip";
+import { TOOLTIPS } from "@/lib/dashboard/tooltips";
 
 interface HormuzScore {
   id: string;
@@ -156,7 +158,7 @@ export default function HormuzTab({ data, loading, onRescore }: Props) {
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[11px] font-mono text-[#8899AA]">
                     {sig.star && <span className="text-[#FFD700] mr-1">*</span>}
-                    {sig.name}
+                    {sig.name}{TOOLTIPS[sig.name] && <InfoTip text={TOOLTIPS[sig.name]} />}
                   </span>
                   <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-sm ${RATING_BADGE[rating] || RATING_BADGE.yellow}`}>
                     {rating.toUpperCase()}
