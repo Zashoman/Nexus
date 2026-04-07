@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import ScoreChart from "@/components/dashboard/ScoreChart";
 import HormuzTab from "@/components/dashboard/HormuzTab";
+import YieldCurveChart from "@/components/dashboard/YieldCurveChart";
+import CreditStressGauge from "@/components/dashboard/CreditStressGauge";
 
 const TABS = [
   { key: "calendar", label: "Economic Calendar" },
@@ -223,73 +225,139 @@ export default function DashboardPage() {
         )}
 
         {/* RATES TAB */}
-        {activeTab === "rates" && rates && (
-          <div className="space-y-4">
-            <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider">Treasury Yields</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                { label: "2Y Yield", val: (rates as Record<string, Record<string, unknown>>).yields?.us2y },
-                { label: "10Y Yield", val: (rates as Record<string, Record<string, unknown>>).yields?.us10y },
-                { label: "30Y Yield", val: (rates as Record<string, Record<string, unknown>>).yields?.us30y },
-                { label: "2s/10s Spread", val: (rates as Record<string, Record<string, unknown>>).yields?.spread_2s10s },
-              ].map((item) => (
-                <div key={item.label} className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
-                  <p className="text-[10px] font-mono text-[#5A6A7A]">{item.label}</p>
-                  <p className={`text-[18px] font-mono font-bold ${Number(item.val) < 0 ? "text-[#FF4444]" : "text-[#E8EAED]"}`}>
-                    {fmt(item.val as number | null)}%
-                  </p>
-                </div>
-              ))}
-            </div>
+        {activeTab === "rates" && rates && (() => {
+          const r = rates as Record<string, unknown>;
+          const yields = r.yields as Record<string, number | null> || {};
+          const credit = r.credit as Record<string, unknown> || {};
+          const fed = r.fed as Record<string, number | null> || {};
+          const fx = r.fx as Record<string, Record<string, number> | null> || {};
+          const yieldCurve = (r.yield_curve as { label: string; value: number | null }[]) || [];
+          const spread = yields.spread_2s10s;
+          const isInverted = spread != null && spread < 0;
 
-            <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider mt-4">Credit Spreads</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
-                <p className="text-[10px] font-mono text-[#5A6A7A]">HY OAS</p>
-                <p className="text-[18px] font-mono font-bold text-[#E8EAED]">
-                  {fmt((rates as Record<string, Record<string, unknown>>).credit?.hy_oas as number | null)}%
-                </p>
+          return (
+            <div className="space-y-4">
+              {/* Score badge */}
+              <div className="flex items-center gap-3">
+                <span className={`px-3 py-1 text-sm font-mono font-bold rounded-sm ${THREAT_COLORS[(r.level as string) || "neutral"]}`}>
+                  {((r.level as string) || "NEUTRAL").toUpperCase()}
+                </span>
+                <span className="text-[16px] font-mono font-bold text-[#E8EAED]">{r.score as number}/{r.max_score as number}</span>
               </div>
+
+              {/* Yield Curve Chart */}
+              <YieldCurveChart data={yieldCurve} />
+
+              {/* 2s/10s Spread */}
+              <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3 flex items-center gap-4">
+                <span className="text-[10px] font-mono text-[#5A6A7A]">2s/10s Spread</span>
+                <span className={`text-[22px] font-mono font-bold ${isInverted ? "text-[#FF4444]" : "text-[#00CC66]"}`}>
+                  {spread != null ? (spread > 0 ? "+" : "") + spread.toFixed(2) + "%" : "--"}
+                </span>
+                {isInverted && <span className="text-[10px] font-mono bg-[#FF4444]/15 text-[#FF4444] px-1.5 py-0.5 rounded-sm">INVERTED</span>}
+              </div>
+
+              {/* Key Rates Table */}
+              <div className="bg-[#0D1117] border border-[#1E2A3A] rounded-sm overflow-hidden">
+                <table className="w-full text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-[#1E2A3A]">
+                      <th className="text-left px-3 py-2 text-[#5A6A7A]">Indicator</th>
+                      <th className="text-right px-3 py-2 text-[#5A6A7A]">Current</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { name: "US 2Y Yield", val: yields.us2y, suffix: "%" },
+                      { name: "US 10Y Yield", val: yields.us10y, suffix: "%" },
+                      { name: "US 30Y Yield", val: yields.us30y, suffix: "%" },
+                      { name: "2s/10s Spread", val: spread, suffix: "%" },
+                      { name: "Fed Funds Rate", val: fed.funds_rate, suffix: "%" },
+                      { name: "HY OAS", val: credit.hy_oas as number | null, suffix: "%" },
+                      { name: "BBB OAS", val: credit.bbb_oas as number | null, suffix: "%" },
+                      { name: "DXY (UUP)", val: (fx.dxy as Record<string, number> | null)?.price, suffix: "" },
+                    ].map((row) => (
+                      <tr key={row.name} className="border-b border-[#1E2A3A]/50">
+                        <td className="px-3 py-1.5 text-[#8899AA]">{row.name}</td>
+                        <td className="px-3 py-1.5 text-right text-[#E8EAED] font-bold">{row.val != null ? fmt(row.val) + row.suffix : "--"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Credit Stress Gauge */}
+              <CreditStressGauge value={credit.hy_oas as number | null} stressLevel={credit.stress_level as string || "calm"} />
+
+              {/* JGB Placeholder */}
               <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
-                <p className="text-[10px] font-mono text-[#5A6A7A]">Fed Funds Rate</p>
-                <p className="text-[18px] font-mono font-bold text-[#E8EAED]">
-                  {fmt((rates as Record<string, Record<string, unknown>>).fed?.funds_rate as number | null)}%
-                </p>
+                <p className="text-[10px] font-mono text-[#5A6A7A]">JGB 10Y</p>
+                <p className="text-[12px] font-mono text-[#5A6A7A]">Data source pending</p>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* COMMODITIES TAB */}
-        {activeTab === "commodities" && commodities && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {Object.entries((commodities as Record<string, Record<string, Record<string, unknown>>>).quotes || {}).map(([symbol, q]) => (
-                <div key={symbol} className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
-                  <p className="text-[10px] font-mono text-[#5A6A7A]">{q.name as string}</p>
-                  <p className="text-[18px] font-mono font-bold text-[#E8EAED]">${fmt(q.price as number)}</p>
-                  <p className={`text-[11px] font-mono ${chgColor(q.changePct as number)}`}>{chg(q.changePct as number)}</p>
+        {activeTab === "commodities" && commodities && (() => {
+          const c = commodities as Record<string, unknown>;
+          const quotes = c.quotes as Record<string, Record<string, unknown>> || {};
+          const ratios = c.ratios as Record<string, number | null> || {};
+
+          const groups = [
+            { label: "ENERGY", symbols: ["USO", "BNO", "UNG"] },
+            { label: "PRECIOUS METALS", symbols: ["GLD", "SLV"] },
+            { label: "INDUSTRIAL", symbols: ["COPX"] },
+            { label: "NUCLEAR", symbols: ["SRUUF"] },
+            { label: "AGRICULTURE", symbols: ["WEAT", "CORN"] },
+          ];
+
+          return (
+            <div className="space-y-4">
+              {/* Score badge */}
+              <div className="flex items-center gap-3">
+                <span className={`px-3 py-1 text-sm font-mono font-bold rounded-sm ${
+                  THREAT_COLORS[(c.level as string) || "neutral"] || "bg-[#5A6A7A] text-[#E8EAED]"
+                }`}>
+                  {((c.level as string) || "NEUTRAL").toUpperCase().replace("_", " ")}
+                </span>
+                <span className="text-[16px] font-mono font-bold text-[#E8EAED]">{c.score as number}/{c.max_score as number}</span>
+              </div>
+
+              {groups.map((group) => (
+                <div key={group.label}>
+                  <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-2">{group.label}</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {group.symbols.map((sym) => {
+                      const q = quotes[sym];
+                      if (!q) return null;
+                      return (
+                        <div key={sym} className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-2.5">
+                          <p className="text-[10px] font-mono text-[#5A6A7A]">{q.name as string}</p>
+                          <p className="text-[9px] font-mono text-[#5A6A7A]/60">{q.displayNote as string}</p>
+                          <p className="text-[18px] font-mono font-bold text-[#E8EAED]">${fmt(q.price as number)}</p>
+                          <p className={`text-[11px] font-mono ${chgColor(q.changePct as number)}`}>{chg(q.changePct as number)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ))}
-            </div>
-            {(commodities as Record<string, Record<string, unknown>>).ratios && (
+
+              {/* Ratios */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
                   <p className="text-[10px] font-mono text-[#5A6A7A]">Gold/Oil Ratio</p>
-                  <p className="text-[18px] font-mono font-bold text-[#FFD700]">
-                    {(commodities as Record<string, Record<string, unknown>>).ratios?.gold_oil as string || "--"}
-                  </p>
+                  <p className="text-[18px] font-mono font-bold text-[#FFD700]">{ratios.gold_oil || "--"}</p>
                 </div>
                 <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
                   <p className="text-[10px] font-mono text-[#5A6A7A]">Copper/Gold Ratio</p>
-                  <p className="text-[18px] font-mono font-bold text-[#FF8C00]">
-                    {(commodities as Record<string, Record<string, unknown>>).ratios?.copper_gold as string || "--"}
-                  </p>
+                  <p className="text-[18px] font-mono font-bold text-[#FF8C00]">{ratios.copper_gold || "--"}</p>
                 </div>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          );
+        })()}
 
         {/* DEMAND DESTRUCTION TAB */}
         {activeTab === "demand" && (
@@ -333,33 +401,74 @@ export default function DashboardPage() {
             {ddData && (ddData as Record<string, Record<string, unknown>>).latest && (
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                 {[
-                  { name: "EMHY", value: "emhy_value", score: "emhy_score" },
-                  { name: "BDI", value: "bdi_value", score: "bdi_score" },
-                  { name: "Korea Exports", value: "kr_exports_value", score: "kr_exports_score" },
-                  { name: "China PMI", value: "china_pmi_value", score: "china_pmi_score" },
-                  { name: "WTI", value: "wti_value", score: "wti_score" },
-                  { name: "Force Majeures", value: "force_majeure_count", score: "force_majeure_score" },
-                  { name: "Jobless Claims", value: "claims_value", score: "claims_score" },
-                  { name: "Copper", value: "copper_value", score: "copper_score" },
-                  { name: "UMich Sentiment", value: "umich_value", score: "umich_score" },
-                  { name: "Gas Price", value: "gas_price_value", score: "gas_price_score" },
+                  { name: "EMHY", value: "emhy_value", score: "emhy_score", baseline: "$39.90", greenT: "Stable", yellowT: "-3-5%", redT: ">-5%" },
+                  { name: "BDI", value: "bdi_value", score: "bdi_score", baseline: "1,972", greenT: "<2,500", yellowT: "-15%", redT: "-30%" },
+                  { name: "Korea Exports", value: "kr_exports_value", score: "kr_exports_score", baseline: "+29%", greenT: "Positive", yellowT: "Slowing", redT: "Negative" },
+                  { name: "China PMI", value: "china_pmi_value", score: "china_pmi_score", baseline: "49.0", greenT: ">50", yellowT: "49-50", redT: "<49" },
+                  { name: "WTI", value: "wti_value", score: "wti_score", baseline: "$96-97", greenT: "<$120", yellowT: "$120-130", redT: ">$130" },
+                  { name: "Force Majeures", value: "force_majeure_count", score: "force_majeure_score", baseline: "None", greenT: "None", yellowT: "1-2", redT: "3+" },
+                  { name: "Jobless Claims", value: "claims_value", score: "claims_score", baseline: "212K", greenT: "<230K", yellowT: "230-260K", redT: ">260K" },
+                  { name: "Copper", value: "copper_value", score: "copper_score", baseline: "$5.79", greenT: ">$5.50", yellowT: "-5%", redT: "-10%" },
+                  { name: "UMich Sentiment", value: "umich_value", score: "umich_score", baseline: "56.6", greenT: ">55", yellowT: "45-55", redT: "<45" },
+                  { name: "Gas Price", value: "gas_price_value", score: "gas_price_score", baseline: "$3.59", greenT: "<$4.50", yellowT: "$4.50-5.50", redT: ">$5.50" },
                 ].map((ind) => {
                   const latest = (ddData as Record<string, Record<string, unknown>>).latest as Record<string, unknown>;
                   const s = (latest[ind.score] as number) || 0;
                   const signalColor = s === 0 ? "bg-[#00CC66]" : s === 1 ? "bg-[#FFD700]" : "bg-[#FF4444]";
+                  const signalLabel = s === 0 ? "GREEN" : s === 1 ? "YELLOW" : "RED";
+                  const signalTextColor = s === 0 ? "text-[#00CC66]" : s === 1 ? "text-[#FFD700]" : "text-[#FF4444]";
                   return (
                     <div key={ind.name} className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-2">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[9px] font-mono text-[#5A6A7A]">{ind.name}</span>
-                        <span className={`w-2 h-2 rounded-full ${signalColor}`} />
+                        <span className={`text-[8px] font-mono px-1 py-0 rounded-sm ${signalTextColor} ${signalColor}/15`}>{signalLabel}</span>
                       </div>
                       <p className="text-[14px] font-mono font-bold text-[#E8EAED]">
                         {latest[ind.value] != null ? fmt(latest[ind.value] as number) : "--"}
                       </p>
-                      <p className="text-[9px] font-mono text-[#5A6A7A]">Score: {s}/2</p>
+                      <p className="text-[8px] font-mono text-[#5A6A7A]">Baseline: {ind.baseline}</p>
+                      <p className="text-[7px] font-mono text-[#5A6A7A]/60">G: {ind.greenT} | Y: {ind.yellowT} | R: {ind.redT}</p>
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Version History Table */}
+            {ddData && ((ddData as Record<string, unknown[]>).scores as Array<Record<string, unknown>>)?.length > 1 && (
+              <div>
+                <h4 className="text-[10px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-2">Score History</h4>
+                <div className="bg-[#0D1117] border border-[#1E2A3A] rounded-sm overflow-x-auto">
+                  <table className="w-full text-[9px] font-mono">
+                    <thead>
+                      <tr className="border-b border-[#1E2A3A]">
+                        <th className="px-2 py-1 text-left text-[#5A6A7A]">Date</th>
+                        <th className="px-2 py-1 text-center text-[#5A6A7A]">Score</th>
+                        <th className="px-2 py-1 text-center text-[#5A6A7A]">Level</th>
+                        {["EMHY","BDI","KR","PMI","WTI","FM","Claims","Cu","UMich","Gas"].map((h) => (
+                          <th key={h} className="px-1 py-1 text-center text-[#5A6A7A]">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {((ddData as Record<string, unknown[]>).scores as Array<Record<string, unknown>>).slice(0, 10).map((s, i) => {
+                        const scoreFields = ["emhy_score","bdi_score","kr_exports_score","china_pmi_score","wti_score","force_majeure_score","claims_score","copper_score","umich_score","gas_price_score"];
+                        return (
+                          <tr key={i} className="border-b border-[#1E2A3A]/30">
+                            <td className="px-2 py-1 text-[#8899AA]">{new Date(s.scored_at as string).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</td>
+                            <td className="px-2 py-1 text-center text-[#E8EAED] font-bold">{s.total_score as number}</td>
+                            <td className="px-2 py-1 text-center">{(s.threat_level as string || "").slice(0, 4).toUpperCase()}</td>
+                            {scoreFields.map((f) => {
+                              const v = (s[f] as number) || 0;
+                              const c = v === 0 ? "text-[#00CC66]" : v === 1 ? "text-[#FFD700]" : "text-[#FF4444]";
+                              return <td key={f} className={`px-1 py-1 text-center ${c}`}>{v}</td>;
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
