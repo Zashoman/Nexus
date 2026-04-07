@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import ScoreChart from "@/components/dashboard/ScoreChart";
+import HormuzTab from "@/components/dashboard/HormuzTab";
 
 const TABS = [
   { key: "calendar", label: "Economic Calendar" },
@@ -375,77 +376,11 @@ export default function DashboardPage() {
 
         {/* HORMUZ TAB */}
         {activeTab === "hormuz" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {hormuzData && (hormuzData as Record<string, Record<string, unknown>>).latest && (
-                  <>
-                    <span className={`px-3 py-1 text-sm font-mono font-bold rounded-sm ${THREAT_COLORS[((hormuzData as Record<string, Record<string, unknown>>).latest?.risk_level as string) || "hold"]}`}>
-                      {((hormuzData as Record<string, Record<string, unknown>>).latest?.risk_level as string || "HOLD").toUpperCase().replace("_", " ")}
-                    </span>
-                    <span className="text-[16px] font-mono font-bold text-[#E8EAED]">
-                      {(hormuzData as Record<string, Record<string, unknown>>).latest?.total_score as number}/50
-                    </span>
-                  </>
-                )}
-              </div>
-              <button onClick={() => rescore("hormuz")} disabled={loading} className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF] cursor-pointer">
-                {loading ? "Scoring..." : "Rescore Now"}
-              </button>
-            </div>
-
-            {/* Score History Chart */}
-            {hormuzData && ((hormuzData as Record<string, unknown[]>).scores as Array<Record<string, unknown>>)?.length > 0 && (
-              <ScoreChart
-                data={((hormuzData as Record<string, unknown[]>).scores as Array<Record<string, unknown>>).map((s) => ({
-                  date: s.scored_at as string,
-                  score: s.total_score as number,
-                  level: s.risk_level as string,
-                }))}
-                maxScore={50}
-                thresholds={[
-                  { value: 0, color: "#00CC66", label: "Hold" },
-                  { value: 16, color: "#FFD700", label: "Monitor" },
-                  { value: 26, color: "#FF8C00", label: "Reduce" },
-                  { value: 36, color: "#FF0000", label: "Sell Now" },
-                ]}
-              />
-            )}
-
-            {hormuzData && (hormuzData as Record<string, Record<string, unknown>>).latest && (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-                  {["Physical Disruption", "Energy Markets", "Geopolitical", "Market Stress", "Scenario"].map((cat, i) => {
-                    const latest = (hormuzData as Record<string, Record<string, unknown>>).latest as Record<string, unknown>;
-                    const maxScores = [12, 10, 10, 10, 8];
-                    const score = (latest[`category_${i + 1}_score`] as number) || 0;
-                    return (
-                      <div key={cat} className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
-                        <p className="text-[10px] font-mono text-[#5A6A7A] mb-1">{cat}</p>
-                        <p className="text-[16px] font-mono font-bold text-[#E8EAED]">{score}/{maxScores[i]}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
-                  <p className="text-[10px] font-mono text-[#5A6A7A] mb-2">AI Assessment</p>
-                  <p className="text-[13px] text-[#E8EAED]/90 leading-relaxed">
-                    {((hormuzData as Record<string, Record<string, unknown>>).latest as Record<string, unknown>)?.ai_assessment as string || "No assessment available."}
-                  </p>
-                </div>
-              </>
-            )}
-
-            {!hormuzData?.latest && !loading && (
-              <div className="text-center py-8">
-                <p className="text-[#5A6A7A] text-xs font-mono">No Hormuz risk scores yet.</p>
-                <button onClick={() => rescore("hormuz")} className="mt-2 px-4 py-2 text-xs font-mono bg-[#4488FF] text-white rounded-sm cursor-pointer">
-                  Run First Score
-                </button>
-              </div>
-            )}
-          </div>
+          <HormuzTab
+            data={hormuzData}
+            loading={loading}
+            onRescore={() => rescore("hormuz")}
+          />
         )}
 
         {/* PRIVATE CREDIT TAB */}

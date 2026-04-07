@@ -5,11 +5,42 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
-function getRiskLevel(score: number): string {
-  if (score <= 15) return 'hold';
-  if (score <= 25) return 'monitor';
-  if (score <= 35) return 'reduce';
-  return 'sell_now';
+const CRISIS_START = new Date('2026-02-28');
+
+const SIGNAL_WEIGHTS = {
+  transit: { green: 6, yellow: 3, red: 0 },
+  mine: { green: 5, yellow: 3, red: 0 },
+  brent: { green: 5, yellow: 3, red: 0 },
+  vlcc: { green: 4, yellow: 2, red: 0 },
+  ttf: { green: 4, yellow: 2, red: 0 },
+  dxy: { green: 3, yellow: 2, red: 0 },
+  fed: { green: 3, yellow: 2, red: 0 },
+  storage: { green: 5, yellow: 3, red: 0 },
+  stagflation: { green: 4, yellow: 2, red: 0 },
+  diplomatic: { green: 4, yellow: 2, red: 0 },
+  iea_spr: { green: 3, yellow: 2, red: 0 },
+};
+
+function getThesisLevel(score: number): string {
+  if (score >= 36) return 'intact';
+  if (score >= 25) return 'holding';
+  if (score >= 15) return 'weakening';
+  return 'broken';
+}
+
+function getConviction(green: number, red: number): string {
+  if (green >= 9 && red === 0) return 'maximum';
+  if (green >= 7 && red <= 1) return 'high';
+  if (green >= 5 && red <= 2) return 'moderate';
+  if (green >= 3) return 'low';
+  return 'broken';
+}
+
+function getSignalScore(rating: string, signal: keyof typeof SIGNAL_WEIGHTS): number {
+  const w = SIGNAL_WEIGHTS[signal];
+  if (rating === 'green') return w.green;
+  if (rating === 'yellow') return w.yellow;
+  return w.red;
 }
 
 export async function GET() {
@@ -24,152 +55,180 @@ export async function GET() {
 
 export async function POST() {
   const db = getServiceSupabase();
+  const dayOfCrisis = Math.floor((Date.now() - CRISIS_START.getTime()) / (1000 * 60 * 60 * 24));
 
   // Fetch market data
-  const [brent, wti, gold, ita, spy] = await Promise.all([
+  const [brentQ, dxyQ, goldQ, spyQ] = await Promise.all([
     fetchFinnhubQuote('BNO'),
-    fetchFinnhubQuote('USO'),
+    fetchFinnhubQuote('UUP'),
     fetchFinnhubQuote('GLD'),
-    fetchFinnhubQuote('ITA'),
     fetchFinnhubQuote('SPY'),
   ]);
 
-  const hyOas = await fetchFRED('BAMLH0A0HYM2');
+  const brentPrice = brentQ?.c || 0;
+  const dxyPrice = dxyQ?.c || 0;
 
-  // Category 2: Energy Markets (max 10) - more granular scoring
-  let cat2Score = 0;
-  const brentPrice = brent?.c || 0;
-  if (brentPrice > 150) cat2Score += 10;
-  else if (brentPrice > 130) cat2Score += 8;
-  else if (brentPrice > 110) cat2Score += 6;
-  else if (brentPrice > 95) cat2Score += 4;
-  else if (brentPrice > 80) cat2Score += 2;
+  // Auto-score market-based signals
+  let brentRating = 'yellow';
+  if (brentPrice > 100) brentRating = 'green';
+  else if (brentPrice < 75) brentRating = 'red';
 
-  // Brent-WTI spread widening
-  const wtiPrice = wti?.c || 0;
-  if (brentPrice > 0 && wtiPrice > 0) {
-    const spread = brentPrice - wtiPrice;
-    if (spread > 5) cat2Score = Math.min(cat2Score + 2, 10);
-  }
+  let dxyRating = 'yellow';
+  if (dxyPrice > 103 || (dxyQ?.dp || 0) > 0) dxyRating = 'green';
+  else if (dxyPrice < 95) dxyRating = 'red';
 
-  const cat2Detail = {
-    brent: brentPrice,
-    wti: wtiPrice,
-    spread: brentPrice > 0 && wtiPrice > 0 ? +(brentPrice - wtiPrice).toFixed(2) : null,
-    brent_change: brent?.dp || 0,
-  };
+  let storageRating = 'green';
+  if (dayOfCrisis < 15) storageRating = 'red';
+  else if (dayOfCrisis < 25) storageRating = 'yellow';
 
-  // Category 4: Market Stress (max 10) - use actual market proxies
-  let cat4Score = 0;
-
-  // Gold trend as fear indicator
-  const goldChg = gold?.dp || 0;
-  if (goldChg > 5) cat4Score += 3;
-  else if (goldChg > 2) cat4Score += 2;
-  else if (goldChg > 0) cat4Score += 1;
-
-  // Credit spreads from FRED
-  if (hyOas) {
-    if (hyOas > 8) cat4Score += 3;
-    else if (hyOas > 5) cat4Score += 2;
-    else if (hyOas > 4) cat4Score += 1;
-  }
-
-  // Defense outperforming SPY
-  if (ita && spy) {
-    const defenseOutperform = (ita.dp || 0) - (spy.dp || 0);
-    if (defenseOutperform > 2) cat4Score += 2;
-    else if (defenseOutperform > 0) cat4Score += 1;
-  }
-
-  // Oil rising sharply
-  if (brent && (brent.dp || 0) > 3) cat4Score += 2;
-
-  cat4Score = Math.min(cat4Score, 10);
-
-  const cat4Detail = {
-    gold: gold?.c,
-    gold_change: goldChg,
-    hy_oas: hyOas,
-    ita_vs_spy: ita && spy ? +((ita.dp || 0) - (spy.dp || 0)).toFixed(2) : null,
-    defense: ita?.c,
-  };
-
-  // Categories 1, 3, 5: News-based (use AI)
+  // Get recent intel items for AI scoring
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data: hormuzItems } = await db
     .from('intel_items')
     .select('title, ai_summary, source_name, source_tier, published_at')
-    .or('title.ilike.%hormuz%,title.ilike.%strait%,title.ilike.%iran%,title.ilike.%tanker%')
+    .or('title.ilike.%hormuz%,title.ilike.%strait%,title.ilike.%iran%,title.ilike.%tanker%,title.ilike.%mine%,title.ilike.%lng%,title.ilike.%naval%,title.ilike.%ceasefire%,title.ilike.%escort%')
     .gte('ingested_at', weekAgo)
+    .order('published_at', { ascending: false })
     .limit(20);
 
-  let cat1Score = 0;
-  let cat3Score = 0;
-  let cat5Score = 0;
-  let scenarioA = 10, scenarioB = 30, scenarioC = 40, scenarioD = 20;
-  let aiAssessment = 'No recent Hormuz-related intelligence available for assessment.';
+  const newsContext = (hormuzItems || []).map((i) => `- ${i.title} (${i.source_name}, Tier ${i.source_tier})`).join('\n');
 
-  if (hormuzItems && hormuzItems.length > 0) {
-    const newsContext = hormuzItems.map((i) => `- ${i.title} (${i.source_name})`).join('\n');
+  // Get previous scoring for upgrade/downgrade comparison
+  const { data: prevScores } = await db
+    .from('hormuz_risk_scores')
+    .select('*')
+    .order('scored_at', { ascending: false })
+    .limit(1);
+  const prev = prevScores?.[0];
 
-    try {
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 500,
-        messages: [{
-          role: 'user',
-          content: `Score the Strait of Hormuz risk based on these recent news items. Return ONLY valid JSON.
+  // AI scoring for qualitative signals
+  let aiResult: Record<string, unknown> = {};
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1200,
+      messages: [{
+        role: 'user',
+        content: `You are a crisis intelligence analyst scoring the Strait of Hormuz disruption framework. The crisis began February 28, 2026. Today is Day ${dayOfCrisis}.
 
-News items from the last 7 days:
-${newsContext}
+MARKET DATA:
+- Brent Crude: $${brentPrice.toFixed(2)}
+- DXY: ${dxyPrice.toFixed(2)}
 
-Return this exact JSON structure:
-{"cat1_score": 0-12, "cat3_score": 0-10, "cat5_score": 0-8, "scenario_a_pct": 0-100, "scenario_b_pct": 0-100, "scenario_c_pct": 0-100, "scenario_d_pct": 0-100, "assessment": "1-2 sentence summary"}
+RECENT INTELLIGENCE (last 7 days):
+${newsContext || 'No recent Hormuz-related intelligence items found.'}
 
-cat1 (Physical Disruption, max 12): tanker incidents, mine reports, insurance withdrawal
-cat3 (Geopolitical Escalation, max 10): military actions, diplomacy status, allied responses
-cat5 (Scenario Assessment, max 8): based on all evidence
-Scenarios: A=extended closure, B=partial resolution, C=quick resolution, D=wider conflict. Must sum to 100.`,
-        }],
-      });
+Score these signals as GREEN, YELLOW, or RED:
 
-      const text = response.content[0].type === 'text' ? response.content[0].text : '';
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        cat1Score = Math.min(parsed.cat1_score || 0, 12);
-        cat3Score = Math.min(parsed.cat3_score || 0, 10);
-        cat5Score = Math.min(parsed.cat5_score || 0, 8);
-        scenarioA = parsed.scenario_a_pct || 10;
-        scenarioB = parsed.scenario_b_pct || 30;
-        scenarioC = parsed.scenario_c_pct || 40;
-        scenarioD = parsed.scenario_d_pct || 20;
-        aiAssessment = parsed.assessment || aiAssessment;
-      }
-    } catch {
-      // Use defaults
+1. Tanker Transit Count - GREEN: <30/day | YELLOW: 30-60/day | RED: >60/day
+2. Mine Status - GREEN: Mines present, no clearance | YELLOW: Clearance beginning | RED: Mines cleared
+3. VLCC Rates - GREEN: >$200K/day | YELLOW: $100-200K | RED: <$100K
+4. TTF Gas - GREEN: >74 EUR/MWh | YELLOW: 47-74 | RED: <40
+5. Fed Rhetoric - GREEN: Holds/hikes | YELLOW: Data dependent | RED: Emergency cuts
+6. Stagflation - GREEN: Oil rising + weak economy | YELLOW: S&P -5% while oil flat | RED: Oil falling despite closure
+7. Diplomatic - GREEN: No ceasefire, Iran defiant | YELLOW: Back-channel talks | RED: Ceasefire confirmed
+8. IEA/SPR - GREEN: No release or failed | YELLOW: Release temporarily suppressing | RED: Release restoring supply
+
+Also provide:
+- Scenario probabilities: A (Extended closure), B (Partial), C (Quick resolution), D (Escalation). Must sum to 100.
+- Scenario classification (A, A+, B, C, or D)
+- 3 assessments: (1) current status, (2) most important signal change, (3) what to watch next 48-72 hours
+
+Return ONLY valid JSON:
+{"transit_rating":"green","transit_value":"<30/day estimated","mine_rating":"green","mine_status":"Mines confirmed active","vlcc_rating":"green","vlcc_value":"$250K+/day","ttf_rating":"green","ttf_value":"82","fed_rating":"green","fed_status":"Holding","stagflation_rating":"green","stagflation_status":"Oil rising, economy weakening","diplomatic_rating":"green","diplomatic_status":"No ceasefire","iea_spr_rating":"green","iea_spr_status":"No release","scenario_a_pct":55,"scenario_b_pct":25,"scenario_c_pct":10,"scenario_d_pct":10,"scenario_class":"A","assessment":"Current status.","key_change":"Most important change.","watch_next":"What to watch."}`,
+      }],
+    });
+
+    const text = response.content[0].type === 'text' ? response.content[0].text : '';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      aiResult = JSON.parse(jsonMatch[0]);
     }
+  } catch {
+    // Use defaults
   }
 
-  const totalScore = cat1Score + cat2Score + cat3Score + cat4Score + cat5Score;
-  const riskLevel = getRiskLevel(totalScore);
+  // Build signal ratings
+  const signals = {
+    transit: { rating: (aiResult.transit_rating as string) || 'green', value: (aiResult.transit_value as string) || 'Unknown' },
+    mine: { rating: (aiResult.mine_rating as string) || 'green', value: (aiResult.mine_status as string) || 'Unknown' },
+    brent: { rating: brentRating, value: brentPrice },
+    vlcc: { rating: (aiResult.vlcc_rating as string) || 'yellow', value: (aiResult.vlcc_value as string) || 'Unknown' },
+    ttf: { rating: (aiResult.ttf_rating as string) || 'yellow', value: parseFloat(aiResult.ttf_value as string) || 0 },
+    dxy: { rating: dxyRating, value: dxyPrice },
+    fed: { rating: (aiResult.fed_rating as string) || 'yellow', value: (aiResult.fed_status as string) || 'Unknown' },
+    storage: { rating: storageRating, value: dayOfCrisis },
+    stagflation: { rating: (aiResult.stagflation_rating as string) || 'yellow', value: (aiResult.stagflation_status as string) || 'Unknown' },
+    diplomatic: { rating: (aiResult.diplomatic_rating as string) || 'green', value: (aiResult.diplomatic_status as string) || 'Unknown' },
+    iea_spr: { rating: (aiResult.iea_spr_rating as string) || 'green', value: (aiResult.iea_spr_status as string) || 'Unknown' },
+  };
+
+  // Calculate scores
+  let totalScore = 0;
+  let greenCount = 0;
+  let yellowCount = 0;
+  let redCount = 0;
+
+  for (const [key, sig] of Object.entries(signals)) {
+    const score = getSignalScore(sig.rating, key as keyof typeof SIGNAL_WEIGHTS);
+    totalScore += score;
+    if (sig.rating === 'green') greenCount++;
+    else if (sig.rating === 'yellow') yellowCount++;
+    else redCount++;
+  }
+
+  const thesisLevel = getThesisLevel(totalScore);
+  const convictionLevel = getConviction(greenCount, redCount);
+
+  // Count upgrades/downgrades
+  let upgradedCount = 0;
+  let downgradedCount = 0;
+  if (prev) {
+    const prevSignals: Record<string, string> = {
+      transit: prev.transit_rating, mine: prev.mine_rating, brent: prev.brent_rating,
+      vlcc: prev.vlcc_rating, ttf: prev.ttf_rating, dxy: prev.dxy_rating,
+      fed: prev.fed_rating, storage: prev.storage_rating, stagflation: prev.stagflation_rating,
+      diplomatic: prev.diplomatic_rating, iea_spr: prev.iea_spr_rating,
+    };
+    const order = ['red', 'yellow', 'green'];
+    for (const [key, sig] of Object.entries(signals)) {
+      const prevRating = prevSignals[key];
+      if (prevRating && order.indexOf(sig.rating) > order.indexOf(prevRating)) upgradedCount++;
+      if (prevRating && order.indexOf(sig.rating) < order.indexOf(prevRating)) downgradedCount++;
+    }
+  }
 
   const { data: score, error } = await db
     .from('hormuz_risk_scores')
     .insert({
       total_score: totalScore,
-      risk_level: riskLevel,
-      category_1_score: cat1Score, category_1_detail: { items: hormuzItems?.length || 0 },
-      category_2_score: cat2Score, category_2_detail: cat2Detail,
-      category_3_score: cat3Score, category_3_detail: { items: hormuzItems?.length || 0 },
-      category_4_score: cat4Score, category_4_detail: cat4Detail,
-      category_5_score: cat5Score, category_5_detail: { scenarios: true },
-      scenario_a_pct: scenarioA,
-      scenario_b_pct: scenarioB,
-      scenario_c_pct: scenarioC,
-      scenario_d_pct: scenarioD,
-      ai_assessment: aiAssessment,
+      thesis_level: thesisLevel,
+      scenario_classification: (aiResult.scenario_class as string) || 'A',
+      transit_value: signals.transit.value, transit_rating: signals.transit.rating, transit_score: getSignalScore(signals.transit.rating, 'transit'),
+      mine_status: signals.mine.value, mine_rating: signals.mine.rating, mine_score: getSignalScore(signals.mine.rating, 'mine'),
+      brent_value: signals.brent.value, brent_rating: signals.brent.rating, brent_score: getSignalScore(signals.brent.rating, 'brent'),
+      vlcc_value: signals.vlcc.value, vlcc_rating: signals.vlcc.rating, vlcc_score: getSignalScore(signals.vlcc.rating, 'vlcc'),
+      ttf_value: signals.ttf.value, ttf_rating: signals.ttf.rating, ttf_score: getSignalScore(signals.ttf.rating, 'ttf'),
+      dxy_value: signals.dxy.value, dxy_rating: signals.dxy.rating, dxy_score: getSignalScore(signals.dxy.rating, 'dxy'),
+      fed_status: signals.fed.value, fed_rating: signals.fed.rating, fed_score: getSignalScore(signals.fed.rating, 'fed'),
+      storage_days: dayOfCrisis, storage_rating: signals.storage.rating, storage_score: getSignalScore(signals.storage.rating, 'storage'),
+      stagflation_status: signals.stagflation.value, stagflation_rating: signals.stagflation.rating, stagflation_score: getSignalScore(signals.stagflation.rating, 'stagflation'),
+      diplomatic_status: signals.diplomatic.value, diplomatic_rating: signals.diplomatic.rating, diplomatic_score: getSignalScore(signals.diplomatic.rating, 'diplomatic'),
+      iea_spr_status: signals.iea_spr.value, iea_spr_rating: signals.iea_spr.rating, iea_spr_score: getSignalScore(signals.iea_spr.rating, 'iea_spr'),
+      scenario_a_pct: (aiResult.scenario_a_pct as number) || 50,
+      scenario_b_pct: (aiResult.scenario_b_pct as number) || 25,
+      scenario_c_pct: (aiResult.scenario_c_pct as number) || 15,
+      scenario_d_pct: (aiResult.scenario_d_pct as number) || 10,
+      green_count: greenCount,
+      yellow_count: yellowCount,
+      red_count: redCount,
+      upgraded_count: upgradedCount,
+      downgraded_count: downgradedCount,
+      ai_assessment: (aiResult.assessment as string) || 'Assessment unavailable.',
+      ai_key_change: (aiResult.key_change as string) || 'No significant changes.',
+      ai_watch_next: (aiResult.watch_next as string) || 'Monitor daily.',
+      conviction_level: convictionLevel,
+      day_of_crisis: dayOfCrisis,
     })
     .select()
     .single();
