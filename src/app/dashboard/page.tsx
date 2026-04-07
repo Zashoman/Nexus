@@ -308,11 +308,11 @@ export default function DashboardPage() {
           const ratios = c.ratios as Record<string, number | null> || {};
 
           const groups = [
-            { label: "ENERGY", symbols: ["USO", "BNO", "UNG"] },
-            { label: "PRECIOUS METALS", symbols: ["GLD", "SLV"] },
-            { label: "INDUSTRIAL", symbols: ["COPX"] },
+            { label: "ENERGY", symbols: ["CL=F", "BZ=F", "NG=F"] },
+            { label: "PRECIOUS METALS", symbols: ["GC=F", "SI=F"] },
+            { label: "INDUSTRIAL", symbols: ["HG=F"] },
             { label: "NUCLEAR", symbols: ["SRUUF"] },
-            { label: "AGRICULTURE", symbols: ["WEAT", "CORN"] },
+            { label: "AGRICULTURE", symbols: ["ZW=F", "ZC=F"] },
           ];
 
           return (
@@ -337,7 +337,6 @@ export default function DashboardPage() {
                       return (
                         <div key={sym} className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-2.5">
                           <p className="text-[10px] font-mono text-[#5A6A7A]">{q.name as string}{TOOLTIPS[q.name as string] && <InfoTip text={TOOLTIPS[q.name as string]} />}</p>
-                          <p className="text-[9px] font-mono text-[#5A6A7A]/60">{q.displayNote as string}</p>
                           <p className="text-[18px] font-mono font-bold text-[#E8EAED]">${fmt(q.price as number)}</p>
                           <p className={`text-[11px] font-mono ${chgColor(q.changePct as number)}`}>{chg(q.changePct as number)}</p>
                         </div>

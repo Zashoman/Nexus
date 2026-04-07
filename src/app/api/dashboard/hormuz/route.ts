@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
-import { fetchFinnhubQuote, fetchFRED, getCached } from '@/lib/dashboard/cache';
+import { fetchFRED } from '@/lib/dashboard/cache';
+import { fetchYahooQuote } from '@/lib/dashboard/yahoo';
 import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
@@ -57,33 +58,20 @@ export async function POST() {
   const db = getServiceSupabase();
   const dayOfCrisis = Math.floor((Date.now() - CRISIS_START.getTime()) / (1000 * 60 * 60 * 24));
 
-  // Fetch market data one at a time to avoid Finnhub rate limits
-  let brentPrice = 0;
-  let dxyPrice = 0;
-  let goldPrice = 0;
-  let spyPrice = 0;
-  let goldChgPct = 0;
-  let spyChgPct = 0;
+  // Fetch ACTUAL commodity futures prices from Yahoo Finance (not ETF proxies)
+  const [brentQ, goldQ, spyQ, dxyQ] = await Promise.all([
+    fetchYahooQuote('BZ=F'),    // Brent crude futures
+    fetchYahooQuote('GC=F'),    // Gold futures
+    fetchYahooQuote('SPY'),     // S&P 500
+    fetchYahooQuote('DX-Y.NYB'), // DXY dollar index
+  ]);
 
-  const bnoQ = await fetchFinnhubQuote('BNO');
-  brentPrice = bnoQ?.c || 0;
-
-  if (brentPrice === 0) {
-    const usoQ = await fetchFinnhubQuote('USO');
-    brentPrice = usoQ?.c || 0;
-  }
-
-  const goldQ = await fetchFinnhubQuote('GLD');
-  goldPrice = goldQ?.c || 0;
-  goldChgPct = goldQ?.dp || 0;
-
-  const spyQ = await fetchFinnhubQuote('SPY');
-  spyPrice = spyQ?.c || 0;
-  spyChgPct = spyQ?.dp || 0;
-
-  // DXY from FRED (free, no rate limit)
-  const dxyFred = await fetchFRED('DTWEXBGS');
-  dxyPrice = dxyFred || 0;
+  const brentPrice = brentQ?.price || 0;
+  const goldPrice = goldQ?.price || 0;
+  const goldChgPct = goldQ?.changePct || 0;
+  const spyPrice = spyQ?.price || 0;
+  const spyChgPct = spyQ?.changePct || 0;
+  const dxyPrice = dxyQ?.price || 0;
 
   // Auto-score market-based signals
   let brentRating = 'yellow';
