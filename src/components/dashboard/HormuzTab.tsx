@@ -143,20 +143,6 @@ export default function HormuzTab({ data, loading, onRescore }: Props) {
         </div>
       )}
 
-      {/* Score History Chart */}
-      {scores.length > 0 && (
-        <ScoreChart
-          data={scores.map((s) => ({ date: s.scored_at, score: s.total_score, level: s.thesis_level }))}
-          maxScore={46}
-          thresholds={[
-            { value: 0, color: "#FF0000", label: "Broken" },
-            { value: 15, color: "#FF8C00", label: "Weakening" },
-            { value: 25, color: "#FFD700", label: "Holding" },
-            { value: 36, color: "#00CC66", label: "Intact" },
-          ]}
-        />
-      )}
-
       {/* 11 Signal Cards */}
       {latest && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -237,6 +223,23 @@ export default function HormuzTab({ data, loading, onRescore }: Props) {
           ))}
         </div>
       </div>
+
+      {/* Score History Chart - at bottom */}
+      {scores.length > 0 && (
+        <div>
+          <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-2">Score Trajectory</h3>
+          <ScoreChart
+            data={scores.map((s) => ({ date: s.scored_at, score: s.total_score, level: s.thesis_level }))}
+            maxScore={46}
+            thresholds={[
+              { value: 0, color: "#FF0000", label: "Broken" },
+              { value: 15, color: "#FF8C00", label: "Weakening" },
+              { value: 25, color: "#FFD700", label: "Holding" },
+              { value: 36, color: "#00CC66", label: "Intact" },
+            ]}
+          />
+        </div>
+      )}
     </div>
   );
 }

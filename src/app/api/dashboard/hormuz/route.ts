@@ -57,16 +57,18 @@ export async function POST() {
   const db = getServiceSupabase();
   const dayOfCrisis = Math.floor((Date.now() - CRISIS_START.getTime()) / (1000 * 60 * 60 * 24));
 
-  // Fetch market data
-  const [brentQ, dxyQ, goldQ, spyQ] = await Promise.all([
+  // Fetch market data - try multiple tickers for reliability
+  const [brentQ, brentAlt, dxyQ, dxyAlt, goldQ, spyQ] = await Promise.all([
     fetchFinnhubQuote('BNO'),
+    fetchFinnhubQuote('USO'), // fallback for oil
     fetchFinnhubQuote('UUP'),
+    fetchFinnhubQuote('DXY'), // try direct DXY
     fetchFinnhubQuote('GLD'),
     fetchFinnhubQuote('SPY'),
   ]);
 
-  const brentPrice = brentQ?.c || 0;
-  const dxyPrice = dxyQ?.c || 0;
+  const brentPrice = (brentQ?.c && brentQ.c > 0) ? brentQ.c : (brentAlt?.c || 0);
+  const dxyPrice = (dxyQ?.c && dxyQ.c > 0) ? dxyQ.c : (dxyAlt?.c || 0);
 
   // Auto-score market-based signals
   let brentRating = 'yellow';
