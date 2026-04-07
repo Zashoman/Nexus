@@ -53,15 +53,14 @@ export async function GET() {
 
   let newVideos = 0;
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const errors: string[] = [];
 
   for (const channel of channels) {
     try {
       const feed = await parser.parseURL(channel.rss_url);
+      const feedItems = feed.items || [];
 
-      // Collect candidate video IDs for duration check
-      const candidates: { videoId: string; item: (typeof feed.items)[number] }[] = [];
-
-      for (const item of (feed.items || []).slice(0, 10)) {
+      for (const item of feedItems.slice(0, 10)) {
         const videoId = item.id?.split(':').pop() || '';
         if (!videoId) continue;
 
@@ -76,19 +75,17 @@ export async function GET() {
 
         if (existing) continue;
 
-        candidates.push({ videoId, item });
-      }
+        // Try to check duration to filter shorts, but don't block if it fails
+        let isShort = false;
+        try {
+          const durations = await getVideoDurations([videoId]);
+          const dur = durations[videoId] || 0;
+          if (dur > 0 && dur < 120) isShort = true;
+        } catch {
+          // Duration check failed, allow the video through
+        }
 
-      if (candidates.length === 0) continue;
-
-      // Check durations to filter out Shorts (under 2 minutes)
-      const videoIds = candidates.map((c) => c.videoId);
-      const durations = await getVideoDurations(videoIds);
-
-      for (const { videoId, item } of candidates) {
-        const duration = durations[videoId] || 0;
-        // Skip Shorts and very short videos (under 120 seconds)
-        if (duration > 0 && duration < 120) continue;
+        if (isShort) continue;
 
         const description = (item.contentSnippet || item.content || '').slice(0, 1000);
 
@@ -96,7 +93,7 @@ export async function GET() {
           ? description.split('\n').filter((l: string) => l.trim().length > 0).slice(0, 2).join(' ').slice(0, 200)
           : null;
 
-        await db.from('intel_youtube_videos').insert({
+        const { error: insertError } = await db.from('intel_youtube_videos').insert({
           video_id: videoId,
           channel_id: channel.channel_id,
           channel_name: channel.channel_name,
@@ -108,20 +105,26 @@ export async function GET() {
           video_url: `https://www.youtube.com/watch?v=${videoId}`,
           mini_summary: miniSummary,
         });
-        newVideos++;
+
+        if (insertError) {
+          if (insertError.code !== '23505') {
+            errors.push(`${channel.channel_name}: insert error - ${insertError.message}`);
+          }
+        } else {
+          newVideos++;
+        }
       }
-    } catch {
-      // Skip failed channels
+    } catch (err) {
+      errors.push(`${channel.channel_name}: ${err instanceof Error ? err.message : 'RSS parse failed'}`);
     }
   }
 
   // Return only recent videos (last 7 days), exclude dismissed
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: videos } = await db
+  const { data: videos, error: queryError } = await db
     .from('intel_youtube_videos')
     .select('*')
     .gte('published_at', cutoff)
-    .or('dismissed.is.null,dismissed.eq.false')
     .order('published_at', { ascending: false })
     .limit(50);
 
@@ -129,6 +132,8 @@ export async function GET() {
     videos: videos || [],
     channels: channels || [],
     new_videos: newVideos,
+    errors: errors.length > 0 ? errors : undefined,
+    query_error: queryError?.message || undefined,
   });
 }
 
