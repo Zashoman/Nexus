@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
-import { fetchFinnhubQuote, fetchFRED } from '@/lib/dashboard/cache';
+import { fetchFinnhubQuote, fetchFRED, getCached } from '@/lib/dashboard/cache';
 import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
@@ -57,18 +57,23 @@ export async function POST() {
   const db = getServiceSupabase();
   const dayOfCrisis = Math.floor((Date.now() - CRISIS_START.getTime()) / (1000 * 60 * 60 * 24));
 
-  // Fetch market data - try multiple tickers for reliability
-  const [brentQ, brentAlt, dxyQ, dxyAlt, goldQ, spyQ] = await Promise.all([
+  // Fetch market data - use tickers confirmed working on Finnhub
+  const [usoQ, bnoQ, uupQ, goldQ, spyQ] = await Promise.all([
+    fetchFinnhubQuote('USO'),
     fetchFinnhubQuote('BNO'),
-    fetchFinnhubQuote('USO'), // fallback for oil
     fetchFinnhubQuote('UUP'),
-    fetchFinnhubQuote('DXY'), // try direct DXY
     fetchFinnhubQuote('GLD'),
     fetchFinnhubQuote('SPY'),
   ]);
 
-  const brentPrice = (brentQ?.c && brentQ.c > 0) ? brentQ.c : (brentAlt?.c || 0);
-  const dxyPrice = (dxyQ?.c && dxyQ.c > 0) ? dxyQ.c : (dxyAlt?.c || 0);
+  // Use whichever oil ticker returned data (USO and BNO are confirmed working)
+  const brentPrice = (bnoQ?.c && bnoQ.c > 0) ? bnoQ.c : (usoQ?.c && usoQ.c > 0) ? usoQ.c : 0;
+  // For DXY, use UUP if available, otherwise try FRED
+  let dxyPrice = (uupQ?.c && uupQ.c > 0) ? uupQ.c : 0;
+  if (dxyPrice === 0) {
+    const dxyFred = await fetchFRED('DTWEXBGS');
+    dxyPrice = dxyFred || 0;
+  }
 
   // Auto-score market-based signals
   let brentRating = 'yellow';
@@ -76,7 +81,7 @@ export async function POST() {
   else if (brentPrice < 75) brentRating = 'red';
 
   let dxyRating = 'yellow';
-  if (dxyPrice > 103 || (dxyQ?.dp || 0) > 0) dxyRating = 'green';
+  if (dxyPrice > 103 || (uupQ?.dp || 0) > 0) dxyRating = 'green';
   else if (dxyPrice < 95) dxyRating = 'red';
 
   let storageRating = 'green';
