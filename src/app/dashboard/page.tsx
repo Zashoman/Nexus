@@ -7,6 +7,7 @@ import YieldCurveChart from "@/components/dashboard/YieldCurveChart";
 import CreditStressGauge from "@/components/dashboard/CreditStressGauge";
 import InfoTip from "@/components/dashboard/InfoTip";
 import { TOOLTIPS } from "@/lib/dashboard/tooltips";
+import PrivateCreditTab from "@/components/dashboard/PrivateCreditTab";
 
 const TABS = [
   { key: "calendar", label: "Economic Calendar" },
@@ -499,6 +500,11 @@ export default function DashboardPage() {
 
         {/* PRIVATE CREDIT TAB */}
         {activeTab === "credit" && (
+          <PrivateCreditTab />
+        )}
+
+        {/* OLD PRIVATE CREDIT - REMOVED */}
+        {false && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

@@ -43,10 +43,17 @@ export async function setCache(key: string, value: unknown, source: string, ttlM
     );
 }
 
-// Fetch from FRED API
+// Fetch from FRED API with per-series 24hr cache
 export async function fetchFRED(seriesId: string): Promise<number | null> {
   const apiKey = process.env.FRED_API_KEY;
   if (!apiKey) return null;
+
+  // Check cache first (FRED data updates daily, cache for 24hrs)
+  const cacheKey = `fred_${seriesId}`;
+  const cachedVal = await getCached(cacheKey);
+  if (cachedVal != null) {
+    return cachedVal as number;
+  }
 
   try {
     const res = await fetch(
@@ -57,7 +64,11 @@ export async function fetchFRED(seriesId: string): Promise<number | null> {
     const data = await res.json();
     if (data.observations && data.observations.length > 0) {
       const val = parseFloat(data.observations[0].value);
-      return isNaN(val) ? null : val;
+      if (!isNaN(val)) {
+        // Cache for 24 hours (FRED updates daily)
+        await setCache(cacheKey, val, 'fred', 1440);
+        return val;
+      }
     }
     return null;
   } catch {
