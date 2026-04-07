@@ -567,62 +567,123 @@ export default function DashboardPage() {
         )}
 
         {/* GEOPOLITICAL TAB */}
-        {activeTab === "geo" && geoData && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 mb-4">
-              <span className={`px-3 py-1 text-sm font-mono font-bold rounded-sm ${THREAT_COLORS[(geoData as Record<string, unknown>).risk_level as string || "low"]}`}>
-                {((geoData as Record<string, unknown>).risk_level as string || "LOW").toUpperCase()}
-              </span>
-              <span className="text-[14px] font-mono text-[#E8EAED]">
-                Composite: {(geoData as Record<string, unknown>).risk_score as number}/4
-              </span>
-            </div>
+        {activeTab === "geo" && geoData && (() => {
+          const g = geoData as Record<string, unknown>;
+          const proxies = g.proxies as Record<string, Record<string, number> | null> || {};
+          const items = (g.intel_items as Array<Record<string, unknown>>) || [];
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {Object.entries((geoData as Record<string, Record<string, Record<string, unknown>>>).proxies || {}).map(([key, val]) => (
-                <div key={key} className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
-                  <p className="text-[10px] font-mono text-[#5A6A7A] uppercase">{key}</p>
-                  <p className="text-[18px] font-mono font-bold text-[#E8EAED]">{val?.price != null ? fmt(val.price as number) : "--"}</p>
-                  <p className={`text-[11px] font-mono ${chgColor(val?.changePct as number)}`}>{chg(val?.changePct as number)}</p>
-                </div>
-              ))}
-            </div>
+          // Group items by day
+          const today = new Date().toDateString();
+          const yesterday = new Date(Date.now() - 86400000).toDateString();
+          const grouped: Record<string, Array<Record<string, unknown>>> = {};
+          for (const item of items) {
+            const d = new Date(item.published_at as string || item.ingested_at as string).toDateString();
+            const label = d === today ? "Today" : d === yesterday ? "Yesterday" : d;
+            if (!grouped[label]) grouped[label] = [];
+            grouped[label].push(item);
+          }
 
-            {(geoData as Record<string, unknown[]>).intel_items && ((geoData as Record<string, unknown[]>).intel_items as Array<Record<string, unknown>>).length > 0 && (
-              <div>
-                <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider mb-2">Recent Geopolitical Intelligence</h3>
-                <div className="space-y-1">
-                  {((geoData as Record<string, unknown[]>).intel_items as Array<Record<string, unknown>>).map((item) => (
-                    <a key={item.id as string} href={item.original_url as string} target="_blank" rel="noopener noreferrer" className="block px-3 py-1.5 bg-[#141820] border border-[#1E2A3A]/50 rounded-sm hover:bg-[#1A2030] text-[13px] text-[#E8EAED]">
-                      {item.title as string}
-                    </a>
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <span className={`px-3 py-1 text-sm font-mono font-bold rounded-sm ${THREAT_COLORS[(g.risk_level as string) || "calm"]}`}>
+                  {((g.risk_level as string) || "CALM").toUpperCase()}
+                </span>
+                <span className="text-[16px] font-mono font-bold text-[#E8EAED]">
+                  {g.risk_score as number}/{g.max_score as number}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {Object.entries(proxies).map(([key, val]) => (
+                  <div key={key} className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3">
+                    <p className="text-[10px] font-mono text-[#5A6A7A] uppercase">{key}</p>
+                    <p className="text-[18px] font-mono font-bold text-[#E8EAED]">{val?.price != null ? fmt(val.price) : "--"}</p>
+                    <p className={`text-[11px] font-mono ${chgColor(val?.changePct)}`}>{chg(val?.changePct)}</p>
+                  </div>
+                ))}
+              </div>
+
+              {Object.keys(grouped).length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-[11px] font-mono text-[#5A6A7A] uppercase tracking-wider">Recent Geopolitical Intelligence</h3>
+                  {Object.entries(grouped).map(([day, dayItems]) => (
+                    <div key={day}>
+                      <p className="text-[9px] font-mono text-[#5A6A7A] mb-1">{day}</p>
+                      <div className="space-y-1">
+                        {dayItems.map((item) => (
+                          <a key={item.id as string} href={item.original_url as string} target="_blank" rel="noopener noreferrer" className="block px-3 py-1.5 bg-[#141820] border border-[#1E2A3A]/50 rounded-sm hover:bg-[#1A2030]">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[9px] font-mono px-1 py-0 rounded-sm ${
+                                item.impact_level === "critical" ? "bg-[#FF4444]/15 text-[#FF4444]" :
+                                item.impact_level === "high" ? "bg-[#FF8C00]/15 text-[#FF8C00]" :
+                                "bg-[#5A6A7A]/15 text-[#5A6A7A]"
+                              }`}>
+                                {(item.impact_level as string || "").toUpperCase()}
+                              </span>
+                              <span className="text-[10px] font-mono text-[#5A6A7A]">{item.source_name as string}</span>
+                            </div>
+                            <p className="text-[13px] text-[#E8EAED] mt-0.5">{item.title as string}</p>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          );
+        })()}
 
         {/* EARNINGS TAB */}
-        {activeTab === "earnings" && earningsData && (
-          <div className="space-y-2">
-            {((earningsData as Record<string, unknown[]>).earnings as Array<Record<string, unknown>> || []).map((e) => (
-              <div key={e.ticker as string} className="bg-[#141820] border border-[#1E2A3A] rounded-sm px-3 py-2 flex items-center gap-4">
-                <span className="text-[14px] font-mono font-bold text-[#E8EAED] w-12">{e.ticker as string}</span>
-                <span className="text-[12px] text-[#8899AA] flex-1">{e.display_name as string}</span>
-                <span className="text-[12px] font-mono text-[#E8EAED]">{(e.date as string) || "TBD"}</span>
-                {e.days_until != null && (
-                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-sm ${(e.days_until as number) <= 3 ? "bg-[#FF4444]/10 text-[#FF4444]" : "bg-[#5A6A7A]/10 text-[#5A6A7A]"}`}>
-                    {(e.days_until as number) === 0 ? "TODAY" : (e.days_until as number) === 1 ? "TOMORROW" : `in ${e.days_until} days`}
-                  </span>
-                )}
-                {e.eps_estimate != null && (
-                  <span className="text-[10px] font-mono text-[#5A6A7A]">Est: ${fmt(e.eps_estimate as number)}</span>
+        {activeTab === "earnings" && earningsData && (() => {
+          const earningsList = (earningsData as Record<string, unknown[]>).earnings as Array<Record<string, unknown>> || [];
+          const thisWeek = earningsList.filter((e) => (e.days_until as number) >= 0 && (e.days_until as number) <= 7);
+
+          return (
+            <div className="space-y-4">
+              {/* Earnings Heat */}
+              <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-3 flex items-center gap-3">
+                <span className="text-[10px] font-mono text-[#5A6A7A]">THIS WEEK:</span>
+                {thisWeek.length === 0 ? (
+                  <span className="text-[13px] font-mono text-[#5A6A7A]">No holdings reporting this week</span>
+                ) : (
+                  <span className="text-[16px] font-mono font-bold text-[#FF8C00]">{thisWeek.length} earnings this week</span>
                 )}
               </div>
-            ))}
-          </div>
-        )}
+
+              {/* Earnings list */}
+              <div className="space-y-1.5">
+                {earningsList.map((e) => (
+                  <div key={e.ticker as string} className={`bg-[#141820] border rounded-sm px-3 py-2.5 ${
+                    (e.days_until as number) <= 1 ? "border-[#FF4444]/30" : "border-[#1E2A3A]"
+                  }`}>
+                    <div className="flex items-center gap-4">
+                      <span className="text-[15px] font-mono font-bold text-[#E8EAED] w-14">{e.ticker as string}</span>
+                      <span className="text-[12px] text-[#8899AA] flex-1">{e.display_name as string}</span>
+                      <span className="text-[12px] font-mono text-[#E8EAED]">{(e.date as string) || "TBD"}</span>
+                      {e.days_until != null && (
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-sm ${
+                          (e.days_until as number) === 0 ? "bg-[#FF4444]/15 text-[#FF4444] font-bold" :
+                          (e.days_until as number) <= 3 ? "bg-[#FF8C00]/10 text-[#FF8C00]" :
+                          "bg-[#5A6A7A]/10 text-[#5A6A7A]"
+                        }`}>
+                          {(e.days_until as number) === 0 ? "TODAY" : (e.days_until as number) === 1 ? "TOMORROW" : `in ${e.days_until} days`}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 mt-1">
+                      <span className="text-[9px] font-mono text-[#5A6A7A]">{e.category as string}</span>
+                      {e.eps_estimate != null && (
+                        <span className="text-[10px] font-mono text-[#5A6A7A]">EPS Est: ${fmt(e.eps_estimate as number)}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ECONOMIC CALENDAR TAB */}
         {activeTab === "calendar" && (
