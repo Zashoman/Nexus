@@ -13,15 +13,14 @@ interface ScoreChartProps {
   height?: number;
 }
 
-export default function ScoreChart({ data, maxScore, thresholds, height = 120 }: ScoreChartProps) {
+export default function ScoreChart({ data, maxScore, thresholds, height = 130 }: ScoreChartProps) {
   if (data.length === 0) return null;
 
   const width = 600;
-  const padding = { top: 10, right: 40, bottom: 25, left: 35 };
+  const padding = { top: 15, right: 50, bottom: 28, left: 35 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
-  // Sort by date
   const sorted = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const points = sorted.map((d, i) => ({
     x: padding.left + (sorted.length === 1 ? chartW / 2 : (i / (sorted.length - 1)) * chartW),
@@ -31,70 +30,77 @@ export default function ScoreChart({ data, maxScore, thresholds, height = 120 }:
     date: d.date,
   }));
 
-  // Build path
   const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
 
-  // Threshold zones (draw as horizontal bands)
-  const zones = thresholds.map((t, i) => {
-    const nextVal = i < thresholds.length - 1 ? thresholds[i + 1].value : maxScore;
-    const y1 = padding.top + chartH - (nextVal / maxScore) * chartH;
-    const y2 = padding.top + chartH - (t.value / maxScore) * chartH;
-    return { ...t, y1, y2, height: y2 - y1 };
-  });
+  // Fill area under the line
+  const areaD = pathD + ` L ${points[points.length - 1].x} ${padding.top + chartH} L ${points[0].x} ${padding.top + chartH} Z`;
 
   return (
-    <div className="bg-[#141820] border border-[#1E2A3A] rounded-sm p-2 mb-4">
+    <div className="bg-[#0D1117] border border-[#1E2A3A] rounded-sm p-3 mb-4">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" style={{ maxHeight: height }}>
-        {/* Threshold zones */}
-        {zones.map((zone) => (
-          <rect
-            key={zone.label}
-            x={padding.left}
-            y={zone.y1}
-            width={chartW}
-            height={Math.max(zone.height, 1)}
-            fill={zone.color}
-            opacity={0.08}
-          />
-        ))}
+        {/* Grid lines - subtle horizontal */}
+        {[0.25, 0.5, 0.75].map((frac) => {
+          const y = padding.top + chartH * (1 - frac);
+          return (
+            <line key={frac} x1={padding.left} y1={y} x2={padding.left + chartW} y2={y} stroke="#1E2A3A" strokeWidth={0.5} />
+          );
+        })}
 
-        {/* Threshold lines */}
+        {/* Threshold lines - very subtle dashed */}
         {thresholds.slice(1).map((t) => {
           const y = padding.top + chartH - (t.value / maxScore) * chartH;
           return (
             <g key={t.label}>
-              <line x1={padding.left} y1={y} x2={padding.left + chartW} y2={y} stroke={t.color} strokeWidth={0.5} strokeDasharray="4,4" opacity={0.4} />
-              <text x={padding.left + chartW + 4} y={y + 3} fill={t.color} fontSize="8" fontFamily="monospace" opacity={0.6}>{t.value}</text>
+              <line x1={padding.left} y1={y} x2={padding.left + chartW} y2={y} stroke="#5A6A7A" strokeWidth={0.5} strokeDasharray="3,6" opacity={0.3} />
+              <text x={padding.left + chartW + 4} y={y + 3} fill="#5A6A7A" fontSize="8" fontFamily="monospace" opacity={0.5}>{t.label}</text>
             </g>
           );
         })}
 
+        {/* Area fill under line */}
+        {points.length > 1 && (
+          <path d={areaD} fill="#4488FF" opacity={0.06} />
+        )}
+
         {/* Score line */}
         {points.length > 1 && (
-          <path d={pathD} fill="none" stroke="#4488FF" strokeWidth={2} />
+          <path d={pathD} fill="none" stroke="#4488FF" strokeWidth={2} strokeLinejoin="round" />
         )}
 
         {/* Score dots */}
-        {points.map((p, i) => (
-          <g key={i}>
-            <circle cx={p.x} cy={p.y} r={i === points.length - 1 ? 5 : 3} fill={i === points.length - 1 ? "#E8EAED" : "#4488FF"} stroke={i === points.length - 1 ? "#4488FF" : "none"} strokeWidth={2} />
-            {/* Score label on last point */}
-            {i === points.length - 1 && (
-              <text x={p.x} y={p.y - 10} fill="#E8EAED" fontSize="10" fontFamily="monospace" textAnchor="middle" fontWeight="bold">{p.score}</text>
-            )}
-          </g>
-        ))}
+        {points.map((p, i) => {
+          const isLast = i === points.length - 1;
+          return (
+            <g key={i}>
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={isLast ? 4 : 2.5}
+                fill={isLast ? "#4488FF" : "#4488FF"}
+                opacity={isLast ? 1 : 0.6}
+              />
+              {isLast && (
+                <>
+                  <circle cx={p.x} cy={p.y} r={7} fill="none" stroke="#4488FF" strokeWidth={1.5} opacity={0.3} />
+                  <text x={p.x} y={p.y - 12} fill="#E8EAED" fontSize="11" fontFamily="monospace" textAnchor="middle" fontWeight="bold">{p.score}</text>
+                </>
+              )}
+            </g>
+          );
+        })}
 
         {/* Date labels */}
-        {points.filter((_, i) => i === 0 || i === points.length - 1 || points.length <= 5).map((p, i) => (
-          <text key={i} x={p.x} y={height - 4} fill="#5A6A7A" fontSize="7" fontFamily="monospace" textAnchor="middle">
+        {points.filter((_, i) => i === 0 || i === points.length - 1 || (points.length <= 7 && points.length > 2)).map((p, i) => (
+          <text key={i} x={p.x} y={height - 4} fill="#5A6A7A" fontSize="8" fontFamily="monospace" textAnchor="middle">
             {new Date(p.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
           </text>
         ))}
 
-        {/* Y axis labels */}
+        {/* Y axis */}
         <text x={padding.left - 8} y={padding.top + 4} fill="#5A6A7A" fontSize="8" fontFamily="monospace" textAnchor="end">{maxScore}</text>
         <text x={padding.left - 8} y={padding.top + chartH + 4} fill="#5A6A7A" fontSize="8" fontFamily="monospace" textAnchor="end">0</text>
+        <line x1={padding.left} y1={padding.top} x2={padding.left} y2={padding.top + chartH} stroke="#1E2A3A" strokeWidth={0.5} />
+        <line x1={padding.left} y1={padding.top + chartH} x2={padding.left + chartW} y2={padding.top + chartH} stroke="#1E2A3A" strokeWidth={0.5} />
       </svg>
     </div>
   );
