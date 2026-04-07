@@ -57,22 +57,53 @@ export async function POST() {
   const db = getServiceSupabase();
   const dayOfCrisis = Math.floor((Date.now() - CRISIS_START.getTime()) / (1000 * 60 * 60 * 24));
 
-  // Fetch market data - use tickers confirmed working on Finnhub
-  const [usoQ, bnoQ, uupQ, goldQ, spyQ] = await Promise.all([
-    fetchFinnhubQuote('USO'),
-    fetchFinnhubQuote('BNO'),
-    fetchFinnhubQuote('UUP'),
-    fetchFinnhubQuote('GLD'),
-    fetchFinnhubQuote('SPY'),
-  ]);
+  // Get market data from cached dashboard data to avoid Finnhub rate limits
+  // The commodities and rates APIs already fetched this data
+  let brentPrice = 0;
+  let dxyPrice = 0;
+  let goldPrice = 0;
+  let spyPrice = 0;
+  let goldChgPct = 0;
+  let spyChgPct = 0;
 
-  // Use whichever oil ticker returned data (USO and BNO are confirmed working)
-  const brentPrice = (bnoQ?.c && bnoQ.c > 0) ? bnoQ.c : (usoQ?.c && usoQ.c > 0) ? usoQ.c : 0;
-  // For DXY, use UUP if available, otherwise try FRED
-  let dxyPrice = (uupQ?.c && uupQ.c > 0) ? uupQ.c : 0;
-  if (dxyPrice === 0) {
-    const dxyFred = await fetchFRED('DTWEXBGS');
-    dxyPrice = dxyFred || 0;
+  const cachedComm = await getCached('dashboard_commodities') as Record<string, unknown> | null;
+  const cachedRates = await getCached('dashboard_rates') as Record<string, unknown> | null;
+  const cachedGeo = await getCached('dashboard_geo') as Record<string, unknown> | null;
+
+  if (cachedComm) {
+    const quotes = cachedComm.quotes as Record<string, Record<string, number>> || {};
+    brentPrice = quotes['BNO']?.price || quotes['USO']?.price || 0;
+    goldPrice = quotes['GLD']?.price || 0;
+    goldChgPct = quotes['GLD']?.changePct || 0;
+  }
+
+  if (cachedRates) {
+    const fx = cachedRates.fx as Record<string, Record<string, number> | null> || {};
+    dxyPrice = fx.dxy?.price || 0;
+  }
+
+  if (cachedGeo) {
+    const proxies = cachedGeo.proxies as Record<string, Record<string, number> | null> || {};
+    spyPrice = proxies.spy?.price || 0;
+    spyChgPct = proxies.spy?.changePct || 0;
+    if (!goldPrice && proxies.gold) {
+      goldPrice = proxies.gold.price || 0;
+      goldChgPct = proxies.gold.changePct || 0;
+    }
+  }
+
+  // Only make direct Finnhub calls if cache is completely empty (first run)
+  if (brentPrice === 0 && goldPrice === 0) {
+    const [bnoQ, goldQ, spyQ] = await Promise.all([
+      fetchFinnhubQuote('BNO'),
+      fetchFinnhubQuote('GLD'),
+      fetchFinnhubQuote('SPY'),
+    ]);
+    brentPrice = bnoQ?.c || 0;
+    goldPrice = goldQ?.c || 0;
+    goldChgPct = goldQ?.dp || 0;
+    spyPrice = spyQ?.c || 0;
+    spyChgPct = spyQ?.dp || 0;
   }
 
   // Auto-score market-based signals
@@ -81,7 +112,7 @@ export async function POST() {
   else if (brentPrice < 75) brentRating = 'red';
 
   let dxyRating = 'yellow';
-  if (dxyPrice > 103 || (uupQ?.dp || 0) > 0) dxyRating = 'green';
+  if (dxyPrice > 103 || dxyPrice > 0) dxyRating = 'green';
   else if (dxyPrice < 95) dxyRating = 'red';
 
   let storageRating = 'green';

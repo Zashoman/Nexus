@@ -70,14 +70,15 @@ export default function DashboardPage() {
 
   async function fetchHeaderScores() {
     try {
-      const [ratesRes, commRes, ddRes, hormuzRes, creditRes, geoRes] = await Promise.all([
-        fetch("/api/dashboard/rates").then(r => r.json()).catch(() => null),
-        fetch("/api/dashboard/commodities").then(r => r.json()).catch(() => null),
-        fetch("/api/dashboard/demand-destruction").then(r => r.json()).catch(() => null),
-        fetch("/api/dashboard/hormuz").then(r => r.json()).catch(() => null),
-        fetch("/api/dashboard/private-credit").then(r => r.json()).catch(() => null),
-        fetch("/api/dashboard/geo").then(r => r.json()).catch(() => null),
-      ]);
+      // Fetch sequentially to avoid Finnhub rate limits (60 calls/min)
+      // Rates and commodities first (they cache), then scoring tabs read from cache
+      const ratesRes = await fetch("/api/dashboard/rates").then(r => r.json()).catch(() => null);
+      const commRes = await fetch("/api/dashboard/commodities").then(r => r.json()).catch(() => null);
+      const geoRes = await fetch("/api/dashboard/geo").then(r => r.json()).catch(() => null);
+      // These read from DB (no Finnhub calls)
+      const ddRes = await fetch("/api/dashboard/demand-destruction").then(r => r.json()).catch(() => null);
+      const hormuzRes = await fetch("/api/dashboard/hormuz").then(r => r.json()).catch(() => null);
+      const creditRes = await fetch("/api/dashboard/private-credit").then(r => r.json()).catch(() => null);
 
       const scores: Record<string, { score: number; max: number; level: string }> = {};
 
