@@ -56,7 +56,7 @@ export default function VideoCard({ video, isSelected, onClick, onRemove }: Vide
           {/* Channel + time */}
           <div className="flex items-center gap-2 mb-0.5">
             <span className="text-[10px] font-mono text-[#FF4444] font-bold">{video.channel_name}</span>
-            <span className="text-[10px] font-mono text-[#5A6A7A] capitalize">{video.category}</span>
+            <span className="text-[10px] font-mono text-[#5A6A7A] capitalize">{video.category === 'ai' ? 'AI' : video.category}</span>
             <span className="ml-auto flex items-center gap-2">
               {video.published_at && (
                 <span className="text-[10px] font-mono text-[#5A6A7A]">{timeAgo(video.published_at)}</span>

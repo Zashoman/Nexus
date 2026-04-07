@@ -75,9 +75,21 @@ export async function GET() {
         const videoId = item.id?.videoId;
         if (!videoId) continue;
 
-        // Skip Shorts (under 2 minutes)
+        const snippet = item.snippet;
+        const title = snippet.title || '';
+
+        // Skip Shorts - check by duration AND title patterns
         const duration = durations[videoId] || 0;
-        if (duration > 0 && duration < 120) continue;
+        const isShortByDuration = duration > 0 && duration < 180; // Under 3 minutes
+        const isShortByTitle = title.toLowerCase().includes('#shorts') || title.toLowerCase().includes('#short');
+
+        // If we have duration data and it's short, skip
+        if (isShortByDuration) continue;
+        // If title says it's a short, skip
+        if (isShortByTitle) continue;
+        // If no duration data available (API failed), check if title length suggests a short
+        // Shorts tend to have very short titles
+        if (duration === 0 && title.length < 15 && !title.includes(':')) continue;
 
         // Check if already exists
         const { data: existing } = await db
@@ -88,7 +100,6 @@ export async function GET() {
 
         if (existing) continue;
 
-        const snippet = item.snippet;
         const description = (snippet.description || '').slice(0, 1000);
         const miniSummary = description.length > 0
           ? description.split('\n').filter((l: string) => l.trim().length > 0).slice(0, 2).join(' ').slice(0, 200)

@@ -21,7 +21,7 @@ export default function YouTubeTabs({ activeTab, categories, onTabChange }: YouT
               : 'border-transparent text-[#5A6A7A] hover:text-[#8899AA] hover:bg-[#141820]/50'
           }`}
         >
-          {tab === 'all' ? 'All Channels' : tab}
+          {tab === 'all' ? 'All Channels' : tab === 'ai' ? 'AI' : tab}
         </button>
       ))}
     </div>
