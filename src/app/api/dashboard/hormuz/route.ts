@@ -57,8 +57,7 @@ export async function POST() {
   const db = getServiceSupabase();
   const dayOfCrisis = Math.floor((Date.now() - CRISIS_START.getTime()) / (1000 * 60 * 60 * 24));
 
-  // Get market data from cached dashboard data to avoid Finnhub rate limits
-  // The commodities and rates APIs already fetched this data
+  // Fetch market data one at a time to avoid Finnhub rate limits
   let brentPrice = 0;
   let dxyPrice = 0;
   let goldPrice = 0;
@@ -66,45 +65,25 @@ export async function POST() {
   let goldChgPct = 0;
   let spyChgPct = 0;
 
-  const cachedComm = await getCached('dashboard_commodities') as Record<string, unknown> | null;
-  const cachedRates = await getCached('dashboard_rates') as Record<string, unknown> | null;
-  const cachedGeo = await getCached('dashboard_geo') as Record<string, unknown> | null;
+  const bnoQ = await fetchFinnhubQuote('BNO');
+  brentPrice = bnoQ?.c || 0;
 
-  if (cachedComm) {
-    const quotes = cachedComm.quotes as Record<string, Record<string, number>> || {};
-    brentPrice = quotes['BNO']?.price || quotes['USO']?.price || 0;
-    goldPrice = quotes['GLD']?.price || 0;
-    goldChgPct = quotes['GLD']?.changePct || 0;
+  if (brentPrice === 0) {
+    const usoQ = await fetchFinnhubQuote('USO');
+    brentPrice = usoQ?.c || 0;
   }
 
-  if (cachedRates) {
-    const fx = cachedRates.fx as Record<string, Record<string, number> | null> || {};
-    dxyPrice = fx.dxy?.price || 0;
-  }
+  const goldQ = await fetchFinnhubQuote('GLD');
+  goldPrice = goldQ?.c || 0;
+  goldChgPct = goldQ?.dp || 0;
 
-  if (cachedGeo) {
-    const proxies = cachedGeo.proxies as Record<string, Record<string, number> | null> || {};
-    spyPrice = proxies.spy?.price || 0;
-    spyChgPct = proxies.spy?.changePct || 0;
-    if (!goldPrice && proxies.gold) {
-      goldPrice = proxies.gold.price || 0;
-      goldChgPct = proxies.gold.changePct || 0;
-    }
-  }
+  const spyQ = await fetchFinnhubQuote('SPY');
+  spyPrice = spyQ?.c || 0;
+  spyChgPct = spyQ?.dp || 0;
 
-  // Only make direct Finnhub calls if cache is completely empty (first run)
-  if (brentPrice === 0 && goldPrice === 0) {
-    const [bnoQ, goldQ, spyQ] = await Promise.all([
-      fetchFinnhubQuote('BNO'),
-      fetchFinnhubQuote('GLD'),
-      fetchFinnhubQuote('SPY'),
-    ]);
-    brentPrice = bnoQ?.c || 0;
-    goldPrice = goldQ?.c || 0;
-    goldChgPct = goldQ?.dp || 0;
-    spyPrice = spyQ?.c || 0;
-    spyChgPct = spyQ?.dp || 0;
-  }
+  // DXY from FRED (free, no rate limit)
+  const dxyFred = await fetchFRED('DTWEXBGS');
+  dxyPrice = dxyFred || 0;
 
   // Auto-score market-based signals
   let brentRating = 'yellow';
