@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
-import RSSParser from 'rss-parser';
-
-const parser = new RSSParser({
-  timeout: 15000,
-  headers: { 'User-Agent': 'NexusBot/1.0' },
-});
 
 const YT_API_KEY = process.env.YOUTUBE_API_KEY;
 
@@ -16,27 +10,6 @@ function parseDuration(iso: string): number {
   const mins = parseInt(match[2] || '0');
   const secs = parseInt(match[3] || '0');
   return hours * 3600 + mins * 60 + secs;
-}
-
-async function getVideoDurations(videoIds: string[]): Promise<Record<string, number>> {
-  if (!YT_API_KEY || videoIds.length === 0) return {};
-  const durations: Record<string, number> = {};
-  try {
-    const ids = videoIds.join(',');
-    const res = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?id=${ids}&part=contentDetails&key=${YT_API_KEY}`,
-      { signal: AbortSignal.timeout(10000) }
-    );
-    if (res.ok) {
-      const data = await res.json();
-      for (const item of data.items || []) {
-        durations[item.id] = parseDuration(item.contentDetails?.duration || '');
-      }
-    }
-  } catch {
-    // Silent
-  }
-  return durations;
 }
 
 export async function GET() {
@@ -52,46 +25,61 @@ export async function GET() {
   }
 
   let newVideos = 0;
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const errors: string[] = [];
+
+  if (!YT_API_KEY) {
+    return NextResponse.json({ videos: [], channels, errors: ['No YouTube API key configured'] });
+  }
 
   for (const channel of channels) {
     try {
-      // Try primary RSS URL, then fallback format
-      let feed;
-      try {
-        feed = await parser.parseURL(channel.rss_url);
-      } catch {
-        // Try alternative URL format
-        const altUrl = channel.rss_url.replace(
-          'https://www.youtube.com/feeds/videos.xml?channel_id=',
-          'https://youtube.com/feeds/videos.xml?channel_id='
-        );
+      // Use YouTube Data API to get recent uploads
+      const searchRes = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?channelId=${channel.channel_id}&part=snippet&order=date&maxResults=10&type=video&publishedAfter=${sevenDaysAgo}&key=${YT_API_KEY}`,
+        { signal: AbortSignal.timeout(15000) }
+      );
+
+      if (!searchRes.ok) {
+        errors.push(`${channel.channel_name}: YouTube API ${searchRes.status}`);
+        continue;
+      }
+
+      const searchData = await searchRes.json();
+      const items = searchData.items || [];
+
+      if (items.length === 0) continue;
+
+      // Get video details (duration) to filter shorts
+      const videoIds = items.map((item: Record<string, Record<string, string>>) => item.id?.videoId).filter(Boolean);
+
+      let durations: Record<string, number> = {};
+      if (videoIds.length > 0) {
         try {
-          feed = await parser.parseURL(altUrl);
-        } catch {
-          // Try fetching via a proxy/direct XML
-          const directRes = await fetch(channel.rss_url, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NexusBot/1.0)' },
-            signal: AbortSignal.timeout(15000),
-          });
-          if (directRes.ok) {
-            const xml = await directRes.text();
-            feed = await parser.parseString(xml);
-          } else {
-            throw new Error(`Status code ${directRes.status}`);
+          const detailRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/videos?id=${videoIds.join(',')}&part=contentDetails&key=${YT_API_KEY}`,
+            { signal: AbortSignal.timeout(10000) }
+          );
+          if (detailRes.ok) {
+            const detailData = await detailRes.json();
+            for (const item of detailData.items || []) {
+              durations[item.id] = parseDuration(item.contentDetails?.duration || '');
+            }
           }
+        } catch {
+          // Duration check failed, allow all videos through
         }
       }
-      const feedItems = feed.items || [];
 
-      for (const item of feedItems.slice(0, 10)) {
-        const videoId = item.id?.split(':').pop() || '';
+      for (const item of items) {
+        const videoId = item.id?.videoId;
         if (!videoId) continue;
 
-        const pubDate = item.isoDate || item.pubDate;
-        if (pubDate && new Date(pubDate).getTime() < sevenDaysAgo) continue;
+        // Skip Shorts (under 2 minutes)
+        const duration = durations[videoId] || 0;
+        if (duration > 0 && duration < 120) continue;
 
+        // Check if already exists
         const { data: existing } = await db
           .from('intel_youtube_videos')
           .select('id')
@@ -100,20 +88,8 @@ export async function GET() {
 
         if (existing) continue;
 
-        // Try to check duration to filter shorts, but don't block if it fails
-        let isShort = false;
-        try {
-          const durations = await getVideoDurations([videoId]);
-          const dur = durations[videoId] || 0;
-          if (dur > 0 && dur < 120) isShort = true;
-        } catch {
-          // Duration check failed, allow the video through
-        }
-
-        if (isShort) continue;
-
-        const description = (item.contentSnippet || item.content || '').slice(0, 1000);
-
+        const snippet = item.snippet;
+        const description = (snippet.description || '').slice(0, 1000);
         const miniSummary = description.length > 0
           ? description.split('\n').filter((l: string) => l.trim().length > 0).slice(0, 2).join(' ').slice(0, 200)
           : null;
@@ -123,30 +99,28 @@ export async function GET() {
           channel_id: channel.channel_id,
           channel_name: channel.channel_name,
           category: channel.category,
-          title: item.title || 'Untitled',
+          title: snippet.title || 'Untitled',
           description,
-          published_at: item.isoDate || item.pubDate || null,
-          thumbnail_url: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
+          published_at: snippet.publishedAt || null,
+          thumbnail_url: snippet.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`,
           video_url: `https://www.youtube.com/watch?v=${videoId}`,
           mini_summary: miniSummary,
         });
 
-        if (insertError) {
-          if (insertError.code !== '23505') {
-            errors.push(`${channel.channel_name}: insert error - ${insertError.message}`);
-          }
-        } else {
+        if (insertError && insertError.code !== '23505') {
+          errors.push(`${channel.channel_name}: insert - ${insertError.message}`);
+        } else if (!insertError) {
           newVideos++;
         }
       }
     } catch (err) {
-      errors.push(`${channel.channel_name}: ${err instanceof Error ? err.message : 'RSS parse failed'}`);
+      errors.push(`${channel.channel_name}: ${err instanceof Error ? err.message : 'Failed'}`);
     }
   }
 
-  // Return only recent videos (last 7 days), exclude dismissed
+  // Return recent videos (last 7 days)
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: videos, error: queryError } = await db
+  const { data: videos } = await db
     .from('intel_youtube_videos')
     .select('*')
     .gte('published_at', cutoff)
@@ -158,7 +132,6 @@ export async function GET() {
     channels: channels || [],
     new_videos: newVideos,
     errors: errors.length > 0 ? errors : undefined,
-    query_error: queryError?.message || undefined,
   });
 }
 
@@ -171,7 +144,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "video_id required" }, { status: 400 });
   }
 
-  // Soft-delete: mark as dismissed instead of removing, so RSS re-fetch doesn't re-add it
-  await db.from("intel_youtube_videos").update({ dismissed: true }).eq("video_id", videoId);
+  await db.from("intel_youtube_videos").delete().eq("video_id", videoId);
   return NextResponse.json({ success: true });
 }
