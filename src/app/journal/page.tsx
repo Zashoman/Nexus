@@ -40,6 +40,7 @@ export default function JournalPage() {
   const [backupStatus, setBackupStatus] = useState<'idle' | 'backing_up' | 'success' | 'error'>('idle');
 
   const GSHEET_URL = process.env.NEXT_PUBLIC_JOURNAL_GSHEET_URL || '';
+  const DB_URL = process.env.NEXT_PUBLIC_JOURNAL_DB_URL || '';
 
   useEffect(() => {
     fetchEntries();
@@ -357,6 +358,19 @@ export default function JournalPage() {
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" /></svg>
               Sheet
+            </a>
+          )}
+          {/* Database link */}
+          {DB_URL && (
+            <a
+              href={DB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono text-[#8899AA] rounded-sm transition-all hover:text-[#E8EAED] cursor-pointer"
+              style={{ background: '#141820', boxShadow: 'inset 0 0 0 1px #1E2A3A' }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></svg>
+              Database
             </a>
           )}
         </div>
