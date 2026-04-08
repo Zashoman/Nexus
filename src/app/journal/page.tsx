@@ -85,22 +85,21 @@ export default function JournalPage() {
   async function handleDelete(entryId: string) {
     if (deleteConfirm !== entryId) {
       setDeleteConfirm(entryId);
-      setTimeout(() => setDeleteConfirm(null), 4000);
+      setTimeout(() => setDeleteConfirm((prev) => prev === entryId ? null : prev), 4000);
       return;
     }
     setIsDeleting(true);
+    setDeleteConfirm(null);
+    // Optimistically remove from UI immediately
+    setEntries((prev) => prev.filter((e) => e.id !== entryId));
+    if (selectedEntry?.id === entryId) setSelectedEntry(null);
+    if (activeEntry?.id === entryId) setActiveEntry(null);
     try {
-      const res = await fetch('/api/journal/delete', {
+      await fetch('/api/journal/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entry_id: entryId }),
       });
-      if (res.ok) {
-        if (selectedEntry?.id === entryId) setSelectedEntry(null);
-        if (activeEntry?.id === entryId) setActiveEntry(null);
-        setDeleteConfirm(null);
-        fetchEntries();
-      }
     } catch { /* */ }
     finally { setIsDeleting(false); }
   }
