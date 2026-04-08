@@ -212,9 +212,11 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
   const [miniSummary, setMiniSummary] = useState<string | null>(null);
   const [fullSummary, setFullSummary] = useState<string | null>(null);
   const [extendedSummary, setExtendedSummary] = useState<string | null>(null);
+  const [factCheck, setFactCheck] = useState<string | null>(null);
   const [miniLoading, setMiniLoading] = useState(false);
   const [fullLoading, setFullLoading] = useState(false);
   const [extendedLoading, setExtendedLoading] = useState(false);
+  const [factCheckLoading, setFactCheckLoading] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
   const [readProgress, setReadProgress] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -224,9 +226,11 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
     setMiniSummary(video.mini_summary || null);
     setFullSummary(video.full_summary || null);
     setExtendedSummary(null);
+    setFactCheck(null);
     setMiniLoading(false);
     setFullLoading(false);
     setExtendedLoading(false);
+    setFactCheckLoading(false);
     setIsStarred(false);
     setReadProgress(0);
   }, [video?.video_id]);
@@ -285,6 +289,21 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
       if (data.summary) setExtendedSummary(data.summary);
     } catch { /* silent */ }
     finally { setExtendedLoading(false); }
+  }
+
+  async function generateFactCheck() {
+    if (!video || factCheckLoading) return;
+    setFactCheckLoading(true);
+    try {
+      const res = await fetch("/api/youtube/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ video_id: video.video_id, mode: "factcheck" }),
+      });
+      const data = await res.json();
+      if (data.summary) setFactCheck(data.summary);
+    } catch { /* silent */ }
+    finally { setFactCheckLoading(false); }
   }
 
   if (!video) {
@@ -415,7 +434,14 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
                     Longer Breakdown
                   </button>
                 )}
-                {/* Fact Check button placeholder — prompt TBD */}
+                {!factCheck && !factCheckLoading && (
+                  <button
+                    onClick={generateFactCheck}
+                    className="flex-1 py-2.5 px-4 text-xs font-mono font-semibold rounded cursor-pointer transition-all duration-200 bg-[#FF8C00] text-white hover:bg-[#FF9922] active:bg-[#EE7B00]"
+                  >
+                    Fact Check
+                  </button>
+                )}
               </div>
             )}
             {extendedLoading && (
@@ -466,6 +492,45 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
               </div>
             )}
           </div>
+
+          {/* Fact Check — separate section below analysis */}
+          {factCheckLoading && (
+            <div className="pt-3 border-t-2 border-[#FF8C00]/30">
+              <div className="bg-[#0B0E11] border border-[#FF8C00]/20 rounded-sm p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-[#FF8C00] rounded-full animate-pulse" />
+                  <p className="text-[11px] font-mono text-[#FF8C00]">Fact-checking claims against primary sources...</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
+                  <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-5/6" />
+                  <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
+                  <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-3/4" />
+                  <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
+                </div>
+                <p className="text-[9px] font-mono text-[#5A6A7A]">45-90 seconds — verifying claims against credible sources</p>
+              </div>
+            </div>
+          )}
+          {factCheck && (
+            <div className="pt-3 border-t-2 border-[#FF8C00]/30">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1.5 h-1.5 bg-[#FF8C00] rounded-full" />
+                <h3 className="text-[13px] font-mono font-bold text-[#FF8C00] uppercase tracking-wider">Independent Fact Check</h3>
+              </div>
+              {parseSections(factCheck).length > 0 ? (
+                <div>
+                  {parseSections(factCheck).map((s) => (
+                    <div key={s.id} id={`fc-${s.id}`}>
+                      <AnalysisSection section={s} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div>{renderSectionContent(factCheck.split("\n"))}</div>
+              )}
+            </div>
+          )}
 
           {/* Feedback */}
           <div className="pt-3 border-t border-[#1E2A3A] space-y-2">

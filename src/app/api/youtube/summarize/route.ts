@@ -225,6 +225,122 @@ RULES:
     }
   }
 
+  // Fact Check mode — rigorous verification of the ORIGINAL full summary only
+  if (mode === 'factcheck') {
+    // Requires the original full summary to exist
+    if (!video.full_summary) {
+      return NextResponse.json({ error: 'Full Summary must be generated first' }, { status: 400 });
+    }
+
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 16000,
+        messages: [{
+          role: 'user',
+          content: `You are conducting a rigorous, independent fact-check of the content analysis provided below. Your sole objective is accuracy. You are not an advocate for or against the speaker's thesis. You are not trying to validate or debunk anything. You are trying to determine what is true, what is false, what is misleading, and what cannot be determined -- and you are going to do this with the methodical discipline of an investigative journalist, not the casual glance of a commentator.
+
+VIDEO CONTEXT:
+Title: ${video.title}
+Channel: ${video.channel_name}
+Category: ${video.category}
+
+ORIGINAL ANALYSIS TO FACT-CHECK:
+${video.full_summary}
+
+SOURCE MATERIAL (${isTranscript ? 'TRANSCRIPT' : 'VIDEO DESCRIPTION'}):
+${content.slice(0, 30000)}
+
+---
+
+Your mandate is objectivity above all else. This means:
+
+You do not give the speaker the benefit of the doubt. You do not give the speaker's critics the benefit of the doubt. You give the evidence the benefit of the doubt and nothing else.
+You search for sources that CONFIRM the claim AND sources that CONTRADICT it. If you only search for confirming evidence, you are not fact-checking -- you are cheerleading. If you only search for contradicting evidence, you are not fact-checking -- you are debunking. Neither is your job. Your job is to find the truth and present it clearly.
+You must use multiple independent sources for every major claim. A single source is not verification -- it is a lead. Two corroborating sources from independent origins is the minimum threshold for marking something VERIFIED.
+You prioritize primary sources over secondary sources, always. Government data (BLS, BEA, Census, Fed, Treasury) over news reports about government data. Company filings (10-K, 10-Q, earnings transcripts) over analyst summaries. Academic papers over pop-science articles. The original dataset over someone's interpretation of the dataset.
+You do not treat the absence of contradicting evidence as confirmation. "I couldn't find anything saying this is wrong" is not the same as "this is verified." Unverified means unverified. Say so plainly.
+
+## STEP 1: CLAIM EXTRACTION & TRIAGE
+
+Go through the analysis above -- particularly the DATA & CLAIMS section, but also claims embedded in THESIS, KEY POINTS, and CRITICAL TAKE -- and compile a master list of every verifiable factual claim. A verifiable claim is any assertion that refers to an objective, external reality that can be checked against data, records, or documented events. Opinions, predictions about the future, and interpretive frameworks are not verifiable claims. Do not fact-check judgments. Fact-check the facts those judgments rest on.
+
+Triage claims into three tiers:
+- TIER 1 -- LOAD-BEARING CLAIMS: Factual assertions the core thesis depends on. If wrong, the argument collapses. These get the most rigorous checking with multiple sources. Every Tier 1 claim must be searched and verified independently.
+- TIER 2 -- SUPPORTING CLAIMS: Factual assertions that strengthen the argument but aren't structurally essential. A single credible source is acceptable.
+- TIER 3 -- PERIPHERAL CLAIMS: Passing references, minor data points, background context. Check only if suspicious or trivial to check.
+
+Present the triage before you begin checking.
+
+## STEP 2: SYSTEMATIC VERIFICATION
+
+For each Tier 1 and Tier 2 claim:
+
+A. State the claim exactly as the speaker made it. Do not paraphrase, round, or soften. Precision matters.
+
+B. Search for the claim using multiple independent queries from at least two different angles.
+
+C. Evaluate source quality using this hierarchy:
+1. Official primary data -- Government statistical agencies (BLS, BEA, Fed, Treasury, OECD, IMF, World Bank), central bank publications, regulatory filings, peer-reviewed research.
+2. Institutional research -- Major financial institutions' research departments, established think tanks with transparent methodology, reputable data aggregators (FRED, Our World in Data).
+3. Quality journalism -- Established financial press (FT, WSJ, Reuters, Bloomberg) with editorial standards.
+4. Expert commentary -- Named analysts, academics, or practitioners with relevant domain expertise.
+5. Everything else -- Blogs, podcasts, social media, newsletters, anonymous sources. These are NOT verification sources. If this is all you can find, the claim is UNVERIFIED.
+
+D. Assign a verdict:
+- VERIFIED -- Confirmed by at least two independent credible sources (tiers 1-3). Substance, magnitude, and framing are all accurate. Note precise figures even for minor rounding.
+- PARTIALLY TRUE -- Directionally correct but contains a material inaccuracy in specifics, framing, or context. Explain exactly what is correct, what is incorrect or misleading, and whether the inaccuracy matters.
+- UNVERIFIED -- Cannot confirm or deny after a good-faith search. Not a soft "probably true" -- a clear statement the reader should not rely on this claim without their own research.
+- FALSE -- Directly contradicted by credible evidence from tiers 1-2. Provide the correct information with sources and explain the magnitude of the error.
+- MISLEADING -- Technically accurate but presented in a way that leads to a false conclusion. Explain what impression the speaker creates and why the full picture looks different.
+
+E. Assess materiality: MATERIAL (if corrected, would weaken/change the argument) or IMMATERIAL (mistake doesn't affect argument validity).
+
+## STEP 3: CROSS-REFERENCING & PATTERN ANALYSIS
+
+After checking individual claims, analyze patterns:
+- Source fidelity -- When the speaker cites specific sources, did they represent those sources accurately?
+- Directional bias in errors -- Do errors skew in one direction? Random errors go both ways. Systematic errors supporting the thesis suggest motivated reasoning.
+- Stale data -- Is the speaker using current data or outdated figures?
+- Denominator games and base rate neglect -- Absolute numbers when percentages would be more informative, or vice versa? Growth rates without establishing the base?
+
+## STEP 4: VERDICTS SUMMARY
+
+Present a clean summary of all checked claims with:
+- The claim (one sentence)
+- The verdict (VERIFIED / PARTIALLY TRUE / UNVERIFIED / FALSE / MISLEADING)
+- Materiality (MATERIAL / IMMATERIAL)
+- One sentence explaining the verdict
+
+Then provide an overall accuracy assessment:
+- What percentage of Tier 1 claims were VERIFIED?
+- Were any Tier 1 claims FALSE or MISLEADING?
+- Does the overall pattern of errors strengthen or weaken confidence in the speaker's research rigor?
+- If you corrected every error, would the core thesis still hold, partially hold, or collapse?
+
+End with a single paragraph addressed to the reader: given the results, how much should they trust the factual foundation? Where should they dig further? What is the single most important thing the speaker got right, and the single most important thing they got wrong?
+
+---
+PROCESS DISCIPLINE REMINDERS:
+- Search before you judge. Do not rate any claim based on training data alone.
+- Do not confuse "the speaker's interpretation of data" with "the data itself."
+- Do not let correct claims create a halo effect on incorrect ones, or vice versa.
+- If you cannot determine the truth, say so. "I don't know" is a valid output.
+- Present the strongest version of counter-evidence, not the weakest.
+- Only analyze what is ACTUALLY in the content. Never fabricate.`,
+        }],
+      });
+
+      const summary = response.content[0].type === 'text' ? response.content[0].text : '';
+      await db.from('intel_youtube_videos').update({
+        metadata: { ...metadata, factcheck: summary },
+      }).eq('video_id', video_id);
+      return NextResponse.json({ summary });
+    } catch (err) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed' }, { status: 500 });
+    }
+  }
+
   // Full summary mode (original ~850 word analysis)
   try {
     const response = await anthropic.messages.create({
