@@ -211,8 +211,10 @@ function FeedbackInput({ videoId }: { videoId: string }) {
 export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelProps) {
   const [miniSummary, setMiniSummary] = useState<string | null>(null);
   const [fullSummary, setFullSummary] = useState<string | null>(null);
+  const [extendedSummary, setExtendedSummary] = useState<string | null>(null);
   const [miniLoading, setMiniLoading] = useState(false);
   const [fullLoading, setFullLoading] = useState(false);
+  const [extendedLoading, setExtendedLoading] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
   const [readProgress, setReadProgress] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -221,8 +223,10 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
     if (!video) return;
     setMiniSummary(video.mini_summary || null);
     setFullSummary(video.full_summary || null);
+    setExtendedSummary(null);
     setMiniLoading(false);
     setFullLoading(false);
+    setExtendedLoading(false);
     setIsStarred(false);
     setReadProgress(0);
   }, [video?.video_id]);
@@ -268,6 +272,21 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
     finally { setFullLoading(false); }
   }
 
+  async function generateExtended() {
+    if (!video || extendedLoading) return;
+    setExtendedLoading(true);
+    try {
+      const res = await fetch("/api/youtube/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ video_id: video.video_id, mode: "extended" }),
+      });
+      const data = await res.json();
+      if (data.summary) setExtendedSummary(data.summary);
+    } catch { /* silent */ }
+    finally { setExtendedLoading(false); }
+  }
+
   if (!video) {
     return (
       <div className="flex-1 bg-[#141820] flex items-center justify-center">
@@ -276,12 +295,14 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
     );
   }
 
-  const sections = fullSummary ? parseSections(fullSummary) : [];
+  // Use extended summary if available, otherwise fall back to full summary
+  const displaySummary = extendedSummary || fullSummary;
+  const sections = displaySummary ? parseSections(displaySummary) : [];
 
   return (
     <div className="flex-1 bg-[#141820] flex flex-col overflow-hidden border-l border-[#1E2A3A]">
       {/* Reading progress bar */}
-      {fullSummary && (
+      {displaySummary && (
         <div className="h-[2px] bg-[#1E2A3A] flex-shrink-0">
           <div
             className="h-full bg-[#4488FF] transition-all duration-150"
@@ -383,7 +404,36 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
                 <p className="text-[9px] font-mono text-[#5A6A7A]">15-30 seconds</p>
               </div>
             )}
-            {fullSummary && sections.length > 0 && (
+            {/* Action buttons — appear after Full Summary is loaded */}
+            {fullSummary && !extendedLoading && (
+              <div className="flex gap-2 mb-3">
+                {!extendedSummary && (
+                  <button
+                    onClick={generateExtended}
+                    className="flex-1 py-2.5 px-4 text-xs font-mono font-semibold rounded cursor-pointer transition-all duration-200 bg-[#4488FF] text-white hover:bg-[#5599FF] active:bg-[#3377EE]"
+                  >
+                    Longer Breakdown
+                  </button>
+                )}
+                {/* Fact Check button placeholder — prompt TBD */}
+              </div>
+            )}
+            {extendedLoading && (
+              <div className="bg-[#0B0E11] border border-[#4488FF]/20 rounded-sm p-4 space-y-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-[#4488FF] rounded-full animate-pulse" />
+                  <p className="text-[11px] font-mono text-[#4488FF]">Generating deep breakdown...</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
+                  <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-5/6" />
+                  <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-full" />
+                  <div className="h-3 bg-[#1E2A3A] rounded animate-pulse w-4/6" />
+                </div>
+                <p className="text-[9px] font-mono text-[#5A6A7A]">30-60 seconds — this is a comprehensive analysis</p>
+              </div>
+            )}
+            {displaySummary && sections.length > 0 && (
               <div>
                 {/* Section nav — sticky jump links */}
                 <div className="flex flex-wrap gap-1.5 mb-4 pb-3 border-b border-[#1E2A3A] sticky top-0 bg-[#141820] z-10 pt-1">
@@ -402,17 +452,17 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
                 </div>
 
                 {/* Collapsible sections */}
-                {sections.map((s, i) => (
+                {sections.map((s) => (
                   <div key={s.id} id={s.id}>
                     <AnalysisSection section={s} />
                   </div>
                 ))}
               </div>
             )}
-            {fullSummary && sections.length === 0 && (
+            {displaySummary && sections.length === 0 && (
               <div>
                 <h4 className="text-[12px] font-mono text-[#00CC66] uppercase tracking-wider mb-3">Analysis</h4>
-                {renderSectionContent(fullSummary.split("\n"))}
+                {renderSectionContent(displaySummary.split("\n"))}
               </div>
             )}
           </div>
