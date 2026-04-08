@@ -518,7 +518,7 @@ export default function JournalPage() {
               ) : (
                 <div className="divide-y divide-[#1E2A3A]/50">
                   {entries.map((entry) => (
-                    <button
+                    <div
                       key={entry.id}
                       onClick={() => handleSelectEntry(entry)}
                       className={`w-full text-left px-4 py-3.5 transition-colors cursor-pointer ${
@@ -534,9 +534,21 @@ export default function JournalPage() {
                         <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: `${A}AA` }}>
                           Entry #{entry.entry_number}
                         </span>
-                        <span className="text-[10px] font-mono text-[#3A4A5A]">
-                          {getTimeAgo(entry.created_at)}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDelete(entry.id); }}
+                            className="text-[10px] font-mono transition-all cursor-pointer px-1.5 py-0.5 rounded-sm"
+                            style={{
+                              color: deleteConfirm === entry.id ? '#FF4444' : '#3A4A5A',
+                              background: deleteConfirm === entry.id ? '#FF444415' : 'transparent',
+                            }}
+                          >
+                            {isDeleting && deleteConfirm === entry.id ? '...' : deleteConfirm === entry.id ? 'Confirm?' : '×'}
+                          </button>
+                          <span className="text-[10px] font-mono text-[#3A4A5A]">
+                            {getTimeAgo(entry.created_at)}
+                          </span>
+                        </div>
                       </div>
                       <p className="text-[12px] text-[#8899AA] line-clamp-2 leading-relaxed">
                         {entry.entry_text.substring(0, 150)}{entry.entry_text.length > 150 ? '...' : ''}
@@ -546,7 +558,7 @@ export default function JournalPage() {
                           {formatDate(entry.created_at)}
                         </span>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
