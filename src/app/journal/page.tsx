@@ -36,6 +36,11 @@ export default function JournalPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Backup state
+  const [backupStatus, setBackupStatus] = useState<'idle' | 'backing_up' | 'success' | 'error'>('idle');
+
+  const GSHEET_URL = process.env.NEXT_PUBLIC_JOURNAL_GSHEET_URL || '';
+
   useEffect(() => {
     fetchEntries();
   }, []);
@@ -50,6 +55,28 @@ export default function JournalPage() {
       const data = await res.json();
       if (data.entries) setEntries(data.entries);
     } catch { /* silent */ }
+  }
+
+  async function handleBackup(entryId: string) {
+    setBackupStatus('backing_up');
+    try {
+      const res = await fetch('/api/journal/backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entry_id: entryId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setBackupStatus('success');
+        setTimeout(() => setBackupStatus('idle'), 3000);
+      } else {
+        setBackupStatus('error');
+        setTimeout(() => setBackupStatus('idle'), 4000);
+      }
+    } catch {
+      setBackupStatus('error');
+      setTimeout(() => setBackupStatus('idle'), 4000);
+    }
   }
 
   async function handleSubmit() {
@@ -282,6 +309,56 @@ export default function JournalPage() {
           <span className="text-[10px] font-mono text-[#5A6A7A]">
             {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
           </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Backup button */}
+          {(activeEntry || selectedEntry) && (
+            <button
+              onClick={() => handleBackup((activeEntry || selectedEntry)!.id)}
+              disabled={backupStatus === 'backing_up'}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono rounded-sm transition-all cursor-pointer"
+              style={{
+                background: backupStatus === 'success' ? '#00CC6620' : backupStatus === 'error' ? '#FF444420' : `${A}10`,
+                color: backupStatus === 'success' ? '#00CC66' : backupStatus === 'error' ? '#FF4444' : '#8899AA',
+                boxShadow: `inset 0 0 0 1px ${backupStatus === 'success' ? '#00CC6640' : backupStatus === 'error' ? '#FF444440' : '#1E2A3A'}`,
+              }}
+            >
+              {backupStatus === 'backing_up' ? (
+                <>
+                  <span className="inline-block w-2.5 h-2.5 border border-[#8899AA]/30 border-t-[#8899AA] rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : backupStatus === 'success' ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
+                  Saved
+                </>
+              ) : backupStatus === 'error' ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                  Failed
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                  Backup
+                </>
+              )}
+            </button>
+          )}
+          {/* Google Sheet link */}
+          {GSHEET_URL && (
+            <a
+              href={GSHEET_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono text-[#8899AA] rounded-sm transition-all hover:text-[#E8EAED] cursor-pointer"
+              style={{ background: '#141820', boxShadow: 'inset 0 0 0 1px #1E2A3A' }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" /></svg>
+              Sheet
+            </a>
+          )}
         </div>
       </div>
 

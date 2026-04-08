@@ -254,7 +254,7 @@ export async function POST(req: NextRequest) {
       try {
         const res = await fetch(gdocWebhook, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain' },
           body: payload,
           redirect: 'manual',
         });
@@ -264,8 +264,9 @@ export async function POST(req: NextRequest) {
           if (redirectUrl) {
             await fetch(redirectUrl, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'text/plain' },
               body: payload,
+              redirect: 'follow',
             });
           }
         }
