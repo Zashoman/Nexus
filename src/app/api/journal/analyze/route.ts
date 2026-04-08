@@ -239,19 +239,38 @@ export async function POST(req: NextRequest) {
     })
     .eq('id', memoryRow.id);
 
-  // Google Doc backup (optional, non-blocking)
+  // Google Sheet backup (optional, non-blocking)
+  // Google Apps Script returns a 302 redirect; fetch changes POST→GET on redirect,
+  // so we follow the redirect manually with another POST.
   const gdocWebhook = process.env.JOURNAL_GDOC_WEBHOOK;
   if (gdocWebhook) {
-    fetch(gdocWebhook, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        entry_number: entryNum,
-        date: shortDate,
-        journal_entry: entry_text.trim(),
-        analysis,
-      }),
-    }).catch(() => { /* non-blocking */ });
+    const payload = JSON.stringify({
+      entry_number: entryNum,
+      date: shortDate,
+      journal_entry: entry_text.trim(),
+      analysis,
+    });
+    (async () => {
+      try {
+        const res = await fetch(gdocWebhook, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          redirect: 'manual',
+        });
+        // Follow the redirect manually with POST preserved
+        if (res.status >= 300 && res.status < 400) {
+          const redirectUrl = res.headers.get('location');
+          if (redirectUrl) {
+            await fetch(redirectUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: payload,
+            });
+          }
+        }
+      } catch { /* non-blocking */ }
+    })();
   }
 
   return NextResponse.json({
