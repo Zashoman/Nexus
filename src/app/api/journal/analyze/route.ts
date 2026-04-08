@@ -239,6 +239,21 @@ export async function POST(req: NextRequest) {
     })
     .eq('id', memoryRow.id);
 
+  // Google Doc backup (optional, non-blocking)
+  const gdocWebhook = process.env.JOURNAL_GDOC_WEBHOOK;
+  if (gdocWebhook) {
+    fetch(gdocWebhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        entry_number: entryNum,
+        date: shortDate,
+        journal_entry: entry_text.trim(),
+        analysis,
+      }),
+    }).catch(() => { /* non-blocking */ });
+  }
+
   return NextResponse.json({
     entry_number: entryNum,
     analysis,
