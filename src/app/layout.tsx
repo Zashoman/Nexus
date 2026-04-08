@@ -168,7 +168,7 @@ export default function RootLayout({
           <a
             href="/journal"
             title="Journal Mentor"
-            className="w-8 h-8 flex items-center justify-center text-[#C8A2FF] hover:text-[#D8B8FF] transition-colors rounded-sm hover:bg-[#C8A2FF]/10"
+            className="w-8 h-8 flex items-center justify-center text-[#D4A85C] hover:text-[#E0BC78] transition-colors rounded-sm hover:bg-[#D4A85C]/10"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
