@@ -1,3 +1,8 @@
+journal_mentor.db
 mentor_memory.json
 analyses/
 backups/
+documents/
+baseline_profile.md
+__pycache__/
+*.pyc
