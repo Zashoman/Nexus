@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Journal Mentor</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('journal')">Journal</button>
+        <button class="tab-btn" onclick="switchTab('debugging')">Debugging Matrix</button>
+        <button class="tab-btn" onclick="switchTab('system')">System</button>
+    </div>
+
+    <!-- ═══ JOURNAL TAB ═══ -->
+    <div id="tab-journal" class="tab-content active">
+        <div class="journal-layout">
+            <!-- Left: Writing / Viewing -->
+            <div class="journal-left">
+                <div class="write-area" id="write-area">
+                    <div class="write-date" id="write-date"></div>
+                    <textarea class="write-textarea" id="entry-textarea" placeholder="What's on your mind..." onkeydown="handleEntryKeydown(event)"></textarea>
+                </div>
+                <div class="write-footer">
+                    <span class="word-count" id="word-count">cmd+enter to submit</span>
+                    <button class="btn btn-accent" id="submit-btn" onclick="submitEntry()">Submit Entry</button>
+                </div>
+                <div class="entry-list" id="entry-list"></div>
+            </div>
+            <!-- Right: Dialectic -->
+            <div class="journal-right">
+                <div class="dialectic-panel" id="dialectic-panel">
+                    <div class="dialectic-header" id="dialectic-header" style="display:none">
+                        <span id="dialectic-title">Mentor Read</span>
+                        <span class="status-bar" id="status-bar"></span>
+                    </div>
+                    <div class="dialectic-body" id="dialectic-body">
+                        <div class="placeholder" id="dialectic-placeholder">
+                            <div class="placeholder-text">Write your journal entry on the left.<br>Your mentor's read will appear here.</div>
+                        </div>
+                        <div id="mentor-response-area" style="display:none">
+                            <div class="mentor-response" id="mentor-response"></div>
+                            <div class="dialectic-messages" id="dialectic-messages"></div>
+                        </div>
+                    </div>
+                    <div class="dialectic-input" id="dialectic-input" style="display:none">
+                        <textarea placeholder="Ask your mentor..." id="dialectic-textarea" onkeydown="handleDialecticKeydown(event)" rows="1"></textarea>
+                        <button class="btn btn-accent btn-sm" onclick="sendDialectic()">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ DEBUGGING TAB ═══ -->
+    <div id="tab-debugging" class="tab-content">
+        <div class="debug-content">
+            <div class="bug-add-form">
+                <input id="bug-name" placeholder="Pattern name" style="flex:1">
+                <input id="bug-desc" placeholder="Description" style="flex:2">
+                <button class="btn btn-accent btn-sm" onclick="addBug()">Add Pattern</button>
+            </div>
+            <div id="pending-bugs"></div>
+            <div id="bugs-list"></div>
+        </div>
+    </div>
+
+    <!-- ═══ SYSTEM TAB ═══ -->
+    <div id="tab-system" class="tab-content">
+        <div class="system-content">
+            <!-- Goals -->
+            <div class="system-section">
+                <div class="section-title">Goals</div>
+                <div class="goals-layout">
+                    <div class="goals-column">
+                        <div class="goals-column-header">Moving Toward</div>
+                        <div id="goals-toward"></div>
+                        <div class="goal-add">
+                            <input id="goal-toward-input" placeholder="Add goal..." onkeydown="if(event.key==='Enter')addGoal('toward')">
+                            <button class="btn btn-sm" onclick="addGoal('toward')">+</button>
+                        </div>
+                    </div>
+                    <div class="goals-column">
+                        <div class="goals-column-header">Moving Away From</div>
+                        <div id="goals-away"></div>
+                        <div class="goal-add">
+                            <input id="goal-away-input" placeholder="Add goal..." onkeydown="if(event.key==='Enter')addGoal('away')">
+                            <button class="btn btn-sm" onclick="addGoal('away')">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports -->
+            <div class="system-section">
+                <div class="section-title">Reports</div>
+                <div class="report-actions">
+                    <button class="btn btn-accent" id="gen-weekly-btn" onclick="generateReport('weekly')">Generate Weekly Report</button>
+                    <button class="btn" id="gen-monthly-btn" onclick="generateReport('monthly')">Generate Monthly Report</button>
+                </div>
+                <div id="reports-list"></div>
+            </div>
+
+            <!-- Documents -->
+            <div class="system-section">
+                <div class="section-title">Document Library</div>
+                <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center">
+                    <input type="file" id="doc-file-input" style="font-size:12px; color:var(--text-secondary)">
+                    <button class="btn btn-sm" onclick="uploadDocument()">Upload</button>
+                    <span id="unanalyzed-count" style="font-family:var(--font-mono); font-size:10px; color:var(--amber)"></span>
+                </div>
+                <div id="documents-list"></div>
+            </div>
+
+            <!-- Baseline -->
+            <div class="system-section">
+                <div class="section-title">Baseline Profile</div>
+                <div class="baseline-box" id="baseline-box">
+                    <div class="baseline-status" id="baseline-status">Loading...</div>
+                    <div class="baseline-preview" id="baseline-preview"></div>
+                    <div class="baseline-upload" id="baseline-upload" style="display:none">
+                        <textarea id="baseline-textarea" placeholder="Paste your baseline profile here..."></textarea>
+                        <button class="btn btn-accent btn-sm" onclick="saveBaseline()" style="margin-top:8px">Save Baseline</button>
+                    </div>
+                    <button class="btn btn-sm" id="baseline-toggle-btn" onclick="toggleBaseline()" style="margin-top:8px">Upload / Edit Baseline</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ── State ────────────────────────────────────────────
+    let currentEntryId = null;
+    let entries = [];
+    let deleteConfirm = null;
+
+    // ── Init ─────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('write-date').textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+        document.getElementById('entry-textarea').addEventListener('input', updateWordCount);
+        fetchEntries();
+        fetchBugs();
+        fetchGoals();
+        fetchBaseline();
+    });
+
+    // ── Tab Switching ────────────────────────────────────
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach(b => { if(b.textContent.toLowerCase().includes(tab.substring(0,4))) b.classList.add('active'); });
+        if (tab === 'debugging') fetchBugs();
+        if (tab === 'system') { fetchGoals(); fetchReports(); fetchDocuments(); fetchBaseline(); }
+    }
+
+    // ── Word Count ───────────────────────────────────────
+    function updateWordCount() {
+        const text = document.getElementById('entry-textarea').value.trim();
+        const wc = document.getElementById('word-count');
+        wc.textContent = text ? text.split(/\s+/).filter(Boolean).length + ' words' : 'cmd+enter to submit';
+    }
+
+    function handleEntryKeydown(e) {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); submitEntry(); }
+    }
+
+    function handleDialecticKeydown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDialectic(); }
+    }
+
+    // ── Entries ──────────────────────────────────────────
+    async function fetchEntries() {
+        const res = await fetch('/api/entries');
+        entries = await res.json();
+        renderEntryList();
+    }
+
+    function renderEntryList() {
+        const list = document.getElementById('entry-list');
+        if (!entries.length) { list.innerHTML = '<div style="padding:16px 24px; font-size:12px; color:var(--text-dim)">No entries yet</div>'; return; }
+        list.innerHTML = entries.map(e => `
+            <div class="entry-item ${currentEntryId === e.id ? 'selected' : ''}" onclick="selectEntry(${e.id})">
+                <div style="flex:1; min-width:0">
+                    <div class="entry-meta">Entry #${e.entry_number} — ${e.date}</div>
+                    <div class="entry-preview">${escHtml(e.preview)}</div>
+                </div>
+                <button class="entry-delete ${deleteConfirm === e.id ? 'confirming' : ''}" onclick="event.stopPropagation(); deleteEntry(${e.id})">${deleteConfirm === e.id ? 'Confirm?' : '×'}</button>
+            </div>
+        `).join('');
+    }
+
+    async function submitEntry() {
+        const textarea = document.getElementById('entry-textarea');
+        const text = textarea.value.trim();
+        if (!text) return;
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        btn.textContent = 'Analyzing...';
+        showLoading();
+
+        try {
+            const res = await fetch('/api/entries', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text}) });
+            const data = await res.json();
+            if (data.error) { alert(data.error); return; }
+            textarea.value = '';
+            updateWordCount();
+            currentEntryId = data.entry.id;
+            showMentorResponse(data.entry, data.bugs_fired, data.new_bugs);
+            fetchEntries();
+        } catch(e) { alert('Error: ' + e.message); }
+        finally { btn.disabled = false; btn.textContent = 'Submit Entry'; }
+    }
+
+    async function selectEntry(id) {
+        currentEntryId = id;
+        renderEntryList();
+        const res = await fetch('/api/entries/' + id);
+        const entry = await res.json();
+        // Show entry text on left
+        const area = document.getElementById('write-area');
+        area.innerHTML = `<div class="write-date">Entry #${entry.entry_number} — ${entry.date}</div><div style="font-size:14px; line-height:1.8; color:#B8BCC4; white-space:pre-wrap">${escHtml(entry.raw_text)}</div>`;
+        document.getElementById('submit-btn').style.display = 'none';
+        // Show response on right
+        showMentorResponse(entry, [], []);
+        // Load dialectic
+        const dRes = await fetch('/api/entries/' + id + '/dialectic');
+        const msgs = await dRes.json();
+        renderDialectic(msgs);
+    }
+
+    function showNewEntryMode() {
+        currentEntryId = null;
+        const area = document.getElementById('write-area');
+        area.innerHTML = `<div class="write-date" id="write-date">${new Date().toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div><textarea class="write-textarea" id="entry-textarea" placeholder="What's on your mind..." onkeydown="handleEntryKeydown(event)"></textarea>`;
+        document.getElementById('entry-textarea').addEventListener('input', updateWordCount);
+        document.getElementById('submit-btn').style.display = '';
+        document.getElementById('word-count').textContent = 'cmd+enter to submit';
+        hideMentorPanel();
+        renderEntryList();
+    }
+
+    async function deleteEntry(id) {
+        if (deleteConfirm !== id) { deleteConfirm = id; renderEntryList(); setTimeout(() => { deleteConfirm = null; renderEntryList(); }, 4000); return; }
+        await fetch('/api/entries/' + id, { method:'DELETE' });
+        deleteConfirm = null;
+        if (currentEntryId === id) showNewEntryMode();
+        fetchEntries();
+    }
+
+    // ── Mentor Panel ─────────────────────────────────────
+    function showLoading() {
+        document.getElementById('dialectic-placeholder').style.display = 'none';
+        document.getElementById('mentor-response-area').style.display = 'block';
+        document.getElementById('mentor-response').innerHTML = '<div class="loading"><div class="spinner"></div>Reading between the lines...</div>';
+        document.getElementById('dialectic-header').style.display = 'flex';
+        document.getElementById('dialectic-input').style.display = 'none';
+    }
+
+    function showMentorResponse(entry, bugsFired, newBugs) {
+        document.getElementById('dialectic-placeholder').style.display = 'none';
+        document.getElementById('mentor-response-area').style.display = 'block';
+        document.getElementById('dialectic-header').style.display = 'flex';
+        document.getElementById('dialectic-title').textContent = 'Mentor Read — Entry #' + entry.entry_number;
+        document.getElementById('mentor-response').innerHTML = (entry.mentor_response || '').split('\n\n').map(p => '<p>' + escHtml(p) + '</p>').join('');
+        document.getElementById('dialectic-messages').innerHTML = '';
+        document.getElementById('dialectic-input').style.display = 'flex';
+        // Status
+        let status = '';
+        if (bugsFired && bugsFired.length) status += bugsFired.map(b => '<span class="bug-tag" onclick="switchTab(\'debugging\')">' + escHtml(b) + '</span>').join(' ');
+        if (newBugs && newBugs.length) status += ' <span style="color:var(--amber)">+' + newBugs.length + ' new pattern' + (newBugs.length>1?'s':'') + '</span>';
+        document.getElementById('status-bar').innerHTML = status;
+    }
+
+    function hideMentorPanel() {
+        document.getElementById('dialectic-placeholder').style.display = 'flex';
+        document.getElementById('mentor-response-area').style.display = 'none';
+        document.getElementById('dialectic-header').style.display = 'none';
+        document.getElementById('dialectic-input').style.display = 'none';
+    }
+
+    function renderDialectic(msgs) {
+        const container = document.getElementById('dialectic-messages');
+        container.innerHTML = msgs.map(m => `<div class="dialectic-msg ${m.role === 'user' ? 'user' : 'mentor'}">${m.content.split('\n\n').map(p => '<p>' + escHtml(p) + '</p>').join('')}</div>`).join('');
+        container.parentElement.scrollTop = container.parentElement.scrollHeight;
+    }
+
+    async function sendDialectic() {
+        if (!currentEntryId) return;
+        const ta = document.getElementById('dialectic-textarea');
+        const msg = ta.value.trim();
+        if (!msg) return;
+        ta.value = '';
+
+        const container = document.getElementById('dialectic-messages');
+        container.innerHTML += `<div class="dialectic-msg user"><p>${escHtml(msg)}</p></div>`;
+        container.innerHTML += '<div class="dialectic-msg mentor" id="thinking-msg"><div class="loading"><div class="spinner"></div>Thinking...</div></div>';
+        container.parentElement.scrollTop = container.parentElement.scrollHeight;
+
+        try {
+            const res = await fetch('/api/entries/' + currentEntryId + '/dialectic', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message: msg}) });
+            const data = await res.json();
+            const el = document.getElementById('thinking-msg');
+            if (el) el.outerHTML = `<div class="dialectic-msg mentor">${data.response.split('\n\n').map(p => '<p>' + escHtml(p) + '</p>').join('')}</div>`;
+        } catch(e) {
+            const el = document.getElementById('thinking-msg');
+            if (el) el.outerHTML = `<div class="dialectic-msg mentor" style="color:var(--red)">Error: ${e.message}</div>`;
+        }
+        container.parentElement.scrollTop = container.parentElement.scrollHeight;
+    }
+
+    // ── Bugs ─────────────────────────────────────────────
+    async function fetchBugs() {
+        const res = await fetch('/api/bugs');
+        const bugs = await res.json();
+        const pending = bugs.filter(b => b.status === 'pending');
+        const active = bugs.filter(b => b.status !== 'pending');
+
+        document.getElementById('pending-bugs').innerHTML = pending.map(b => `
+            <div class="bug-card pending">
+                <div class="bug-status-dot pending"></div>
+                <div class="bug-info">
+                    <div class="bug-name">${escHtml(b.name)}</div>
+                    <div class="bug-desc">${escHtml(b.description)}</div>
+                    <div class="bug-meta"><span>Proposed by mentor</span></div>
+                </div>
+                <div class="bug-actions">
+                    <button class="btn btn-sm btn-accent" onclick="confirmBug(${b.id})">Confirm</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteBug(${b.id})">Dismiss</button>
+                </div>
+            </div>`).join('');
+
+        document.getElementById('bugs-list').innerHTML = active.map(b => {
+            const dotClass = b.fire_count >= 5 ? 'active-high' : b.status === 'declining' ? 'declining' : b.status === 'resolved' ? 'resolved' : 'active';
+            return `<div class="bug-card">
+                <div class="bug-status-dot ${dotClass}"></div>
+                <div class="bug-info">
+                    <div class="bug-name">${escHtml(b.name)}</div>
+                    <div class="bug-desc">${escHtml(b.description)}</div>
+                    <div class="bug-meta">
+                        <span class="bug-fire-badge">${b.fire_count}×</span>
+                        ${b.last_fired_entry ? '<span>Last: #' + b.last_fired_entry + '</span>' : ''}
+                        <span>${b.source || ''}</span>
+                    </div>
+                </div>
+                <div class="bug-actions">
+                    <select class="bug-status-select" onchange="updateBugStatus(${b.id}, this.value)">
+                        <option value="active" ${b.status==='active'?'selected':''}>Active</option>
+                        <option value="declining" ${b.status==='declining'?'selected':''}>Declining</option>
+                        <option value="resolved" ${b.status==='resolved'?'selected':''}>Resolved</option>
+                    </select>
+                    <button class="btn btn-sm btn-danger" onclick="deleteBug(${b.id})">×</button>
+                </div>
+            </div>`;
+        }).join('') || '<div style="padding:16px; font-size:12px; color:var(--text-dim)">No patterns tracked yet. Add one above or let the mentor detect them.</div>';
+    }
+
+    async function addBug() {
+        const name = document.getElementById('bug-name').value.trim();
+        const desc = document.getElementById('bug-desc').value.trim();
+        if (!name || !desc) return;
+        await fetch('/api/bugs', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, description: desc}) });
+        document.getElementById('bug-name').value = '';
+        document.getElementById('bug-desc').value = '';
+        fetchBugs();
+    }
+
+    async function updateBugStatus(id, status) {
+        await fetch('/api/bugs/' + id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status}) });
+        fetchBugs();
+    }
+
+    async function deleteBug(id) { await fetch('/api/bugs/' + id, { method:'DELETE' }); fetchBugs(); }
+    async function confirmBug(id) { await fetch('/api/bugs/' + id + '/confirm', { method:'POST' }); fetchBugs(); }
+
+    // ── Goals ────────────────────────────────────────────
+    async function fetchGoals() {
+        const res = await fetch('/api/goals');
+        const data = await res.json();
+        ['toward', 'away'].forEach(dir => {
+            const el = document.getElementById('goals-' + dir);
+            el.innerHTML = (data[dir] || []).map(g => `<div class="goal-card"><span>${escHtml(g.description)}</span><button class="entry-delete" onclick="deleteGoal(${g.id})">×</button></div>`).join('') || '<div style="font-size:12px; color:var(--text-dim); padding:8px 0">None set</div>';
+        });
+    }
+
+    async function addGoal(direction) {
+        const input = document.getElementById('goal-' + direction + '-input');
+        const desc = input.value.trim();
+        if (!desc) return;
+        await fetch('/api/goals', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({direction, description: desc}) });
+        input.value = '';
+        fetchGoals();
+    }
+
+    async function deleteGoal(id) { await fetch('/api/goals/' + id, { method:'DELETE' }); fetchGoals(); }
+
+    // ── Reports ──────────────────────────────────────────
+    async function fetchReports() {
+        const res = await fetch('/api/reports');
+        const reports = await res.json();
+        document.getElementById('reports-list').innerHTML = reports.map(r => `
+            <div class="report-item" onclick="this.querySelector('.report-content').classList.toggle('expanded')">
+                <div class="report-meta">
+                    <span class="report-type-badge ${r.report_type}">${r.report_type}</span>
+                    <span>${escHtml(r.period)}</span>
+                    <span>${r.created_at?.substring(0,10) || ''}</span>
+                </div>
+                <div class="report-content">${escHtml(r.content)}</div>
+            </div>`).join('') || '<div style="font-size:12px; color:var(--text-dim)">No reports generated yet.</div>';
+    }
+
+    async function generateReport(type) {
+        const btn = document.getElementById('gen-' + type + '-btn');
+        btn.disabled = true;
+        btn.textContent = 'Generating...';
+        try {
+            const res = await fetch('/api/reports/' + type, { method:'POST' });
+            const data = await res.json();
+            if (data.error) alert(data.error);
+            fetchReports();
+        } catch(e) { alert('Error: ' + e.message); }
+        finally { btn.disabled = false; btn.textContent = type === 'weekly' ? 'Generate Weekly Report' : 'Generate Monthly Report'; }
+    }
+
+    // ── Documents ────────────────────────────────────────
+    async function fetchDocuments() {
+        const res = await fetch('/api/documents');
+        const docs = await res.json();
+        const unRes = await fetch('/api/documents/unanalyzed');
+        const unData = await unRes.json();
+        document.getElementById('unanalyzed-count').textContent = unData.count ? unData.count + ' unanalyzed' : '';
+        document.getElementById('documents-list').innerHTML = docs.map(d => `
+            <div class="doc-item">
+                <span>${escHtml(d.filename)}</span>
+                <span class="doc-status ${d.analysis_status === 'unanalyzed' ? 'unanalyzed' : 'analyzed'}">${d.analysis_status}</span>
+            </div>`).join('') || '<div style="font-size:12px; color:var(--text-dim)">No documents uploaded.</div>';
+    }
+
+    async function uploadDocument() {
+        const input = document.getElementById('doc-file-input');
+        if (!input.files.length) return;
+        const form = new FormData();
+        form.append('file', input.files[0]);
+        await fetch('/api/documents/upload', { method:'POST', body: form });
+        input.value = '';
+        fetchDocuments();
+    }
+
+    // ── Baseline ─────────────────────────────────────────
+    async function fetchBaseline() {
+        const res = await fetch('/api/baseline');
+        const data = await res.json();
+        if (data.exists) {
+            document.getElementById('baseline-status').innerHTML = `<span style="color:var(--green)">Loaded</span> — ${data.word_count} words`;
+            document.getElementById('baseline-preview').textContent = data.preview;
+        } else {
+            document.getElementById('baseline-status').innerHTML = '<span style="color:var(--amber)">Not loaded</span>';
+            document.getElementById('baseline-preview').textContent = '';
+        }
+    }
+
+    function toggleBaseline() {
+        const el = document.getElementById('baseline-upload');
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function saveBaseline() {
+        const content = document.getElementById('baseline-textarea').value;
+        await fetch('/api/baseline/upload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({content}) });
+        document.getElementById('baseline-upload').style.display = 'none';
+        fetchBaseline();
+    }
+
+    // ── Utility ──────────────────────────────────────────
+    function escHtml(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    </script>
+</body>
+</html>
