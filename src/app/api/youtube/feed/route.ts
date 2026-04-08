@@ -131,11 +131,11 @@ export async function GET() {
 
   // Return recent videos (last 7 days), exclude dismissed
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: videos } = await db
+  const { data: videos, error: queryErr } = await db
     .from('intel_youtube_videos')
     .select('*')
     .gte('published_at', cutoff)
-    .or('is_dismissed.eq.false,is_dismissed.is.null')
+    .neq('is_dismissed', true)
     .order('published_at', { ascending: false })
     .limit(50);
 
