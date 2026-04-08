@@ -76,11 +76,16 @@ export async function DELETE(req: NextRequest) {
   const db = getServiceSupabase();
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
+  const name = searchParams.get('name');
 
-  if (!id) {
-    return NextResponse.json({ error: 'id required' }, { status: 400 });
+  if (!id && !name) {
+    return NextResponse.json({ error: 'id or name required' }, { status: 400 });
   }
 
-  await db.from('intel_youtube_channels').update({ is_active: false }).eq('id', id);
+  if (id) {
+    await db.from('intel_youtube_channels').update({ is_active: false }).eq('id', id);
+  } else if (name) {
+    await db.from('intel_youtube_channels').update({ is_active: false }).eq('channel_name', name);
+  }
   return NextResponse.json({ success: true });
 }
