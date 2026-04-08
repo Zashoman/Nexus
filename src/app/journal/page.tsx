@@ -313,9 +313,12 @@ export default function JournalPage() {
         </div>
         <div className="flex items-center gap-2">
           {/* Backup button */}
-          {(activeEntry || selectedEntry) && (
+          {(activeEntry || selectedEntry || entries.length > 0) && (
             <button
-              onClick={() => handleBackup((activeEntry || selectedEntry)!.id)}
+              onClick={() => {
+                const target = activeEntry || selectedEntry || entries[0];
+                if (target) handleBackup(target.id);
+              }}
               disabled={backupStatus === 'backing_up'}
               className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono rounded-sm transition-all cursor-pointer"
               style={{
@@ -361,18 +364,16 @@ export default function JournalPage() {
             </a>
           )}
           {/* Database link */}
-          {DB_URL && (
-            <a
-              href={DB_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono text-[#8899AA] rounded-sm transition-all hover:text-[#E8EAED] cursor-pointer"
-              style={{ background: '#141820', boxShadow: 'inset 0 0 0 1px #1E2A3A' }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></svg>
-              Database
-            </a>
-          )}
+          <a
+            href={DB_URL || `/journal`}
+            target={DB_URL ? '_blank' : undefined}
+            rel={DB_URL ? 'noopener noreferrer' : undefined}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono text-[#8899AA] rounded-sm transition-all hover:text-[#E8EAED] cursor-pointer"
+            style={{ background: '#141820', boxShadow: 'inset 0 0 0 1px #1E2A3A' }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></svg>
+            Database
+          </a>
         </div>
       </div>
 
