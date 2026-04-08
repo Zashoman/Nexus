@@ -36,6 +36,8 @@ export default function YouTubePage() {
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [addForm, setAddForm] = useState({ handle: '', channel_name: '', category: '' });
   const [adding, setAdding] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshResult, setRefreshResult] = useState<string | null>(null);
 
   useEffect(() => {
     fetchFeed();
@@ -50,6 +52,28 @@ export default function YouTubePage() {
       setChannels(data.channels || []);
     } catch { /* silent */ }
     finally { setLoading(false); }
+  }
+
+  async function manualRefresh() {
+    setRefreshing(true);
+    setRefreshResult(null);
+    try {
+      const res = await fetch('/api/youtube/refresh', {
+        headers: { 'x-manual-refresh': 'true' },
+      });
+      const data = await res.json();
+      if (data.error) {
+        setRefreshResult(`Error: ${data.error}`);
+      } else {
+        setRefreshResult(`+${data.new_videos} new videos from ${data.channels_checked} channels${data.errors ? ` (${data.errors.length} errors)` : ''}`);
+        if (data.new_videos > 0) fetchFeed();
+      }
+    } catch {
+      setRefreshResult('Refresh failed');
+    } finally {
+      setRefreshing(false);
+      setTimeout(() => setRefreshResult(null), 5000);
+    }
   }
 
   async function addChannel() {
@@ -101,12 +125,24 @@ export default function YouTubePage() {
           <h1 className="text-xs font-mono text-[#FF4444] font-bold uppercase tracking-wider">YouTube Intelligence</h1>
           <span className="text-[10px] font-mono text-[#5A6A7A]">{channels.length} channels · {videos.length} videos</span>
         </div>
-        <button
-          onClick={() => setShowAddChannel(!showAddChannel)}
-          className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF] cursor-pointer"
-        >
-          {showAddChannel ? '✕ Cancel' : '+ Add Channel'}
-        </button>
+        <div className="flex items-center gap-3">
+          {refreshResult && (
+            <span className="text-[10px] font-mono text-[#00CC66]">{refreshResult}</span>
+          )}
+          <button
+            onClick={manualRefresh}
+            disabled={refreshing}
+            className="text-[10px] font-mono text-[#00CC66] hover:text-[#33DD88] cursor-pointer disabled:opacity-50"
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh Now'}
+          </button>
+          <button
+            onClick={() => setShowAddChannel(!showAddChannel)}
+            className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF] cursor-pointer"
+          >
+            {showAddChannel ? '✕ Cancel' : '+ Add Channel'}
+          </button>
+        </div>
       </div>
 
       {/* Add Channel Form */}
