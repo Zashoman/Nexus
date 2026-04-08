@@ -38,6 +38,8 @@ export default function JournalPage() {
 
   // Backup state
   const [backupStatus, setBackupStatus] = useState<'idle' | 'backing_up' | 'success' | 'error'>('idle');
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const GSHEET_URL = process.env.NEXT_PUBLIC_JOURNAL_GSHEET_URL || '';
   const DB_URL = process.env.NEXT_PUBLIC_JOURNAL_DB_URL || '';
@@ -78,6 +80,29 @@ export default function JournalPage() {
       setBackupStatus('error');
       setTimeout(() => setBackupStatus('idle'), 4000);
     }
+  }
+
+  async function handleDelete(entryId: string) {
+    if (deleteConfirm !== entryId) {
+      setDeleteConfirm(entryId);
+      setTimeout(() => setDeleteConfirm(null), 4000);
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      const res = await fetch('/api/journal/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entry_id: entryId }),
+      });
+      if (res.ok) {
+        if (selectedEntry?.id === entryId) setSelectedEntry(null);
+        if (activeEntry?.id === entryId) setActiveEntry(null);
+        setDeleteConfirm(null);
+        fetchEntries();
+      }
+    } catch { /* */ }
+    finally { setIsDeleting(false); }
   }
 
   async function handleSubmit() {
@@ -536,10 +561,23 @@ export default function JournalPage() {
                     <div className="px-8 py-6">
                       {/* Entry header */}
                       <div className="mb-6 pb-4 border-b border-[#1E2A3A]/50">
-                        <div className="flex items-center gap-3 mb-1">
+                        <div className="flex items-center justify-between mb-1">
                           <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: A }}>
                             Entry #{selectedEntry.entry_number}
                           </span>
+                          <button
+                            onClick={() => handleDelete(selectedEntry.id)}
+                            disabled={isDeleting}
+                            className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono rounded-sm transition-all cursor-pointer"
+                            style={{
+                              background: deleteConfirm === selectedEntry.id ? '#FF444420' : 'transparent',
+                              color: deleteConfirm === selectedEntry.id ? '#FF4444' : '#5A6A7A',
+                              boxShadow: deleteConfirm === selectedEntry.id ? 'inset 0 0 0 1px #FF444440' : 'none',
+                            }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+                            {isDeleting ? 'Deleting...' : deleteConfirm === selectedEntry.id ? 'Confirm?' : 'Delete'}
+                          </button>
                         </div>
                         <span className="text-[11px] font-mono text-[#5A6A7A]">
                           {formatFullDate(selectedEntry.created_at)}
