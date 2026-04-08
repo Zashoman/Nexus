@@ -108,10 +108,10 @@ export default function YouTubePage() {
     }
   }
 
-  const categories = [...new Set(channels.map((c: Channel) => c.category))];
+  const categories = [...new Set(channels.map((c: Channel) => c.category.toLowerCase()))];
   const filteredVideos = activeTab === 'all'
     ? videos
-    : videos.filter((v: Video) => v.category === activeTab);
+    : videos.filter((v: Video) => v.category.toLowerCase() === activeTab);
 
   function handleSelectVideo(video: Video) {
     setSelectedVideo(video);
