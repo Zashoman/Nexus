@@ -65,14 +65,15 @@ export default function YouTubePage() {
       if (data.error) {
         setRefreshResult(`Error: ${data.error}`);
       } else {
-        setRefreshResult(`+${data.new_videos} new videos from ${data.channels_checked} channels${data.errors ? ` (${data.errors.length} errors)` : ''}`);
-        if (data.new_videos > 0) fetchFeed();
+        const errorSuffix = data.errors ? ` | Errors: ${data.errors.join(', ')}` : '';
+        setRefreshResult(`+${data.new_videos} new from ${data.channels_checked} ch | ${data.skipped_existing || 0} exist, ${data.skipped_shorts || 0} shorts${errorSuffix}`);
+        fetchFeed(); // Always reload in case dismissed state changed
       }
     } catch {
       setRefreshResult('Refresh failed');
     } finally {
       setRefreshing(false);
-      setTimeout(() => setRefreshResult(null), 5000);
+      setTimeout(() => setRefreshResult(null), 15000);
     }
   }
 
