@@ -830,3 +830,12 @@ body {
 
 /* Document type badge */
 .doc-type-badge { font-family: var(--font-mono); font-size: 8px; padding: 1px 5px; border: 1px solid; border-radius: 2px; margin-left: 6px; text-transform: uppercase; }
+
+/* ── User Manual ── */
+.manual-section { margin-bottom: 20px; }
+.manual-section h2 { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.manual-section p { font-size: 13px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 8px; }
+.manual-section strong { color: var(--text); font-weight: 500; }
+.manual-section code { font-family: var(--font-mono); font-size: 11px; background: var(--bg-card); padding: 1px 5px; border-radius: 2px; color: var(--accent); }
+.manual-section ul, .manual-section ol { padding-left: 20px; margin-bottom: 8px; }
+.manual-section li { font-size: 13px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 4px; }
