@@ -23,7 +23,6 @@ BASELINE_PATH = os.path.join(BASE_DIR, "baseline_profile.md")
 
 API_KEY = os.environ.get("ANTHROPIC_JOURNAL_KEY")
 GDOC_WEBHOOK = os.environ.get("JOURNAL_GDOC_WEBHOOK")
-EMAIL_WEBHOOK = os.environ.get("JOURNAL_EMAIL_WEBHOOK")
 
 app = Flask(__name__)
 
@@ -460,14 +459,38 @@ def backup_to_google_doc(entry_num, date_str, title, entry_text, mentor_read):
         pass
 
 
-def send_report_email(subject, body):
-    if not EMAIL_WEBHOOK:
-        return False
+def send_to_apple_notes(title, body, folder="Journal Mentor"):
+    """Create a new note in Apple Notes via AppleScript."""
+    import subprocess
+    html_body = body.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>')
+    escaped_title = title.replace('"', '\\"')
+    applescript = (
+        'tell application "Notes"\n'
+        '    tell account "iCloud"\n'
+        '        if not (exists folder "' + folder + '") then\n'
+        '            make new folder with properties {name:"' + folder + '"}\n'
+        '        end if\n'
+        '        tell folder "' + folder + '"\n'
+        '            make new note with properties {name:"' + escaped_title + '", body:"<html><body style=\\"font-family: -apple-system, system-ui, sans-serif; font-size: 15px; line-height: 1.7; color: #1a1a1a;\\">' + html_body + '</body></html>"}\n'
+        '        end tell\n'
+        '    end tell\n'
+        'end tell'
+    )
     try:
-        res = requests.post(EMAIL_WEBHOOK, json={"subject": subject, "body": body}, timeout=15)
-        return res.status_code == 200
-    except:
+        subprocess.run(['osascript', '-e', applescript], check=True, capture_output=True, timeout=15)
+        return True
+    except Exception as e:
+        print(f"  Apple Notes delivery failed: {e}")
         return False
+
+
+def save_entry_to_apple_notes(entry_num, date_str, entry_text, mentor_read):
+    """Save journal entry + mentor response to Apple Notes."""
+    body = f"MY JOURNAL ENTRY\n{'='*40}\n\n{entry_text}\n\n\nMENTOR RESPONSE\n{'='*40}\n\n{mentor_read}"
+    send_to_apple_notes(
+        title=f"Entry #{entry_num} — {date_str}",
+        body=body
+    )
 
 
 # ══════════════════════════════════════════════════════════
@@ -1242,8 +1265,11 @@ def create_entry():
     with open(os.path.join(ANALYSES_DIR, fname), "w") as f:
         f.write(f"# Entry #{entry_num}{title_line} — {short_date}\n\n## Journal Entry\n\n{text}\n\n---\n\n## Mentor Response\n\n{parsed['clean_response']}")
 
-    # Google backup
+    # Google Sheet backup
     backup_to_google_doc(entry_num, short_date, title, text, parsed["clean_response"])
+
+    # Apple Notes backup
+    save_entry_to_apple_notes(entry_num, short_date, text, parsed["clean_response"])
 
     return jsonify({
         "entry": {"id": entry_id, "entry_number": entry_num, "title": title, "date": short_date,
@@ -1979,13 +2005,13 @@ def generate_weekly():
     period = f"Week of {(now - timedelta(days=7)).strftime('%d')}–{now.strftime('%d %b %Y')}"
 
     conn = get_db()
-    email_sent = 1 if send_report_email(f"Journal Mentor — Weekly Report — {period}", content) else 0
-    conn.execute("INSERT INTO reports (report_type, period, content, email_sent) VALUES ('weekly',?,?,?)", (period, content, email_sent))
+    notes_sent = 1 if send_to_apple_notes(f"Weekly Report — {period}", content) else 0
+    conn.execute("INSERT INTO reports (report_type, period, content, email_sent) VALUES ('weekly',?,?,?)", (period, content, notes_sent))
     conn.commit()
     conn.close()
 
     add_mentor_log('weekly_synthesis', f'Weekly report generated: {period}', content[:200])
-    return jsonify({"report": content, "period": period, "email_sent": bool(email_sent)})
+    return jsonify({"report": content, "period": period, "notes_sent": bool(notes_sent)})
 
 
 @app.route('/api/reports/monthly', methods=['POST'])
@@ -2040,13 +2066,13 @@ def generate_monthly():
     period = datetime.now().strftime('%B %Y')
 
     conn = get_db()
-    email_sent = 1 if send_report_email(f"Journal Mentor — Monthly Report — {period}", content) else 0
-    conn.execute("INSERT INTO reports (report_type, period, content, email_sent) VALUES ('monthly',?,?,?)", (period, content, email_sent))
+    notes_sent = 1 if send_to_apple_notes(f"Monthly Deep Report — {period}", content) else 0
+    conn.execute("INSERT INTO reports (report_type, period, content, email_sent) VALUES ('monthly',?,?,?)", (period, content, notes_sent))
     conn.commit()
     conn.close()
 
     add_mentor_log('monthly_audit', f'Monthly report generated: {period}', content[:200])
-    return jsonify({"report": content, "period": period, "email_sent": bool(email_sent)})
+    return jsonify({"report": content, "period": period, "notes_sent": bool(notes_sent)})
 
 
 # ── Mentor Log ─────────────────────────────────────────────
