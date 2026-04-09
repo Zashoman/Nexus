@@ -925,10 +925,11 @@ def process_entry_results(entry_id, entry_number, parsed):
 def check_rumination(entry_id):
     """Check for 3+ consecutive abstract-evaluative entries."""
     conn = get_db()
-    recent = conn.execute("SELECT processing_mode FROM entries ORDER BY entry_number DESC LIMIT 3").fetchall()
+    recent = conn.execute("SELECT id, processing_mode FROM entries ORDER BY entry_number DESC LIMIT 3").fetchall()
     conn.close()
     if len(recent) >= 3 and all(r['processing_mode'] == 'abstract_evaluative' for r in recent):
-        add_mentor_log('processing_mode_alert', '3+ consecutive abstract-evaluative entries', None, entry_id)
+        last_id = recent[0]['id']
+        add_mentor_log('processing_mode_alert', '3+ consecutive abstract-evaluative entries', None, last_id)
         return True
     return False
 
@@ -936,14 +937,15 @@ def check_rumination(entry_id):
 def check_deterioration(entry_id):
     """Simple deterioration check based on valence trend."""
     conn = get_db()
-    recent = conn.execute("SELECT emotional_valence FROM entries WHERE emotional_valence IS NOT NULL ORDER BY entry_number DESC LIMIT 5").fetchall()
+    recent = conn.execute("SELECT id, emotional_valence FROM entries WHERE emotional_valence IS NOT NULL ORDER BY entry_number DESC LIMIT 5").fetchall()
     conn.close()
     if len(recent) < 5:
         return False
     vals = [r['emotional_valence'] for r in recent]
+    last_entry_id = recent[0]['id']  # Use actual DB id for FK safety
     avg = sum(vals) / len(vals)
     if avg <= -1.0:
-        add_mentor_log('deterioration_flag', f'Declining trend: avg valence {avg:.1f} over last 5 entries', json.dumps(vals), entry_id)
+        add_mentor_log('deterioration_flag', f'Declining trend: avg valence {avg:.1f} over last 5 entries', json.dumps(vals), last_entry_id)
         return True
     return False
 
@@ -1116,6 +1118,7 @@ def delete_entry(eid):
     conn.execute("DELETE FROM defense_tracking WHERE entry_id=?", (eid,))
     conn.execute("DELETE FROM relational_patterns WHERE entry_id=?", (eid,))
     conn.execute("DELETE FROM behavioral_experiments WHERE entry_id=?", (eid,))
+    conn.execute("UPDATE mentor_log SET entry_id=NULL WHERE entry_id=?", (eid,))
     conn.execute("DELETE FROM entries WHERE id=?", (eid,))
     conn.commit()
     conn.close()
@@ -1209,14 +1212,16 @@ def update_bug(bid):
     data = request.json
     conn = get_db()
     old = conn.execute("SELECT * FROM bugs WHERE id=?", (bid,)).fetchone()
+    old_name = old['name'] if old else ''
+    old_status = old['status'] if old else ''
     if 'status' in data:
         conn.execute("UPDATE bugs SET status=? WHERE id=?", (data['status'], bid))
-        if old:
-            add_mentor_log('bug_status_change', f'Bug "{old["name"]}": {old["status"]} → {data["status"]}')
     if 'description' in data:
         conn.execute("UPDATE bugs SET description=? WHERE id=?", (data['description'], bid))
     conn.commit()
     conn.close()
+    if 'status' in data and old_name:
+        add_mentor_log('bug_status_change', f'Bug "{old_name}": {old_status} → {data["status"]}')
     return jsonify({"status": "ok"})
 
 @app.route('/api/bugs/<int:bid>', methods=['DELETE'])
