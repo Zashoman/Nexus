@@ -14,7 +14,7 @@
             <button class="tab-btn" onclick="switchTab('debugging')">Debugging Matrix</button>
             <button class="tab-btn" onclick="switchTab('mentorlog')">Mentor Log <span id="pending-badge" class="pending-badge" style="display:none">0</span></button>
             <button class="tab-btn" onclick="switchTab('system')">System</button>
-            <button class="tab-btn" onclick="toggleManual()" style="margin-left:auto; color:var(--accent)">?</button>
+            <button class="tab-btn" onclick="toggleManual()" style="margin-left:auto">Manual</button>
         </div>
         <div style="display:flex; align-items:center; gap:6px; padding-right:12px">
             <button class="btn btn-sm" id="new-entry-btn" onclick="showNewEntryMode()" style="display:none">+ New Entry</button>
@@ -132,6 +132,7 @@
             <!-- Goals -->
             <div class="system-section">
                 <div class="section-title">Goals</div>
+                <div class="info-box">What you're actively moving toward and what you're moving away from. The mentor references these in every analysis and weekly reports track your adherence.</div>
                 <div class="goals-layout">
                     <div class="goals-column">
                         <div class="goals-column-header">Moving Toward</div>
@@ -149,6 +150,7 @@
             <!-- Priors -->
             <div class="system-section">
                 <div class="section-title">Priors Dashboard</div>
+                <div class="info-box">Key beliefs the system tracks about you with confidence levels. These update automatically as evidence accumulates from your entries. Seed initial priors after uploading a baseline.</div>
                 <div style="margin-bottom:8px"><button class="btn btn-sm" onclick="seedPriors()">Seed Initial Priors</button></div>
                 <div id="priors-list"></div>
             </div>
@@ -156,6 +158,7 @@
             <!-- Phases -->
             <div class="system-section">
                 <div class="section-title">Developmental Phases</div>
+                <div class="info-box">Track where you are in your growth arc. Adding a new phase closes the previous one. The mentor uses your current phase to calibrate its reads.</div>
                 <div id="phases-list"></div>
                 <div class="goal-add" style="margin-top:8px">
                     <input id="phase-name" placeholder="Phase name" style="flex:1">
@@ -167,6 +170,7 @@
             <!-- Reports -->
             <div class="system-section">
                 <div class="section-title">Reports</div>
+                <div class="info-box">Weekly reports track goal adherence, commitment follow-through, and bug activity. Monthly reports provide a deep read plus a full system audit with recommendations you approve or reject.</div>
                 <div class="report-actions">
                     <button class="btn btn-accent" id="gen-weekly-btn" onclick="generateReport('weekly')">Generate Weekly Report</button>
                     <button class="btn" id="gen-monthly-btn" onclick="generateReport('monthly')">Generate Monthly Report</button>
@@ -177,6 +181,7 @@
             <!-- Documents & Baseline -->
             <div class="system-section">
                 <div class="section-title">Document Library & Baseline</div>
+                <div class="info-box">Upload your foundational research documents (the "why" behind patterns) and practical playbooks (the "what to do"). Playbooks can be decomposed into bugs with intervention protocols. Your baseline profile is the core document the mentor reads before every analysis.</div>
                 <div style="display:flex; gap:24px; flex-wrap:wrap">
                     <div style="flex:1; min-width:300px">
                         <div style="font-family:var(--font-mono); font-size:10px; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase">Documents</div>
@@ -217,6 +222,7 @@
             <!-- Micro-Assessments -->
             <div class="system-section">
                 <div class="section-title">Micro-Assessments</div>
+                <div class="info-box">Quick daily check-ins across four dimensions. The system uses these to detect deterioration trends and compare your self-reported wellbeing against journal tone.</div>
                 <div class="micro-form">
                     <div class="micro-row"><label>Wellbeing (1-10)</label><input type="number" id="micro-wb" min="1" max="10" value="5"></div>
                     <div class="micro-row"><label>Interpersonal (1-10)</label><input type="number" id="micro-ip" min="1" max="10" value="5"></div>
@@ -232,6 +238,7 @@
             <!-- Show Me Your Model -->
             <div class="system-section">
                 <div class="section-title">Show Me Your Model</div>
+                <div class="info-box">Generates a plain-language summary of everything the system currently believes about you. Read it, then correct anything wrong — your corrections make the model sharper.</div>
                 <button class="btn btn-accent" id="model-btn" onclick="showModel()">Show Me What You Believe About Me</button>
                 <div id="model-summary" style="margin-top:12px"></div>
             </div>
