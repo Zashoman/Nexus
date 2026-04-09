@@ -21,6 +21,7 @@
             <div class="journal-left">
                 <div class="write-area" id="write-area">
                     <div class="write-date" id="write-date"></div>
+                    <input type="text" id="entry-title" placeholder="Title (optional)" style="width:100%; background:transparent; border:none; border-bottom:1px solid var(--border); outline:none; font-size:18px; font-weight:500; color:var(--text); padding:4px 0 8px 0; margin-bottom:16px; caret-color:var(--accent); font-family:var(--font-sans)" onkeydown="handleEntryKeydown(event)">
                     <textarea class="write-textarea" id="entry-textarea" placeholder="What's on your mind..." onkeydown="handleEntryKeydown(event)"></textarea>
                 </div>
                 <div class="write-footer">
@@ -121,6 +122,11 @@
                     <div class="baseline-status" id="baseline-status">Loading...</div>
                     <div class="baseline-preview" id="baseline-preview"></div>
                     <div class="baseline-upload" id="baseline-upload" style="display:none">
+                        <div style="margin-bottom:8px; display:flex; gap:8px; align-items:center">
+                            <input type="file" id="baseline-file-input" accept=".md,.txt,.text" style="font-size:12px; color:var(--text-secondary)">
+                            <button class="btn btn-sm btn-accent" onclick="uploadBaselineFile()">Upload File</button>
+                        </div>
+                        <div style="font-family:var(--font-mono); font-size:9px; color:var(--text-dim); margin-bottom:8px">— or paste below —</div>
                         <textarea id="baseline-textarea" placeholder="Paste your baseline profile here..."></textarea>
                         <button class="btn btn-accent btn-sm" onclick="saveBaseline()" style="margin-top:8px">Save Baseline</button>
                     </div>
@@ -185,6 +191,7 @@
             <div class="entry-item ${currentEntryId === e.id ? 'selected' : ''}" onclick="selectEntry(${e.id})">
                 <div style="flex:1; min-width:0">
                     <div class="entry-meta">Entry #${e.entry_number} — ${e.date}</div>
+                    ${e.title ? '<div style="font-weight:500; font-size:13px; color:var(--text); margin-bottom:2px">' + escHtml(e.title) + '</div>' : ''}
                     <div class="entry-preview">${escHtml(e.preview)}</div>
                 </div>
                 <button class="entry-delete ${deleteConfirm === e.id ? 'confirming' : ''}" onclick="event.stopPropagation(); deleteEntry(${e.id})">${deleteConfirm === e.id ? 'Confirm?' : '×'}</button>
@@ -194,7 +201,9 @@
 
     async function submitEntry() {
         const textarea = document.getElementById('entry-textarea');
+        const titleInput = document.getElementById('entry-title');
         const text = textarea.value.trim();
+        const title = titleInput ? titleInput.value.trim() : '';
         if (!text) return;
         const btn = document.getElementById('submit-btn');
         btn.disabled = true;
@@ -202,10 +211,11 @@
         showLoading();
 
         try {
-            const res = await fetch('/api/entries', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text}) });
+            const res = await fetch('/api/entries', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text, title}) });
             const data = await res.json();
             if (data.error) { alert(data.error); return; }
             textarea.value = '';
+            if (titleInput) titleInput.value = '';
             updateWordCount();
             currentEntryId = data.entry.id;
             showMentorResponse(data.entry, data.bugs_fired, data.new_bugs);
@@ -221,7 +231,7 @@
         const entry = await res.json();
         // Show entry text on left
         const area = document.getElementById('write-area');
-        area.innerHTML = `<div class="write-date">Entry #${entry.entry_number} — ${entry.date}</div><div style="font-size:14px; line-height:1.8; color:#B8BCC4; white-space:pre-wrap">${escHtml(entry.raw_text)}</div>`;
+        area.innerHTML = `<div class="write-date">Entry #${entry.entry_number} — ${entry.date}</div>${entry.title ? '<div style="font-size:18px; font-weight:500; color:var(--text); margin-bottom:12px">' + escHtml(entry.title) + '</div>' : ''}<div style="font-size:14px; line-height:1.8; color:#B8BCC4; white-space:pre-wrap">${escHtml(entry.raw_text)}</div>`;
         document.getElementById('submit-btn').style.display = 'none';
         // Show response on right
         showMentorResponse(entry, [], []);
@@ -234,7 +244,7 @@
     function showNewEntryMode() {
         currentEntryId = null;
         const area = document.getElementById('write-area');
-        area.innerHTML = `<div class="write-date" id="write-date">${new Date().toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div><textarea class="write-textarea" id="entry-textarea" placeholder="What's on your mind..." onkeydown="handleEntryKeydown(event)"></textarea>`;
+        area.innerHTML = `<div class="write-date" id="write-date">${new Date().toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div><input type="text" id="entry-title" placeholder="Title (optional)" style="width:100%; background:transparent; border:none; border-bottom:1px solid var(--border); outline:none; font-size:18px; font-weight:500; color:var(--text); padding:4px 0 8px 0; margin-bottom:16px; caret-color:var(--accent); font-family:var(--font-sans)" onkeydown="handleEntryKeydown(event)"><textarea class="write-textarea" id="entry-textarea" placeholder="What's on your mind..." onkeydown="handleEntryKeydown(event)"></textarea>`;
         document.getElementById('entry-textarea').addEventListener('input', updateWordCount);
         document.getElementById('submit-btn').style.display = '';
         document.getElementById('word-count').textContent = 'cmd+enter to submit';
@@ -469,6 +479,17 @@
     async function saveBaseline() {
         const content = document.getElementById('baseline-textarea').value;
         await fetch('/api/baseline/upload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({content}) });
+        document.getElementById('baseline-upload').style.display = 'none';
+        fetchBaseline();
+    }
+
+    async function uploadBaselineFile() {
+        const input = document.getElementById('baseline-file-input');
+        if (!input.files.length) return;
+        const form = new FormData();
+        form.append('file', input.files[0]);
+        await fetch('/api/baseline/upload', { method:'POST', body: form });
+        input.value = '';
         document.getElementById('baseline-upload').style.display = 'none';
         fetchBaseline();
     }

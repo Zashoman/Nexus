@@ -42,6 +42,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS entries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             entry_number INTEGER NOT NULL,
+            title TEXT DEFAULT '',
             date TEXT NOT NULL,
             raw_text TEXT NOT NULL,
             mentor_response TEXT,
@@ -139,10 +140,10 @@ def get_goals(direction=None):
     conn.close()
     return [dict(g) for g in goals]
 
-def backup_to_google_doc(entry_num, date_str, entry_text, mentor_read):
+def backup_to_google_doc(entry_num, date_str, title, entry_text, mentor_read):
     if not GDOC_WEBHOOK:
         return
-    payload = json.dumps({"entry_number": entry_num, "date": date_str, "journal_entry": entry_text, "analysis": mentor_read})
+    payload = json.dumps({"entry_number": entry_num, "date": date_str, "title": title, "journal_entry": entry_text, "analysis": mentor_read})
     try:
         res = requests.post(GDOC_WEBHOOK, data=payload, headers={"Content-Type": "text/plain"}, timeout=15, allow_redirects=False)
         if 300 <= res.status_code < 400:
@@ -415,7 +416,7 @@ def index():
 @app.route('/api/entries', methods=['GET'])
 def list_entries():
     conn = get_db()
-    entries = conn.execute("SELECT id, entry_number, date, substr(raw_text, 1, 150) as preview, created_at FROM entries ORDER BY entry_number DESC").fetchall()
+    entries = conn.execute("SELECT id, entry_number, title, date, substr(raw_text, 1, 150) as preview, created_at FROM entries ORDER BY entry_number DESC").fetchall()
     conn.close()
     return jsonify([dict(e) for e in entries])
 
@@ -437,6 +438,7 @@ def create_entry():
 
     data = request.json
     text = data.get("text", "").strip()
+    title = data.get("title", "").strip()
     if not text:
         return jsonify({"error": "No text provided"}), 400
 
@@ -448,12 +450,16 @@ def create_entry():
 
     system = build_system_prompt()
 
+    entry_header = f"Entry #{entry_num} — {date_str}"
+    if title:
+        entry_header += f"\nTitle: {title}"
+
     try:
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=2000,
             system=system,
-            messages=[{"role": "user", "content": f"Entry #{entry_num} — {date_str}\n\n{text}"}]
+            messages=[{"role": "user", "content": f"{entry_header}\n\n{text}"}]
         )
     except Exception as e:
         memory["entry_count"] -= 1
@@ -464,8 +470,8 @@ def create_entry():
 
     # Save entry
     conn = get_db()
-    cur = conn.execute("INSERT INTO entries (entry_number, date, raw_text, mentor_response) VALUES (?, ?, ?, ?)",
-                        (entry_num, short_date, text, clean_response))
+    cur = conn.execute("INSERT INTO entries (entry_number, title, date, raw_text, mentor_response) VALUES (?, ?, ?, ?, ?)",
+                        (entry_num, title, short_date, text, clean_response))
     entry_id = cur.lastrowid
     conn.commit()
     conn.close()
@@ -480,14 +486,15 @@ def create_entry():
     # Save analysis file
     os.makedirs(ANALYSES_DIR, exist_ok=True)
     fname = f"entry_{entry_num:03d}_{datetime.now().strftime('%Y%m%d')}.md"
+    title_line = f" — {title}" if title else ""
     with open(os.path.join(ANALYSES_DIR, fname), "w") as f:
-        f.write(f"# Entry #{entry_num} — {short_date}\n\n## Journal Entry\n\n{text}\n\n---\n\n## Mentor Response\n\n{clean_response}")
+        f.write(f"# Entry #{entry_num}{title_line} — {short_date}\n\n## Journal Entry\n\n{text}\n\n---\n\n## Mentor Response\n\n{clean_response}")
 
     # Google Doc backup
-    backup_to_google_doc(entry_num, short_date, text, clean_response)
+    backup_to_google_doc(entry_num, short_date, title, text, clean_response)
 
     return jsonify({
-        "entry": {"id": entry_id, "entry_number": entry_num, "date": short_date, "raw_text": text, "mentor_response": clean_response},
+        "entry": {"id": entry_id, "entry_number": entry_num, "title": title, "date": short_date, "raw_text": text, "mentor_response": clean_response},
         "bugs_fired": bugs_fired,
         "new_bugs": new_bugs
     })
@@ -692,8 +699,15 @@ def get_baseline():
 
 @app.route('/api/baseline/upload', methods=['POST'])
 def upload_baseline():
-    data = request.json
-    content = data.get("content", "")
+    # Support both JSON (paste) and file upload
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file"}), 400
+        f = request.files['file']
+        content = f.read().decode('utf-8', errors='replace')
+    else:
+        data = request.json
+        content = data.get("content", "")
     with open(BASELINE_PATH, "w") as f:
         f.write(content)
     return jsonify({"status": "ok", "word_count": len(content.split())})
