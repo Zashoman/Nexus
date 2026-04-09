@@ -88,10 +88,21 @@
     <!-- ═══ DEBUGGING MATRIX TAB ═══ -->
     <div id="tab-debugging" class="tab-content">
         <div class="debug-content">
-            <div class="bug-add-form">
-                <input id="bug-name" placeholder="Pattern name" style="flex:1">
-                <input id="bug-desc" placeholder="Description" style="flex:2">
-                <button class="btn btn-accent btn-sm" onclick="addBug()">Add Pattern</button>
+            <div class="bug-add-form" style="flex-wrap:wrap">
+                <div style="display:flex; gap:8px; width:100%; margin-bottom:6px">
+                    <input id="bug-name" placeholder="Pattern name" style="flex:1">
+                    <input id="bug-desc" placeholder="Description" style="flex:2">
+                    <button class="btn btn-accent btn-sm" onclick="addBug()">Add Pattern</button>
+                </div>
+                <details style="width:100%; font-size:11px; color:var(--text-muted)">
+                    <summary style="cursor:pointer; font-family:var(--font-mono); font-size:10px">+ Intervention fields (optional)</summary>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:6px">
+                        <input id="bug-trigger" placeholder="Trigger pattern" style="background:var(--bg-input); border:1px solid var(--border); padding:6px 8px; color:var(--text); font-size:11px; border-radius:2px; outline:none">
+                        <input id="bug-thought" placeholder="Thought signature" style="background:var(--bg-input); border:1px solid var(--border); padding:6px 8px; color:var(--text); font-size:11px; border-radius:2px; outline:none">
+                        <input id="bug-behavior" placeholder="Behavior signature" style="background:var(--bg-input); border:1px solid var(--border); padding:6px 8px; color:var(--text); font-size:11px; border-radius:2px; outline:none">
+                        <input id="bug-intervention" placeholder="Intervention protocol" style="background:var(--bg-input); border:1px solid var(--border); padding:6px 8px; color:var(--text); font-size:11px; border-radius:2px; outline:none">
+                    </div>
+                </details>
             </div>
             <div id="pending-bugs"></div>
             <div id="bugs-list"></div>
@@ -168,10 +179,18 @@
                 <div style="display:flex; gap:24px; flex-wrap:wrap">
                     <div style="flex:1; min-width:300px">
                         <div style="font-family:var(--font-mono); font-size:10px; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase">Documents</div>
-                        <div style="margin-bottom:8px; display:flex; gap:6px; align-items:center">
+                        <div style="margin-bottom:8px; display:flex; gap:6px; align-items:center; flex-wrap:wrap">
                             <input type="file" id="doc-file-input" style="font-size:11px; color:var(--text-secondary)">
+                            <select id="doc-type-select" style="background:var(--bg-input); border:1px solid var(--border); color:var(--text-secondary); font-size:10px; padding:4px 6px; border-radius:2px; font-family:var(--font-mono)">
+                                <option value="foundational_research">Foundational Research</option>
+                                <option value="practical_playbook">Practical Playbook</option>
+                                <option value="narrative_analysis">Narrative Analysis</option>
+                                <option value="journal_raw">Raw Journal</option>
+                                <option value="other">Other</option>
+                            </select>
                             <button class="btn btn-sm" onclick="uploadDocument()">Upload</button>
                         </div>
+                        <div id="decompose-results" style="display:none"></div>
                         <div id="documents-list"></div>
                     </div>
                     <div style="flex:1; min-width:300px">
@@ -493,10 +512,11 @@
         document.getElementById('pending-bugs').innerHTML=pending.map(b=>`<div class="bug-card pending"><div class="bug-status-dot pending"></div><div class="bug-info"><div class="bug-name">${esc(b.name)}</div><div class="bug-desc">${esc(b.description)}</div><div class="bug-meta"><span>Proposed by mentor</span></div></div><div class="bug-actions"><button class="btn btn-sm btn-accent" onclick="confirmBug(${b.id})">Confirm</button><button class="btn btn-sm btn-danger" onclick="deleteBug(${b.id})">Dismiss</button></div></div>`).join('');
         document.getElementById('bugs-list').innerHTML=active.map(b=>{
             const dc=b.fire_count>=5?'active-high':b.status==='declining'?'declining':b.status==='resolved'?'resolved':'active';
-            return `<div class="bug-card"><div class="bug-status-dot ${dc}"></div><div class="bug-info"><div class="bug-name">${esc(b.name)}</div><div class="bug-desc">${esc(b.description)}</div><div class="bug-meta"><span class="bug-fire-badge">${b.fire_count}×</span>${b.last_fired_entry?'<span>Last: #'+b.last_fired_entry+'</span>':''}<span>${b.source||''}</span>${b.parent_id?'<span class="evolved-tag">evolved</span>':''}</div></div><div class="bug-actions"><select class="bug-status-select" onchange="updateBugStatus(${b.id},this.value)"><option value="active" ${b.status==='active'?'selected':''}>Active</option><option value="declining" ${b.status==='declining'?'selected':''}>Declining</option><option value="resolved" ${b.status==='resolved'?'selected':''}>Resolved</option></select><button class="btn btn-sm btn-danger" onclick="deleteBug(${b.id})">×</button></div></div>`;
+            const hasIntervention = b.trigger_pattern||b.thought_signature||b.behavior_signature||b.intervention;
+            return `<div class="bug-card"><div class="bug-status-dot ${dc}"></div><div class="bug-info"><div class="bug-name">${esc(b.name)}</div><div class="bug-desc">${esc(b.description)}</div><div class="bug-meta"><span class="bug-fire-badge">${b.fire_count}×</span>${b.last_fired_entry?'<span>Last: #'+b.last_fired_entry+'</span>':''}<span>${b.source||''}</span>${b.parent_id?'<span class="evolved-tag">evolved</span>':''}</div>${hasIntervention?'<details class="intervention-details"><summary>Intervention Protocol</summary><div class="intervention-grid">'+(b.trigger_pattern?'<div><span class="int-label">TRIGGERS</span>'+esc(b.trigger_pattern)+'</div>':'')+(b.thought_signature?'<div><span class="int-label">THOUGHT</span>'+esc(b.thought_signature)+'</div>':'')+(b.behavior_signature?'<div><span class="int-label">BEHAVIOR</span>'+esc(b.behavior_signature)+'</div>':'')+(b.intervention?'<div><span class="int-label">INTERVENTION</span>'+esc(b.intervention)+'</div>':'')+'</div></details>':''}</div><div class="bug-actions"><select class="bug-status-select" onchange="updateBugStatus(${b.id},this.value)"><option value="active" ${b.status==='active'?'selected':''}>Active</option><option value="declining" ${b.status==='declining'?'selected':''}>Declining</option><option value="resolved" ${b.status==='resolved'?'selected':''}>Resolved</option></select><button class="btn btn-sm btn-danger" onclick="deleteBug(${b.id})">×</button></div></div>`;
         }).join('')||'<div style="padding:16px;font-size:12px;color:var(--text-dim)">No patterns tracked yet.</div>';
     }
-    async function addBug(){const n=document.getElementById('bug-name').value.trim(),d=document.getElementById('bug-desc').value.trim();if(!n||!d)return;await fetch('/api/bugs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,description:d})});document.getElementById('bug-name').value='';document.getElementById('bug-desc').value='';fetchBugs();}
+    async function addBug(){const n=document.getElementById('bug-name').value.trim(),d=document.getElementById('bug-desc').value.trim();if(!n||!d)return;const body={name:n,description:d};const t=document.getElementById('bug-trigger');if(t&&t.value.trim())body.trigger_pattern=t.value.trim();const th=document.getElementById('bug-thought');if(th&&th.value.trim())body.thought_signature=th.value.trim();const bh=document.getElementById('bug-behavior');if(bh&&bh.value.trim())body.behavior_signature=bh.value.trim();const iv=document.getElementById('bug-intervention');if(iv&&iv.value.trim())body.intervention=iv.value.trim();await fetch('/api/bugs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});['bug-name','bug-desc','bug-trigger','bug-thought','bug-behavior','bug-intervention'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});fetchBugs();}
     async function updateBugStatus(id,s){await fetch('/api/bugs/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:s})});fetchBugs();}
     async function deleteBug(id){await fetch('/api/bugs/'+id,{method:'DELETE'});fetchBugs();}
     async function confirmBug(id){await fetch('/api/bugs/'+id+'/confirm',{method:'POST'});fetchBugs();}
@@ -541,8 +561,12 @@
     async function generateReport(type){const btn=document.getElementById('gen-'+type+'-btn');btn.disabled=true;btn.textContent='Generating...';try{const res=await fetch('/api/reports/'+type,{method:'POST'});const d=await res.json();if(d.error)alert(d.error);fetchReports();}catch(e){alert(e.message);}finally{btn.disabled=false;btn.textContent=type==='weekly'?'Generate Weekly Report':'Generate Monthly Report';}}
 
     // ── Documents ────────────────────────────────────────
-    async function fetchDocuments(){const res=await fetch('/api/documents');const docs=await res.json();document.getElementById('documents-list').innerHTML=docs.map(d=>`<div class="doc-item"><span>${esc(d.filename)}</span><span class="doc-status ${d.analysis_status==='unanalyzed'?'unanalyzed':'analyzed'}">${d.analysis_status}</span></div>`).join('')||'<div style="font-size:12px;color:var(--text-dim)">No documents.</div>';}
-    async function uploadDocument(){const i=document.getElementById('doc-file-input');if(!i.files.length)return;const f=new FormData();f.append('file',i.files[0]);await fetch('/api/documents/upload',{method:'POST',body:f});i.value='';fetchDocuments();}
+    const DOC_TYPE_COLORS={foundational_research:'#4488FF',practical_playbook:'#00CC66',narrative_analysis:'#C8A2FF',journal_raw:'#5A6A7A',report:'#5A6A7A',other:'#5A6A7A'};
+    async function fetchDocuments(){const res=await fetch('/api/documents');const docs=await res.json();document.getElementById('documents-list').innerHTML=docs.map(d=>{const tc=DOC_TYPE_COLORS[d.doc_type]||'#5A6A7A';const canDecompose=d.doc_type==='practical_playbook'&&d.analysis_status==='unanalyzed';return`<div class="doc-item"><div style="flex:1"><span>${esc(d.filename)}</span><span class="doc-type-badge" style="color:${tc};border-color:${tc}30;background:${tc}10">${(d.doc_type||'other').replace(/_/g,' ')}</span></div><span class="doc-status ${d.analysis_status==='unanalyzed'?'unanalyzed':'analyzed'}">${d.analysis_status.replace(/_/g,' ')}</span>${canDecompose?'<button class="btn btn-sm" style="margin-left:6px" onclick="decomposeDoc('+d.id+')">Decompose</button>':''}</div>`;}).join('')||'<div style="font-size:12px;color:var(--text-dim)">No documents.</div>';}
+    async function decomposeDoc(id){const btn=event.target;btn.disabled=true;btn.textContent='Decomposing...';try{const res=await fetch('/api/documents/'+id+'/decompose',{method:'POST'});const d=await res.json();if(d.error){alert(d.error);return;}showDecomposeResults(id,d.proposed_bugs);}catch(e){alert(e.message);}finally{btn.disabled=false;btn.textContent='Decompose';}}
+    function showDecomposeResults(docId,bugs){const el=document.getElementById('decompose-results');el.style.display='block';el.innerHTML='<div style="margin-bottom:8px;font-family:var(--font-mono);font-size:10px;color:var(--accent)">PROPOSED BUGS FROM PLAYBOOK ('+bugs.length+')</div>'+bugs.map((b,i)=>`<div class="inline-card" style="margin-bottom:6px"><strong>${esc(b.name)}</strong><div style="font-size:11px;color:var(--text-secondary);margin:4px 0">${esc(b.description)}</div>${b.trigger_pattern?'<div style="font-size:10px;color:var(--text-muted)"><span class="int-label">TRIGGER</span> '+esc(b.trigger_pattern)+'</div>':''}${b.intervention?'<div style="font-size:10px;color:var(--text-muted)"><span class="int-label">INTERVENTION</span> '+esc(b.intervention)+'</div>':''}</div>`).join('')+'<div style="margin-top:8px"><button class="btn btn-accent btn-sm" onclick="confirmDecompose('+docId+',decomposedBugs)">Confirm All</button> <button class="btn btn-sm" onclick="document.getElementById(\'decompose-results\').style.display=\'none\'">Cancel</button></div>';window.decomposedBugs=bugs;}
+    async function confirmDecompose(docId,bugs){await fetch('/api/documents/'+docId+'/decompose/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({bugs})});document.getElementById('decompose-results').style.display='none';fetchDocuments();fetchBugs();}
+    async function uploadDocument(){const i=document.getElementById('doc-file-input');if(!i.files.length)return;const f=new FormData();f.append('file',i.files[0]);f.append('doc_type',document.getElementById('doc-type-select').value);await fetch('/api/documents/upload',{method:'POST',body:f});i.value='';fetchDocuments();}
 
     // ── Baseline ─────────────────────────────────────────
     async function fetchBaseline(){const res=await fetch('/api/baseline');const d=await res.json();if(d.exists){document.getElementById('baseline-status').innerHTML=`<span style="color:var(--green)">Loaded (v${d.version})</span> — ${d.word_count} words`;document.getElementById('baseline-preview').textContent=d.preview;}else{document.getElementById('baseline-status').innerHTML='<span style="color:var(--amber)">Not loaded</span>';document.getElementById('baseline-preview').textContent='';}}

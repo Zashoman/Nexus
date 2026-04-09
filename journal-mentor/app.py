@@ -82,6 +82,10 @@ def init_db():
             source TEXT,
             parent_id INTEGER,
             superseded_by INTEGER,
+            trigger_pattern TEXT,
+            thought_signature TEXT,
+            behavior_signature TEXT,
+            intervention TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (parent_id) REFERENCES bugs(id),
             FOREIGN KEY (superseded_by) REFERENCES bugs(id)
@@ -687,7 +691,22 @@ def build_system_prompt():
 
     # Bugs
     bugs = get_active_bugs()
-    bugs_text = "\n".join([f"- {b['name']}: {b['description']} (fired {b['fire_count']}x, status: {b['status']})" for b in bugs]) if bugs else "No bugs tracked yet."
+    if bugs:
+        bugs_lines = []
+        for b in bugs:
+            line = f"- {b['name']}: {b['description']} (fired {b['fire_count']}x, status: {b['status']})"
+            if b.get('trigger_pattern'):
+                line += f"\n  TRIGGERS: {b['trigger_pattern']}"
+            if b.get('thought_signature'):
+                line += f"\n  THOUGHT SIGNATURE: {b['thought_signature']}"
+            if b.get('behavior_signature'):
+                line += f"\n  BEHAVIOR SIGNATURE: {b['behavior_signature']}"
+            if b.get('intervention'):
+                line += f"\n  INTERVENTION: {b['intervention']}"
+            bugs_lines.append(line)
+        bugs_text = "\n\n".join(bugs_lines)
+    else:
+        bugs_text = "No bugs tracked yet."
     prompt = prompt.replace("{BUGS_CONTEXT}", bugs_text)
 
     # Priors
@@ -1201,7 +1220,10 @@ def list_bugs():
 def add_bug():
     data = request.json
     conn = get_db()
-    conn.execute("INSERT INTO bugs (name, description, source) VALUES (?,?,'user')", (data['name'], data['description']))
+    conn.execute("""INSERT INTO bugs (name, description, source, trigger_pattern, thought_signature, behavior_signature, intervention)
+        VALUES (?,?,'user',?,?,?,?)""",
+        (data['name'], data['description'], data.get('trigger_pattern'), data.get('thought_signature'),
+         data.get('behavior_signature'), data.get('intervention')))
     conn.commit()
     conn.close()
     add_mentor_log('bug_confirmed', f'User added pattern: {data["name"]}', data['description'])
@@ -1218,6 +1240,9 @@ def update_bug(bid):
         conn.execute("UPDATE bugs SET status=? WHERE id=?", (data['status'], bid))
     if 'description' in data:
         conn.execute("UPDATE bugs SET description=? WHERE id=?", (data['description'], bid))
+    for field in ['trigger_pattern', 'thought_signature', 'behavior_signature', 'intervention']:
+        if field in data:
+            conn.execute(f"UPDATE bugs SET {field}=? WHERE id=?", (data[field], bid))
     conn.commit()
     conn.close()
     if 'status' in data and old_name:
@@ -1252,8 +1277,13 @@ def evolve_bug(bid):
     if not old:
         conn.close()
         return jsonify({"error": "Bug not found"}), 404
-    cur = conn.execute("INSERT INTO bugs (name, description, source, parent_id) VALUES (?,?,'monthly_audit',?)",
-                       (data['new_name'], data['new_description'], bid))
+    cur = conn.execute("""INSERT INTO bugs (name, description, source, parent_id, trigger_pattern, thought_signature, behavior_signature, intervention)
+        VALUES (?,?,'monthly_audit',?,?,?,?,?)""",
+        (data['new_name'], data['new_description'], bid,
+         data.get('trigger_pattern', old['trigger_pattern']),
+         data.get('thought_signature', old['thought_signature']),
+         data.get('behavior_signature', old['behavior_signature']),
+         data.get('intervention', old['intervention'])))
     new_id = cur.lastrowid
     conn.execute("UPDATE bugs SET superseded_by=?, status='resolved' WHERE id=?", (new_id, bid))
     conn.commit()
@@ -1491,6 +1521,85 @@ def mark_analyzed():
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
+
+
+PLAYBOOK_DECOMPOSITION_PROMPT = """You are extracting actionable pattern-intervention protocols from a practical psychology document. This document describes recurring thinking and behavior patterns observed in a specific person, with guidance on how to identify and interrupt each pattern.
+
+For EACH pattern you identify, extract:
+
+1. NAME: Short plain-language name (2-5 words)
+2. DESCRIPTION: One paragraph describing what this pattern is and why it matters
+3. TRIGGER_PATTERN: What situations, emotions, or conditions activate this pattern?
+4. THOUGHT_SIGNATURE: What does the internal monologue sound like when this is running?
+5. BEHAVIOR_SIGNATURE: What observable behavior follows?
+6. INTERVENTION: The specific action protocol for the mentor — what to say, what question to ask, what redirect to use. Calibrated to this specific person.
+
+Output as a JSON array:
+[{"name":"...","description":"...","trigger_pattern":"...","thought_signature":"...","behavior_signature":"...","intervention":"..."}, ...]
+
+Output ONLY the JSON array. No preamble.
+
+DOCUMENT TO DECOMPOSE:
+{document_content}"""
+
+
+@app.route('/api/documents/<int:did>/decompose', methods=['POST'])
+def decompose_document(did):
+    if not client:
+        return jsonify({"error": "No API key"}), 500
+    conn = get_db()
+    doc = conn.execute("SELECT * FROM documents WHERE id=?", (did,)).fetchone()
+    conn.close()
+    if not doc:
+        return jsonify({"error": "Document not found"}), 404
+    if doc['doc_type'] != 'practical_playbook':
+        return jsonify({"error": "Only practical_playbook documents can be decomposed"}), 400
+
+    # Read file content
+    try:
+        with open(doc['filepath'], 'r', errors='replace') as f:
+            content = f.read()
+    except:
+        return jsonify({"error": "Could not read document file"}), 500
+
+    prompt = PLAYBOOK_DECOMPOSITION_PROMPT.replace("{document_content}", content)
+
+    try:
+        result = call_anthropic(prompt, max_tokens=3000)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+    # Parse JSON response
+    try:
+        # Find JSON array in response
+        match = re.search(r'\[.*\]', result, re.DOTALL)
+        if match:
+            proposed = json.loads(match.group())
+        else:
+            proposed = json.loads(result)
+    except:
+        return jsonify({"error": "Failed to parse decomposition result", "raw": result}), 500
+
+    return jsonify({"proposed_bugs": proposed, "document_id": did})
+
+
+@app.route('/api/documents/<int:did>/decompose/confirm', methods=['POST'])
+def confirm_decomposition(did):
+    data = request.json
+    bugs_list = data.get("bugs", [])
+    conn = get_db()
+    for b in bugs_list:
+        conn.execute("""INSERT INTO bugs (name, description, source, trigger_pattern, thought_signature, behavior_signature, intervention)
+            VALUES (?,?,'practical_playbook',?,?,?,?)""",
+            (b['name'], b['description'], b.get('trigger_pattern'), b.get('thought_signature'),
+             b.get('behavior_signature'), b.get('intervention')))
+    conn.execute("UPDATE documents SET analysis_status='decomposed_into_bugs', last_analyzed=? WHERE id=?",
+                 (datetime.now().isoformat(), did))
+    conn.commit()
+    conn.close()
+    for b in bugs_list:
+        add_mentor_log('bug_confirmed', f'Bug from playbook: {b["name"]}', b.get('description'))
+    return jsonify({"status": "ok", "bugs_created": len(bugs_list)})
 
 
 # ── Baseline ──────────────────────────────────────────────
