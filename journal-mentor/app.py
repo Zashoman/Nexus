@@ -270,6 +270,15 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE TABLE IF NOT EXISTS topics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            text TEXT NOT NULL,
+            notes TEXT DEFAULT '',
+            status TEXT DEFAULT 'open',
+            priority INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
         CREATE TABLE IF NOT EXISTS mentor_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             event_type TEXT NOT NULL,
@@ -1611,6 +1620,103 @@ def add_micro():
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
+
+
+# ── Topics / Ideation ─────────────────────────────────────
+
+@app.route('/api/topics', methods=['GET'])
+def list_topics():
+    conn = get_db()
+    topics = conn.execute("SELECT * FROM topics ORDER BY status='open' DESC, priority DESC, created_at DESC").fetchall()
+    conn.close()
+    return jsonify([dict(t) for t in topics])
+
+@app.route('/api/topics', methods=['POST'])
+def add_topic():
+    data = request.json
+    conn = get_db()
+    conn.execute("INSERT INTO topics (text, notes, priority) VALUES (?,?,?)",
+                 (data['text'], data.get('notes', ''), data.get('priority', 0)))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+@app.route('/api/topics/<int:tid>', methods=['PUT'])
+def update_topic(tid):
+    data = request.json
+    conn = get_db()
+    if 'status' in data:
+        conn.execute("UPDATE topics SET status=? WHERE id=?", (data['status'], tid))
+    if 'text' in data:
+        conn.execute("UPDATE topics SET text=? WHERE id=?", (data['text'], tid))
+    if 'notes' in data:
+        conn.execute("UPDATE topics SET notes=? WHERE id=?", (data['notes'], tid))
+    if 'priority' in data:
+        conn.execute("UPDATE topics SET priority=? WHERE id=?", (data['priority'], tid))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+@app.route('/api/topics/<int:tid>', methods=['DELETE'])
+def delete_topic(tid):
+    conn = get_db()
+    conn.execute("DELETE FROM topics WHERE id=?", (tid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+@app.route('/api/topics/export', methods=['GET'])
+def export_topics():
+    """Export topics as plain text for Apple Notes."""
+    conn = get_db()
+    topics = conn.execute("SELECT * FROM topics WHERE status='open' ORDER BY priority DESC, created_at DESC").fetchall()
+    conn.close()
+    lines = ["Ideation — Topics\n"]
+    for t in topics:
+        lines.append(f"• {t['text']}")
+        if t['notes']:
+            lines.append(f"  {t['notes']}")
+        lines.append("")
+    return jsonify({"text": "\n".join(lines), "count": len(topics)})
+
+@app.route('/api/topics/sync-notes', methods=['POST'])
+def sync_to_apple_notes():
+    """Sync topics to Apple Notes via osascript (macOS only)."""
+    conn = get_db()
+    topics = conn.execute("SELECT * FROM topics WHERE status='open' ORDER BY priority DESC, created_at DESC").fetchall()
+    conn.close()
+
+    lines = ["Ideation — Topics", f"Updated: {datetime.now().strftime('%d %b %Y %H:%M')}", ""]
+    for t in topics:
+        lines.append(f"• {t['text']}")
+        if t['notes']:
+            lines.append(f"  {t['notes']}")
+        lines.append("")
+
+    note_content = "\n".join(lines)
+    note_title = "Journal Mentor — Ideation"
+
+    # Use AppleScript to create/update a note in Apple Notes
+    import subprocess
+    escaped_content = note_content.replace(chr(10), '<br>').replace('"', '\\"')
+    script = ('tell application "Notes"\n'
+              '    set noteFound to false\n'
+              '    repeat with eachNote in notes of default account\n'
+              '        if name of eachNote is "' + note_title + '" then\n'
+              '            set body of eachNote to "' + escaped_content + '"\n'
+              '            set noteFound to true\n'
+              '            exit repeat\n'
+              '        end if\n'
+              '    end repeat\n'
+              '    if not noteFound then\n'
+              '        make new note at default account with properties {name:"' + note_title + '", body:"' + escaped_content + '"}\n'
+              '    end if\n'
+              'end tell')
+    try:
+        subprocess.run(['osascript', '-e', script], capture_output=True, timeout=10)
+        return jsonify({"status": "ok", "message": "Synced to Apple Notes"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ── Documents ──────────────────────────────────────────────

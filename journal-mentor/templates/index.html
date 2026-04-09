@@ -14,6 +14,7 @@
             <button class="tab-btn" onclick="switchTab('debugging')">Debugging Matrix</button>
             <button class="tab-btn" onclick="switchTab('mentorlog')">Mentor Log <span id="pending-badge" class="pending-badge" style="display:none">0</span></button>
             <button class="tab-btn" onclick="switchTab('system')">System</button>
+            <button class="tab-btn" onclick="switchTab('ideation')">Ideation</button>
             <button class="tab-btn" onclick="toggleManual()" style="margin-left:auto">Manual</button>
         </div>
         <div style="display:flex; align-items:center; gap:6px; padding-right:12px">
@@ -268,6 +269,28 @@
         </div>
     </div>
 
+    <!-- ═══ IDEATION TAB ═══ -->
+    <div id="tab-ideation" class="tab-content">
+        <div class="ideation-content">
+            <div class="ideation-header">
+                <div>
+                    <h2 class="ideation-title">Topics</h2>
+                    <p class="ideation-subtitle">Ideas, curiosities, threads to pull on</p>
+                </div>
+                <div style="display:flex; gap:8px">
+                    <button class="btn btn-sm" onclick="syncToAppleNotes()" id="sync-notes-btn">Sync to Apple Notes</button>
+                    <button class="btn btn-sm" onclick="copyTopics()">Copy All</button>
+                </div>
+            </div>
+            <div class="ideation-input-area">
+                <input type="text" id="topic-input" class="ideation-input" placeholder="What's on your mind? Drop an idea..." onkeydown="if(event.key==='Enter')addTopic()">
+                <button class="btn btn-accent" onclick="addTopic()">Add</button>
+            </div>
+            <div id="topics-list" class="topics-list"></div>
+            <div id="topics-done" style="margin-top:24px"></div>
+        </div>
+    </div>
+
     <!-- User Manual Overlay -->
     <div id="manual-overlay" style="display:none; position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.8); overflow-y:auto">
         <div style="max-width:700px; margin:40px auto; padding:32px; background:var(--bg-surface); border:1px solid var(--border); border-radius:4px; position:relative">
@@ -394,6 +417,7 @@
         if (tab === 'debugging') fetchBugs();
         if (tab === 'mentorlog') fetchMentorLog();
         if (tab === 'system') { fetchGoals(); fetchPriors(); fetchPhases(); fetchReports(); fetchDocuments(); fetchBaseline(); fetchMicro(); }
+        if (tab === 'ideation') fetchTopics();
     }
 
     // ── Journal Mode ─────────────────────────────────────
@@ -727,6 +751,45 @@
     async function showModel(){const btn=document.getElementById('model-btn');btn.disabled=true;btn.textContent='Generating...';try{const res=await fetch('/api/system/model-summary');const d=await res.json();document.getElementById('model-summary').innerHTML='<div class="model-text">'+d.summary.split('\n\n').map(p=>'<p>'+esc(p)+'</p>').join('')+'</div>';}catch(e){document.getElementById('model-summary').innerHTML='<div style="color:var(--red)">Error: '+e.message+'</div>';}finally{btn.disabled=false;btn.textContent='Show Me What You Believe About Me';}}
 
     // ── Utility ──────────────────────────────────────────
+    // ── Ideation / Topics ──────────────────────────────
+    async function fetchTopics(){
+        const res=await fetch('/api/topics');const topics=await res.json();
+        const open=topics.filter(t=>t.status==='open');
+        const done=topics.filter(t=>t.status==='done');
+        document.getElementById('topics-list').innerHTML=open.map(t=>`
+            <div class="topic-card">
+                <button class="topic-check" onclick="markTopicDone(${t.id})"></button>
+                <div class="topic-body">
+                    <div class="topic-text">${esc(t.text)}</div>
+                    ${t.notes?'<div class="topic-notes">'+esc(t.notes)+'</div>':''}
+                </div>
+                <div class="topic-actions">
+                    <button class="topic-note-btn" onclick="editTopicNote(${t.id},'${esc(t.notes||'').replace(/'/g,"\\'")}')">note</button>
+                    <button class="entry-delete" onclick="deleteTopic(${t.id})">×</button>
+                </div>
+                <span class="topic-date">${(t.created_at||'').substring(0,10)}</span>
+            </div>
+        `).join('')||'<div class="ideation-empty">No topics yet. Drop an idea above.</div>';
+        if(done.length){
+            document.getElementById('topics-done').innerHTML='<div class="topics-done-header" onclick="this.nextElementSibling.classList.toggle(\'collapsed\')">Explored ('+done.length+')</div><div class="topics-done-list">'+done.map(t=>`
+                <div class="topic-card done">
+                    <button class="topic-check checked" onclick="reopenTopic(${t.id})">✓</button>
+                    <div class="topic-body"><div class="topic-text">${esc(t.text)}</div></div>
+                    <button class="entry-delete" onclick="deleteTopic(${t.id})">×</button>
+                </div>
+            `).join('')+'</div>';
+        } else {
+            document.getElementById('topics-done').innerHTML='';
+        }
+    }
+    async function addTopic(){const i=document.getElementById('topic-input');const t=i.value.trim();if(!t)return;await fetch('/api/topics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})});i.value='';fetchTopics();}
+    async function deleteTopic(id){await fetch('/api/topics/'+id,{method:'DELETE'});fetchTopics();}
+    async function markTopicDone(id){await fetch('/api/topics/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'done'})});fetchTopics();}
+    async function reopenTopic(id){await fetch('/api/topics/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'open'})});fetchTopics();}
+    async function editTopicNote(id,current){const n=prompt('Add a note:',current);if(n===null)return;await fetch('/api/topics/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes:n})});fetchTopics();}
+    async function copyTopics(){const res=await fetch('/api/topics/export');const d=await res.json();navigator.clipboard.writeText(d.text);alert('Copied '+d.count+' topics to clipboard');}
+    async function syncToAppleNotes(){const btn=document.getElementById('sync-notes-btn');btn.disabled=true;btn.textContent='Syncing...';try{const res=await fetch('/api/topics/sync-notes',{method:'POST'});const d=await res.json();btn.textContent=d.error?'Failed':'Synced!';} catch{btn.textContent='Failed';}setTimeout(()=>{btn.textContent='Sync to Apple Notes';btn.disabled=false;},3000);}
+
     function toggleManual(){const el=document.getElementById('manual-overlay');el.style.display=el.style.display==='none'?'block':'none';}
     function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
     </script>

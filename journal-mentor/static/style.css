@@ -864,3 +864,181 @@ body {
 .goal-status-badge.achieved { background: var(--green-bg); color: var(--green); }
 .goal-status-badge.paused { background: var(--amber-bg); color: var(--amber); }
 .principle-card { padding: 10px 12px; border-left: 2px solid var(--accent); margin-bottom: 6px; font-size: 13px; color: var(--text-secondary); font-style: italic; display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); }
+
+/* ── Ideation Tab ── */
+.ideation-content {
+  padding: 32px 48px;
+  overflow-y: auto;
+  flex: 1;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.ideation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.ideation-title {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.ideation-subtitle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ideation-input-area {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+.ideation-input {
+  flex: 1;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 14px 18px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--text);
+  outline: none;
+  caret-color: var(--accent);
+  transition: border-color 0.2s;
+}
+
+.ideation-input:focus {
+  border-color: var(--accent);
+}
+
+.ideation-input::placeholder { color: var(--text-dim); }
+
+.ideation-empty {
+  text-align: center;
+  padding: 48px 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+/* Topic cards */
+.topic-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  background: var(--bg-surface);
+  transition: all 0.15s;
+}
+
+.topic-card:hover {
+  border-color: var(--border);
+  background: var(--bg-card);
+}
+
+.topic-card.done {
+  opacity: 0.5;
+}
+
+.topic-check {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: all 0.2s;
+}
+
+.topic-check:hover {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.topic-check.checked {
+  border-color: var(--green);
+  background: var(--green-bg);
+  color: var(--green);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.topic-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.topic-text {
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.topic-notes {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.topic-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.topic-card:hover .topic-actions {
+  opacity: 1;
+}
+
+.topic-note-btn {
+  background: none;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.topic-note-btn:hover { color: var(--accent); }
+
+.topic-date {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+/* Done section */
+.topics-done-header {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.topics-done-header:hover { color: var(--text-secondary); }
+
+.topics-done-list.collapsed { display: none; }
