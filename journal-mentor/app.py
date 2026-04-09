@@ -100,6 +100,9 @@ def migrate_db():
     # Reports table migrations
     add_column('reports', 'email_sent', 'INTEGER', '0')
 
+    # Entries backup tracking
+    add_column('entries', 'backed_up', 'INTEGER', '0')
+
     conn.commit()
     conn.close()
 
@@ -1172,7 +1175,7 @@ def index():
 def list_entries():
     conn = get_db()
     entries = conn.execute("""SELECT id, entry_number, title, date, substr(raw_text,1,200) as preview,
-        tags, emotional_valence, time_of_day, processing_mode, insight_action_ratio, created_at
+        tags, emotional_valence, time_of_day, processing_mode, insight_action_ratio, backed_up, created_at
         FROM entries ORDER BY entry_number DESC""").fetchall()
     conn.close()
     return jsonify([dict(e) for e in entries])
@@ -1271,9 +1274,16 @@ def create_entry():
     # Apple Notes backup
     save_entry_to_apple_notes(entry_num, short_date, text, parsed["clean_response"])
 
+    # Mark as backed up
+    if GDOC_WEBHOOK:
+        conn = get_db()
+        conn.execute("UPDATE entries SET backed_up=1 WHERE id=?", (entry_id,))
+        conn.commit()
+        conn.close()
+
     return jsonify({
         "entry": {"id": entry_id, "entry_number": entry_num, "title": title, "date": short_date,
-                  "raw_text": text, "mentor_response": parsed["clean_response"]},
+                  "raw_text": text, "mentor_response": parsed["clean_response"], "backed_up": 1 if GDOC_WEBHOOK else 0},
         "bugs_fired": parsed["bugs_fired"],
         "new_bugs": parsed["new_bugs"],
         "experiments_proposed": parsed["experiments"],
@@ -1308,6 +1318,10 @@ def backup_entry(eid):
     if not entry:
         return jsonify({"error": "Not found"}), 404
     backup_to_google_doc(entry['entry_number'], entry['date'], entry.get('title','') or '', entry['raw_text'], entry['mentor_response'] or '')
+    conn = get_db()
+    conn.execute("UPDATE entries SET backed_up=1 WHERE id=?", (eid,))
+    conn.commit()
+    conn.close()
     return jsonify({"status": "ok"})
 
 

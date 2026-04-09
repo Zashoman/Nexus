@@ -15,7 +15,7 @@
             <button class="tab-btn" onclick="switchTab('debugging')">Debugging Matrix</button>
             <button class="tab-btn" onclick="switchTab('mentorlog')">Mentor Log <span id="pending-badge" class="pending-badge" style="display:none">0</span></button>
             <button class="tab-btn" onclick="switchTab('system')">System</button>
-            <button class="tab-btn" onclick="toggleManual()" style="margin-left:auto">Manual</button>
+            <button class="tab-btn" onclick="switchTab('manual')" style="margin-left:auto">Manual</button>
         </div>
         <div style="display:flex; align-items:center; gap:6px; padding-right:12px">
             <button class="btn btn-sm" id="new-entry-btn" onclick="showNewEntryMode()" style="display:none">+ New Entry</button>
@@ -311,11 +311,11 @@
     </div>
 
     <!-- User Manual Overlay -->
-    <div id="manual-overlay" style="display:none; position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.8); overflow-y:auto">
-        <div style="max-width:700px; margin:40px auto; padding:32px; background:var(--bg-surface); border:1px solid var(--border); border-radius:4px; position:relative">
-            <button onclick="toggleManual()" style="position:absolute; top:12px; right:16px; background:none; border:none; color:var(--text-muted); font-size:20px; cursor:pointer">×</button>
-            <h1 style="font-size:18px; color:var(--accent); margin-bottom:4px">Journal Mentor — User Manual</h1>
-            <p style="font-size:11px; color:var(--text-dim); font-family:var(--font-mono); margin-bottom:24px">Dialectic System v3.1</p>
+    <!-- ═══ MANUAL TAB ═══ -->
+    <div id="tab-manual" class="tab-content">
+        <div class="manual-page">
+            <h1 style="font-size:22px; color:var(--accent); margin-bottom:4px">Journal Mentor — User Manual</h1>
+            <p style="font-size:11px; color:var(--text-dim); font-family:var(--font-mono); margin-bottom:32px">Dialectic System v3.1</p>
 
             <div class="manual-section">
                 <h2>How It Works</h2>
@@ -394,7 +394,7 @@
                 </ol>
             </div>
 
-            <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border); font-size:11px; color:var(--text-dim)">
+            <div style="margin-top:32px; padding-top:16px; border-top:1px solid var(--border); font-size:11px; color:var(--text-dim)">
                 All data stays on your Mac. Back up by copying the ~/journal-mentor folder.
             </div>
         </div>
@@ -455,11 +455,13 @@
         document.getElementById('history-count').textContent = entries.length + ' entries';
         document.getElementById('history-entries').innerHTML = entries.map(e => {
             const valDot = e.emotional_valence != null ? '<span class="valence-dot v'+e.emotional_valence+'"></span>' : '';
+            const backupBadge = e.backed_up ? '<span class="backup-badge">✓ Backed up</span>' : '<span class="backup-badge not-backed">Not backed up</span>';
             return '<div class="history-entry-item" onclick="viewHistoryEntry('+e.id+')">' +
+                backupBadge +
                 '<div class="history-entry-meta">'+valDot+'Entry #'+e.entry_number+' — '+e.date+'</div>' +
                 (e.title ? '<div class="history-entry-title">'+esc(e.title)+'</div>' : '') +
                 '<div class="history-entry-preview">'+esc(e.preview)+'</div>' +
-                '<button class="entry-delete" onclick="event.stopPropagation();deleteHistoryEntry('+e.id+')" style="position:absolute;top:8px;right:8px">×</button>' +
+                '<button class="entry-delete" onclick="event.stopPropagation();deleteHistoryEntry('+e.id+')" style="position:absolute;top:30px;right:8px">×</button>' +
             '</div>';
         }).join('') || '<div class="ideation-empty">No entries yet.</div>';
     }
@@ -867,7 +869,6 @@
     async function copyTopics(){const res=await fetch('/api/topics/export');const d=await res.json();navigator.clipboard.writeText(d.text);alert('Copied '+d.count+' topics to clipboard');}
     async function syncToAppleNotes(){const btn=document.getElementById('sync-notes-btn');btn.disabled=true;btn.textContent='Syncing...';try{const res=await fetch('/api/topics/sync-notes',{method:'POST'});const d=await res.json();btn.textContent=d.error?'Failed':'Synced!';} catch{btn.textContent='Failed';}setTimeout(()=>{btn.textContent='Sync to Apple Notes';btn.disabled=false;},3000);}
 
-    function toggleManual(){const el=document.getElementById('manual-overlay');el.style.display=el.style.display==='none'?'block':'none';}
     function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
     </script>
 </body>
