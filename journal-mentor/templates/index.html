@@ -15,6 +15,7 @@
             <button class="tab-btn" onclick="switchTab('debugging')">Debugging Matrix</button>
             <button class="tab-btn" onclick="switchTab('mentorlog')">Mentor Log <span id="pending-badge" class="pending-badge" style="display:none">0</span></button>
             <button class="tab-btn" onclick="switchTab('system')">System</button>
+            <button class="tab-btn" onclick="switchTab('ideation')">Ideation</button>
             <button class="tab-btn" onclick="switchTab('manual')" style="margin-left:auto">Manual</button>
         </div>
         <div style="display:flex; align-items:center; gap:6px; padding-right:12px">
@@ -59,13 +60,7 @@
                 </div>
             </div>
             <div class="journal-right">
-                <!-- Right-side toggle: Mentor / Ideation -->
-                <div class="right-toggle">
-                    <button class="right-toggle-btn active" id="rt-mentor" onclick="showRightPanel('mentor')">Mentor</button>
-                    <button class="right-toggle-btn" id="rt-ideation" onclick="showRightPanel('ideation')">Ideation</button>
-                </div>
-                <!-- Mentor Panel -->
-                <div id="right-mentor" class="dialectic-panel">
+                <div class="dialectic-panel">
                     <div class="dialectic-header" id="dialectic-header" style="display:none">
                         <span id="dialectic-title">Mentor Read</span>
                         <span class="status-indicators" id="status-indicators"></span>
@@ -84,23 +79,6 @@
                     <div class="dialectic-input" id="dialectic-input" style="display:none">
                         <textarea placeholder="Ask your mentor..." id="dialectic-textarea" onkeydown="handleDialecticKeydown(event)" rows="1"></textarea>
                         <button class="btn btn-accent btn-sm" onclick="sendDialectic()">Send</button>
-                    </div>
-                </div>
-                <!-- Ideation Panel -->
-                <div id="right-ideation" class="ideation-panel-right" style="display:none">
-                    <div class="ideation-panel-body">
-                        <div class="ideation-input-area" style="padding:24px 32px 0">
-                            <input type="text" id="topic-input" class="ideation-input" placeholder="Drop an idea..." onkeydown="if(event.key==='Enter')addTopic()">
-                            <button class="btn btn-accent btn-sm" onclick="addTopic()">Add</button>
-                        </div>
-                        <div style="padding:16px 32px; flex:1; overflow-y:auto">
-                            <div id="topics-list" class="topics-list"></div>
-                            <div id="topics-done"></div>
-                        </div>
-                    </div>
-                    <div style="padding:8px 32px 12px; border-top:1px solid var(--border); display:flex; gap:8px; background:var(--bg-surface)">
-                        <button class="btn btn-sm" onclick="syncToAppleNotes()" id="sync-notes-btn">Sync to Notes</button>
-                        <button class="btn btn-sm" onclick="copyTopics()">Copy All</button>
                     </div>
                 </div>
             </div>
@@ -310,7 +288,28 @@
         </div>
     </div>
 
-    <!-- User Manual Overlay -->
+    <!-- ═══ IDEATION TAB ═══ -->
+    <div id="tab-ideation" class="tab-content">
+        <div class="ideation-content">
+            <div class="ideation-header">
+                <div>
+                    <h2 class="ideation-title">Topics</h2>
+                    <p class="ideation-subtitle">Ideas, curiosities, threads to pull on</p>
+                </div>
+                <div style="display:flex; gap:8px">
+                    <button class="btn btn-sm" onclick="syncToAppleNotes()" id="sync-notes-btn">Sync to Apple Notes</button>
+                    <button class="btn btn-sm" onclick="copyTopics()">Copy All</button>
+                </div>
+            </div>
+            <div class="ideation-input-area">
+                <input type="text" id="topic-input" class="ideation-input" placeholder="What's on your mind? Drop an idea..." onkeydown="if(event.key==='Enter')addTopic()">
+                <button class="btn btn-accent" onclick="addTopic()">Add</button>
+            </div>
+            <div id="topics-list" class="topics-list"></div>
+            <div id="topics-done" style="margin-top:24px"></div>
+        </div>
+    </div>
+
     <!-- ═══ MANUAL TAB ═══ -->
     <div id="tab-manual" class="tab-content">
         <div class="manual-page">
@@ -437,17 +436,10 @@
         if (tab === 'mentorlog') fetchMentorLog();
         if (tab === 'system') { fetchGoals(); fetchPriors(); fetchPhases(); fetchReports(); fetchDocuments(); fetchBaseline(); fetchMicro(); }
         if (tab === 'history') fetchHistoryEntries();
+        if (tab === 'ideation') fetchTopics();
     }
 
     // ── Right Panel Toggle ────────────────────────────────
-    function showRightPanel(panel) {
-        document.getElementById('right-mentor').style.display = panel==='mentor' ? 'flex' : 'none';
-        document.getElementById('right-ideation').style.display = panel==='ideation' ? 'flex' : 'none';
-        document.getElementById('rt-mentor').classList.toggle('active', panel==='mentor');
-        document.getElementById('rt-ideation').classList.toggle('active', panel==='ideation');
-        if (panel==='ideation') fetchTopics();
-    }
-
     // ── History ──────────────────────────────────────────
     async function fetchHistoryEntries() {
         const res = await fetch('/api/entries');
