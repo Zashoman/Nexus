@@ -8,10 +8,17 @@
 </head>
 <body>
     <!-- Tab Bar -->
-    <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchTab('journal')">Journal</button>
-        <button class="tab-btn" onclick="switchTab('debugging')">Debugging Matrix</button>
-        <button class="tab-btn" onclick="switchTab('system')">System</button>
+    <div class="tab-bar" style="justify-content:space-between">
+        <div style="display:flex">
+            <button class="tab-btn active" onclick="switchTab('journal')">Journal</button>
+            <button class="tab-btn" onclick="switchTab('debugging')">Debugging Matrix</button>
+            <button class="tab-btn" onclick="switchTab('system')">System</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; padding-right:12px">
+            <button class="btn btn-sm" id="new-entry-btn" onclick="showNewEntryMode()" style="display:none">+ New Entry</button>
+            <button class="btn btn-sm" id="backup-btn" onclick="backupCurrentEntry()" style="display:none">Backup</button>
+            <a id="sheet-link" href="#" target="_blank" rel="noopener" class="btn btn-sm" style="display:none; text-decoration:none">Sheet</a>
+        </div>
     </div>
 
     <!-- ═══ JOURNAL TAB ═══ -->
@@ -218,6 +225,7 @@
             if (titleInput) titleInput.value = '';
             updateWordCount();
             currentEntryId = data.entry.id;
+            updateHeaderButtons();
             showMentorResponse(data.entry, data.bugs_fired, data.new_bugs);
             fetchEntries();
         } catch(e) { alert('Error: ' + e.message); }
@@ -233,6 +241,7 @@
         const area = document.getElementById('write-area');
         area.innerHTML = `<div class="write-date">Entry #${entry.entry_number} — ${entry.date}</div>${entry.title ? '<div style="font-size:18px; font-weight:500; color:var(--text); margin-bottom:12px">' + escHtml(entry.title) + '</div>' : ''}<div style="font-size:14px; line-height:1.8; color:#B8BCC4; white-space:pre-wrap">${escHtml(entry.raw_text)}</div>`;
         document.getElementById('submit-btn').style.display = 'none';
+        updateHeaderButtons();
         // Show response on right
         showMentorResponse(entry, [], []);
         // Load dialectic
@@ -248,8 +257,31 @@
         document.getElementById('entry-textarea').addEventListener('input', updateWordCount);
         document.getElementById('submit-btn').style.display = '';
         document.getElementById('word-count').textContent = 'cmd+enter to submit';
+        document.getElementById('new-entry-btn').style.display = 'none';
+        document.getElementById('backup-btn').style.display = 'none';
         hideMentorPanel();
         renderEntryList();
+    }
+
+    function updateHeaderButtons() {
+        document.getElementById('new-entry-btn').style.display = currentEntryId ? 'block' : 'none';
+        document.getElementById('backup-btn').style.display = currentEntryId ? 'block' : 'none';
+    }
+
+    async function backupCurrentEntry() {
+        if (!currentEntryId) return;
+        const btn = document.getElementById('backup-btn');
+        btn.textContent = 'Saving...';
+        btn.disabled = true;
+        try {
+            const res = await fetch('/api/entries/' + currentEntryId + '/backup', { method:'POST' });
+            const data = await res.json();
+            btn.textContent = data.error ? 'Failed' : 'Saved!';
+            setTimeout(() => { btn.textContent = 'Backup'; btn.disabled = false; }, 3000);
+        } catch {
+            btn.textContent = 'Failed';
+            setTimeout(() => { btn.textContent = 'Backup'; btn.disabled = false; }, 3000);
+        }
     }
 
     async function deleteEntry(id) {

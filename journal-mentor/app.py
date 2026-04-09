@@ -511,6 +511,19 @@ def delete_entry(entry_id):
     return jsonify({"status": "ok"})
 
 
+@app.route('/api/entries/<int:entry_id>/backup', methods=['POST'])
+def backup_entry(entry_id):
+    if not GDOC_WEBHOOK:
+        return jsonify({"error": "JOURNAL_GDOC_WEBHOOK not configured"}), 500
+    conn = get_db()
+    entry = conn.execute("SELECT * FROM entries WHERE id=?", (entry_id,)).fetchone()
+    conn.close()
+    if not entry:
+        return jsonify({"error": "Entry not found"}), 404
+    backup_to_google_doc(entry['entry_number'], entry['date'], entry.get('title', '') or '', entry['raw_text'], entry['mentor_response'] or '')
+    return jsonify({"status": "ok"})
+
+
 # ── Dialectic ──────────────────────────────────────────────
 @app.route('/api/entries/<int:entry_id>/dialectic', methods=['GET'])
 def get_dialectic(entry_id):
