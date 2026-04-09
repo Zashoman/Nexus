@@ -40,6 +40,71 @@ def get_db():
     return conn
 
 
+def migrate_db():
+    """Add new columns to existing tables without destroying data. Safe to run repeatedly."""
+    conn = get_db()
+
+    # Auto-backup before any migration
+    if os.path.exists(DB_PATH):
+        os.makedirs(BACKUPS_DIR, exist_ok=True)
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup = os.path.join(BACKUPS_DIR, f"journal_mentor_db_backup_{ts}.db")
+        if not os.path.exists(backup):
+            shutil.copy2(DB_PATH, backup)
+            # Keep last 10 DB backups
+            db_backups = sorted([f for f in os.listdir(BACKUPS_DIR) if f.startswith("journal_mentor_db_backup_")])
+            while len(db_backups) > 10:
+                os.remove(os.path.join(BACKUPS_DIR, db_backups.pop(0)))
+
+    def table_exists(table):
+        return conn.execute("SELECT COUNT(*) as c FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()['c'] > 0
+
+    def has_column(table, column):
+        if not table_exists(table):
+            return True  # Skip — table doesn't exist yet, init_db will create it properly
+        cols = [c['name'] for c in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+        return column in cols
+
+    def add_column(table, column, col_type, default=None):
+        if not table_exists(table):
+            return  # Table will be created by init_db with all columns
+        if not has_column(table, column):
+            default_clause = f" DEFAULT {default}" if default is not None else ""
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}{default_clause}")
+
+    # Entries table migrations
+    add_column('entries', 'title', 'TEXT', "''")
+    add_column('entries', 'time_of_day', 'TEXT')
+    add_column('entries', 'tags', 'TEXT', "'[]'")
+    add_column('entries', 'emotional_valence', 'INTEGER')
+    add_column('entries', 'commitments_made', 'TEXT', "'[]'")
+    add_column('entries', 'processing_mode', 'TEXT')
+    add_column('entries', 'somatic_content', 'INTEGER', '0')
+    add_column('entries', 'schema_level', 'TEXT')
+    add_column('entries', 'insight_action_ratio', 'TEXT')
+    add_column('entries', 'containment_level', 'TEXT')
+    add_column('entries', 'journaling_mode', 'TEXT', "'freeform'")
+
+    # Bugs table migrations
+    add_column('bugs', 'parent_id', 'INTEGER')
+    add_column('bugs', 'superseded_by', 'INTEGER')
+    add_column('bugs', 'trigger_pattern', 'TEXT')
+    add_column('bugs', 'thought_signature', 'TEXT')
+    add_column('bugs', 'behavior_signature', 'TEXT')
+    add_column('bugs', 'intervention', 'TEXT')
+
+    # Goals table migrations
+    add_column('goals', 'layer', 'TEXT', "'objective'")
+    add_column('goals', 'domain', 'TEXT')
+    add_column('goals', 'status', 'TEXT', "'active'")
+
+    # Reports table migrations
+    add_column('reports', 'email_sent', 'INTEGER', '0')
+
+    conn.commit()
+    conn.close()
+
+
 def init_db():
     conn = get_db()
     conn.executescript("""
@@ -1977,6 +2042,7 @@ Write in second person. Direct. Under 500 words."""
 # ── Startup ────────────────────────────────────────────────
 if __name__ == '__main__':
     init_db()
+    migrate_db()
     for d in [ANALYSES_DIR, BACKUPS_DIR, BASELINES_DIR, DOCUMENTS_DIR]:
         os.makedirs(d, exist_ok=True)
     print("\n  JOURNAL MENTOR — Dialectic System v3")
