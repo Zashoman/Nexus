@@ -11,10 +11,10 @@
     <div class="tab-bar">
         <div style="display:flex">
             <button class="tab-btn active" onclick="switchTab('journal')">Journal</button>
+            <button class="tab-btn" onclick="switchTab('history')">History</button>
             <button class="tab-btn" onclick="switchTab('debugging')">Debugging Matrix</button>
             <button class="tab-btn" onclick="switchTab('mentorlog')">Mentor Log <span id="pending-badge" class="pending-badge" style="display:none">0</span></button>
             <button class="tab-btn" onclick="switchTab('system')">System</button>
-            <button class="tab-btn" onclick="switchTab('ideation')">Ideation</button>
             <button class="tab-btn" onclick="toggleManual()" style="margin-left:auto">Manual</button>
         </div>
         <div style="display:flex; align-items:center; gap:6px; padding-right:12px">
@@ -57,10 +57,15 @@
                     <span class="word-count" id="word-count">cmd+enter to submit</span>
                     <button class="btn btn-accent" id="submit-btn" onclick="submitEntry()">Submit Entry</button>
                 </div>
-                <div class="entry-list" id="entry-list"></div>
             </div>
             <div class="journal-right">
-                <div class="dialectic-panel">
+                <!-- Right-side toggle: Mentor / Ideation -->
+                <div class="right-toggle">
+                    <button class="right-toggle-btn active" id="rt-mentor" onclick="showRightPanel('mentor')">Mentor</button>
+                    <button class="right-toggle-btn" id="rt-ideation" onclick="showRightPanel('ideation')">Ideation</button>
+                </div>
+                <!-- Mentor Panel -->
+                <div id="right-mentor" class="dialectic-panel">
                     <div class="dialectic-header" id="dialectic-header" style="display:none">
                         <span id="dialectic-title">Mentor Read</span>
                         <span class="status-indicators" id="status-indicators"></span>
@@ -71,9 +76,7 @@
                         </div>
                         <div id="mentor-response-area" style="display:none">
                             <div class="mentor-response" id="mentor-response"></div>
-                            <!-- Experiments proposed inline -->
                             <div id="experiments-inline"></div>
-                            <!-- New bugs proposed inline -->
                             <div id="new-bugs-inline"></div>
                             <div class="dialectic-messages" id="dialectic-messages"></div>
                         </div>
@@ -81,6 +84,23 @@
                     <div class="dialectic-input" id="dialectic-input" style="display:none">
                         <textarea placeholder="Ask your mentor..." id="dialectic-textarea" onkeydown="handleDialecticKeydown(event)" rows="1"></textarea>
                         <button class="btn btn-accent btn-sm" onclick="sendDialectic()">Send</button>
+                    </div>
+                </div>
+                <!-- Ideation Panel -->
+                <div id="right-ideation" class="ideation-panel-right" style="display:none">
+                    <div class="ideation-panel-body">
+                        <div class="ideation-input-area" style="padding:24px 32px 0">
+                            <input type="text" id="topic-input" class="ideation-input" placeholder="Drop an idea..." onkeydown="if(event.key==='Enter')addTopic()">
+                            <button class="btn btn-accent btn-sm" onclick="addTopic()">Add</button>
+                        </div>
+                        <div style="padding:16px 32px; flex:1; overflow-y:auto">
+                            <div id="topics-list" class="topics-list"></div>
+                            <div id="topics-done"></div>
+                        </div>
+                    </div>
+                    <div style="padding:8px 32px 12px; border-top:1px solid var(--border); display:flex; gap:8px; background:var(--bg-surface)">
+                        <button class="btn btn-sm" onclick="syncToAppleNotes()" id="sync-notes-btn">Sync to Notes</button>
+                        <button class="btn btn-sm" onclick="copyTopics()">Copy All</button>
                     </div>
                 </div>
             </div>
@@ -269,25 +289,24 @@
         </div>
     </div>
 
-    <!-- ═══ IDEATION TAB ═══ -->
-    <div id="tab-ideation" class="tab-content">
-        <div class="ideation-content">
-            <div class="ideation-header">
-                <div>
-                    <h2 class="ideation-title">Topics</h2>
-                    <p class="ideation-subtitle">Ideas, curiosities, threads to pull on</p>
+    <!-- ═══ HISTORY TAB ═══ -->
+    <div id="tab-history" class="tab-content">
+        <div class="history-layout">
+            <!-- Left: Entry list -->
+            <div class="history-list-panel">
+                <div class="history-list-header">
+                    <span class="history-count" id="history-count">0 entries</span>
                 </div>
-                <div style="display:flex; gap:8px">
-                    <button class="btn btn-sm" onclick="syncToAppleNotes()" id="sync-notes-btn">Sync to Apple Notes</button>
-                    <button class="btn btn-sm" onclick="copyTopics()">Copy All</button>
+                <div class="history-entries" id="history-entries"></div>
+            </div>
+            <!-- Right: Entry detail -->
+            <div class="history-detail-panel">
+                <div id="history-detail" class="history-detail">
+                    <div class="placeholder">
+                        <div class="placeholder-text">Select an entry to read it.</div>
+                    </div>
                 </div>
             </div>
-            <div class="ideation-input-area">
-                <input type="text" id="topic-input" class="ideation-input" placeholder="What's on your mind? Drop an idea..." onkeydown="if(event.key==='Enter')addTopic()">
-                <button class="btn btn-accent" onclick="addTopic()">Add</button>
-            </div>
-            <div id="topics-list" class="topics-list"></div>
-            <div id="topics-done" style="margin-top:24px"></div>
         </div>
     </div>
 
@@ -417,7 +436,64 @@
         if (tab === 'debugging') fetchBugs();
         if (tab === 'mentorlog') fetchMentorLog();
         if (tab === 'system') { fetchGoals(); fetchPriors(); fetchPhases(); fetchReports(); fetchDocuments(); fetchBaseline(); fetchMicro(); }
-        if (tab === 'ideation') fetchTopics();
+        if (tab === 'history') fetchHistoryEntries();
+    }
+
+    // ── Right Panel Toggle ────────────────────────────────
+    function showRightPanel(panel) {
+        document.getElementById('right-mentor').style.display = panel==='mentor' ? 'flex' : 'none';
+        document.getElementById('right-ideation').style.display = panel==='ideation' ? 'flex' : 'none';
+        document.getElementById('rt-mentor').classList.toggle('active', panel==='mentor');
+        document.getElementById('rt-ideation').classList.toggle('active', panel==='ideation');
+        if (panel==='ideation') fetchTopics();
+    }
+
+    // ── History ──────────────────────────────────────────
+    async function fetchHistoryEntries() {
+        const res = await fetch('/api/entries');
+        const entries = await res.json();
+        document.getElementById('history-count').textContent = entries.length + ' entries';
+        document.getElementById('history-entries').innerHTML = entries.map(e => {
+            const valDot = e.emotional_valence != null ? '<span class="valence-dot v'+e.emotional_valence+'"></span>' : '';
+            return '<div class="history-entry-item" onclick="viewHistoryEntry('+e.id+')">' +
+                '<div class="history-entry-meta">'+valDot+'Entry #'+e.entry_number+' — '+e.date+'</div>' +
+                (e.title ? '<div class="history-entry-title">'+esc(e.title)+'</div>' : '') +
+                '<div class="history-entry-preview">'+esc(e.preview)+'</div>' +
+                '<button class="entry-delete" onclick="event.stopPropagation();deleteHistoryEntry('+e.id+')" style="position:absolute;top:8px;right:8px">×</button>' +
+            '</div>';
+        }).join('') || '<div class="ideation-empty">No entries yet.</div>';
+    }
+
+    async function viewHistoryEntry(id) {
+        const res = await fetch('/api/entries/'+id);
+        const e = await res.json();
+        const detail = document.getElementById('history-detail');
+        detail.innerHTML = '<div class="history-detail-inner">' +
+            '<div class="history-detail-header">' +
+                '<span class="write-date">Entry #'+e.entry_number+' — '+e.date+'</span>' +
+                '<button class="btn btn-sm" onclick="backupHistoryEntry('+e.id+')">Backup</button>' +
+            '</div>' +
+            (e.title ? '<h2 class="entry-view-title">'+esc(e.title)+'</h2>' : '') +
+            '<div class="entry-view-text" style="margin-bottom:32px">'+esc(e.raw_text)+'</div>' +
+            (e.mentor_response ? '<div class="history-mentor-label">MENTOR READ</div><div class="mentor-response">'+e.mentor_response.split('\\n\\n').map(function(p){return '<p>'+esc(p)+'</p>';}).join('')+'</div>' : '') +
+            ((e.dialectic&&e.dialectic.length) ? '<div class="history-mentor-label" style="margin-top:24px">DIALECTIC</div>'+e.dialectic.map(function(m){return '<div class="dialectic-msg '+(m.role==='user'?'user':'mentor')+'">'+m.content.split('\\n\\n').map(function(p){return '<p>'+esc(p)+'</p>';}).join('')+'</div>';}).join('') : '') +
+        '</div>';
+        // Highlight selected
+        document.querySelectorAll('.history-entry-item').forEach(function(el){el.classList.remove('selected');});
+        event.target.closest('.history-entry-item').classList.add('selected');
+    }
+
+    async function deleteHistoryEntry(id) {
+        if(!confirm('Delete this entry permanently?')) return;
+        await fetch('/api/entries/'+id, {method:'DELETE'});
+        fetchHistoryEntries();
+        document.getElementById('history-detail').innerHTML = '<div class="placeholder"><div class="placeholder-text">Entry deleted.</div></div>';
+    }
+
+    async function backupHistoryEntry(id) {
+        const res = await fetch('/api/entries/'+id+'/backup', {method:'POST'});
+        const d = await res.json();
+        alert(d.error ? 'Backup failed: '+d.error : 'Backed up to Google Sheet');
     }
 
     // ── Journal Mode ─────────────────────────────────────
@@ -458,7 +534,8 @@
 
     function renderEntryList() {
         const list = document.getElementById('entry-list');
-        if (!entries.length) { list.innerHTML = '<div style="padding:16px 24px; font-size:12px; color:var(--text-dim)">No entries yet. Write your first journal entry above.</div>'; return; }
+        if (!list) return;
+        if (!entries.length) { list.innerHTML = '<div style="padding:16px 24px; font-size:12px; color:var(--text-dim)">No entries yet.</div>'; return; }
         list.innerHTML = entries.map(e => {
             const valDot = e.emotional_valence != null ? `<span class="valence-dot v${e.emotional_valence}"></span>` : '';
             return `<div class="entry-item ${currentEntryId===e.id?'selected':''}" onclick="selectEntry(${e.id})">
