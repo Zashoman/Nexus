@@ -8,28 +8,48 @@
 </head>
 <body>
     <!-- Tab Bar -->
-    <div class="tab-bar" style="justify-content:space-between">
+    <div class="tab-bar">
         <div style="display:flex">
             <button class="tab-btn active" onclick="switchTab('journal')">Journal</button>
             <button class="tab-btn" onclick="switchTab('debugging')">Debugging Matrix</button>
+            <button class="tab-btn" onclick="switchTab('mentorlog')">Mentor Log <span id="pending-badge" class="pending-badge" style="display:none">0</span></button>
             <button class="tab-btn" onclick="switchTab('system')">System</button>
         </div>
         <div style="display:flex; align-items:center; gap:6px; padding-right:12px">
             <button class="btn btn-sm" id="new-entry-btn" onclick="showNewEntryMode()" style="display:none">+ New Entry</button>
             <button class="btn btn-sm" id="backup-btn" onclick="backupCurrentEntry()" style="display:none">Backup</button>
-            <a id="sheet-link" href="#" target="_blank" rel="noopener" class="btn btn-sm" style="display:none; text-decoration:none">Sheet</a>
         </div>
+    </div>
+
+    <!-- Deterioration Banner (hidden by default) -->
+    <div id="deterioration-banner" class="deterioration-banner" style="display:none">
+        Your mentor has noticed a shift in your recent entries. Before diving into patterns, let's check in.
+        <button class="btn btn-sm" onclick="startCheckIn()">Start check-in</button>
     </div>
 
     <!-- ═══ JOURNAL TAB ═══ -->
     <div id="tab-journal" class="tab-content active">
         <div class="journal-layout">
-            <!-- Left: Writing / Viewing -->
             <div class="journal-left">
+                <!-- Mode toggle -->
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="mode-freeform" onclick="setMode('freeform')">Free-form</button>
+                    <button class="mode-btn" id="mode-guided" onclick="setMode('guided')">Guided</button>
+                </div>
                 <div class="write-area" id="write-area">
                     <div class="write-date" id="write-date"></div>
-                    <input type="text" id="entry-title" placeholder="Title (optional)" style="width:100%; background:transparent; border:none; border-bottom:1px solid var(--border); outline:none; font-size:18px; font-weight:500; color:var(--text); padding:4px 0 8px 0; margin-bottom:16px; caret-color:var(--accent); font-family:var(--font-sans)" onkeydown="handleEntryKeydown(event)">
-                    <textarea class="write-textarea" id="entry-textarea" placeholder="What's on your mind..." onkeydown="handleEntryKeydown(event)"></textarea>
+                    <input type="text" id="entry-title" class="title-input" placeholder="Title (optional)">
+                    <div id="freeform-area">
+                        <textarea class="write-textarea" id="entry-textarea" placeholder="What's on your mind..."></textarea>
+                    </div>
+                    <div id="guided-area" style="display:none">
+                        <div class="guided-section"><label>GRATITUDE ANCHOR</label><textarea id="g-gratitude" placeholder="Name one thing you're grateful for today..."></textarea></div>
+                        <div class="guided-section"><label>BODY CHECK</label><textarea id="g-body" placeholder="Where in your body do you feel the residue of today?"></textarea></div>
+                        <div class="guided-section"><label>EMOTIONAL WEATHER</label><textarea id="g-emotional" placeholder="When did you feel most alive? Most contracted?"></textarea></div>
+                        <div class="guided-section"><label>CHOOSE ONE MOMENT</label><textarea id="g-moment" placeholder="What one moment calls for attention?" style="min-height:120px"></textarea></div>
+                        <div class="guided-section"><label>SELF-COMPASSION BRIDGE</label><textarea id="g-compassion" placeholder="What would a wise, caring friend say about this?"></textarea></div>
+                        <div class="guided-section"><label>TOMORROW'S INTENTION</label><textarea id="g-intention" placeholder="What one thing will you practice differently?"></textarea></div>
+                    </div>
                 </div>
                 <div class="write-footer">
                     <span class="word-count" id="word-count">cmd+enter to submit</span>
@@ -37,12 +57,11 @@
                 </div>
                 <div class="entry-list" id="entry-list"></div>
             </div>
-            <!-- Right: Dialectic -->
             <div class="journal-right">
-                <div class="dialectic-panel" id="dialectic-panel">
+                <div class="dialectic-panel">
                     <div class="dialectic-header" id="dialectic-header" style="display:none">
                         <span id="dialectic-title">Mentor Read</span>
-                        <span class="status-bar" id="status-bar"></span>
+                        <span class="status-indicators" id="status-indicators"></span>
                     </div>
                     <div class="dialectic-body" id="dialectic-body">
                         <div class="placeholder" id="dialectic-placeholder">
@@ -50,6 +69,10 @@
                         </div>
                         <div id="mentor-response-area" style="display:none">
                             <div class="mentor-response" id="mentor-response"></div>
+                            <!-- Experiments proposed inline -->
+                            <div id="experiments-inline"></div>
+                            <!-- New bugs proposed inline -->
+                            <div id="new-bugs-inline"></div>
                             <div class="dialectic-messages" id="dialectic-messages"></div>
                         </div>
                     </div>
@@ -62,7 +85,7 @@
         </div>
     </div>
 
-    <!-- ═══ DEBUGGING TAB ═══ -->
+    <!-- ═══ DEBUGGING MATRIX TAB ═══ -->
     <div id="tab-debugging" class="tab-content">
         <div class="debug-content">
             <div class="bug-add-form">
@@ -72,6 +95,22 @@
             </div>
             <div id="pending-bugs"></div>
             <div id="bugs-list"></div>
+        </div>
+    </div>
+
+    <!-- ═══ MENTOR LOG TAB ═══ -->
+    <div id="tab-mentorlog" class="tab-content">
+        <div class="log-content">
+            <div class="log-filters">
+                <button class="log-filter active" onclick="filterLog('all', this)">All</button>
+                <button class="log-filter" onclick="filterLog('memory', this)">Memory</button>
+                <button class="log-filter" onclick="filterLog('bugs', this)">Bugs</button>
+                <button class="log-filter" onclick="filterLog('priors', this)">Priors</button>
+                <button class="log-filter" onclick="filterLog('experiments', this)">Experiments</button>
+                <button class="log-filter" onclick="filterLog('safety', this)">Safety</button>
+                <button class="log-filter" onclick="filterLog('corrections', this)">My Corrections</button>
+            </div>
+            <div id="log-list"></div>
         </div>
     </div>
 
@@ -85,19 +124,31 @@
                     <div class="goals-column">
                         <div class="goals-column-header">Moving Toward</div>
                         <div id="goals-toward"></div>
-                        <div class="goal-add">
-                            <input id="goal-toward-input" placeholder="Add goal..." onkeydown="if(event.key==='Enter')addGoal('toward')">
-                            <button class="btn btn-sm" onclick="addGoal('toward')">+</button>
-                        </div>
+                        <div class="goal-add"><input id="goal-toward-input" placeholder="Add goal..." onkeydown="if(event.key==='Enter')addGoal('toward')"><button class="btn btn-sm" onclick="addGoal('toward')">+</button></div>
                     </div>
                     <div class="goals-column">
                         <div class="goals-column-header">Moving Away From</div>
                         <div id="goals-away"></div>
-                        <div class="goal-add">
-                            <input id="goal-away-input" placeholder="Add goal..." onkeydown="if(event.key==='Enter')addGoal('away')">
-                            <button class="btn btn-sm" onclick="addGoal('away')">+</button>
-                        </div>
+                        <div class="goal-add"><input id="goal-away-input" placeholder="Add goal..." onkeydown="if(event.key==='Enter')addGoal('away')"><button class="btn btn-sm" onclick="addGoal('away')">+</button></div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Priors -->
+            <div class="system-section">
+                <div class="section-title">Priors Dashboard</div>
+                <div style="margin-bottom:8px"><button class="btn btn-sm" onclick="seedPriors()">Seed Initial Priors</button></div>
+                <div id="priors-list"></div>
+            </div>
+
+            <!-- Phases -->
+            <div class="system-section">
+                <div class="section-title">Developmental Phases</div>
+                <div id="phases-list"></div>
+                <div class="goal-add" style="margin-top:8px">
+                    <input id="phase-name" placeholder="Phase name" style="flex:1">
+                    <input id="phase-desc" placeholder="Description" style="flex:2">
+                    <button class="btn btn-sm" onclick="addPhase()">Add Phase</button>
                 </div>
             </div>
 
@@ -111,34 +162,58 @@
                 <div id="reports-list"></div>
             </div>
 
-            <!-- Documents -->
+            <!-- Documents & Baseline -->
             <div class="system-section">
-                <div class="section-title">Document Library</div>
-                <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center">
-                    <input type="file" id="doc-file-input" style="font-size:12px; color:var(--text-secondary)">
-                    <button class="btn btn-sm" onclick="uploadDocument()">Upload</button>
-                    <span id="unanalyzed-count" style="font-family:var(--font-mono); font-size:10px; color:var(--amber)"></span>
+                <div class="section-title">Document Library & Baseline</div>
+                <div style="display:flex; gap:24px; flex-wrap:wrap">
+                    <div style="flex:1; min-width:300px">
+                        <div style="font-family:var(--font-mono); font-size:10px; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase">Documents</div>
+                        <div style="margin-bottom:8px; display:flex; gap:6px; align-items:center">
+                            <input type="file" id="doc-file-input" style="font-size:11px; color:var(--text-secondary)">
+                            <button class="btn btn-sm" onclick="uploadDocument()">Upload</button>
+                        </div>
+                        <div id="documents-list"></div>
+                    </div>
+                    <div style="flex:1; min-width:300px">
+                        <div style="font-family:var(--font-mono); font-size:10px; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase">Baseline Profile</div>
+                        <div class="baseline-box" id="baseline-box">
+                            <div class="baseline-status" id="baseline-status">Loading...</div>
+                            <div class="baseline-preview" id="baseline-preview"></div>
+                            <div id="baseline-upload" style="display:none">
+                                <div style="margin-bottom:6px; display:flex; gap:6px; align-items:center">
+                                    <input type="file" id="baseline-file-input" accept=".md,.txt" style="font-size:11px; color:var(--text-secondary)">
+                                    <button class="btn btn-sm btn-accent" onclick="uploadBaselineFile()">Upload File</button>
+                                </div>
+                                <div style="font-family:var(--font-mono); font-size:9px; color:var(--text-dim); margin-bottom:6px">— or paste —</div>
+                                <textarea id="baseline-textarea" placeholder="Paste baseline..." style="width:100%; min-height:100px; background:var(--bg-input); border:1px solid var(--border); color:var(--text); padding:8px; font-size:12px; resize:vertical; outline:none; border-radius:2px"></textarea>
+                                <button class="btn btn-accent btn-sm" onclick="saveBaseline()" style="margin-top:6px">Save</button>
+                            </div>
+                            <button class="btn btn-sm" onclick="toggleBaseline()" style="margin-top:6px">Upload / Edit</button>
+                        </div>
+                    </div>
                 </div>
-                <div id="documents-list"></div>
             </div>
 
-            <!-- Baseline -->
+            <!-- Micro-Assessments -->
             <div class="system-section">
-                <div class="section-title">Baseline Profile</div>
-                <div class="baseline-box" id="baseline-box">
-                    <div class="baseline-status" id="baseline-status">Loading...</div>
-                    <div class="baseline-preview" id="baseline-preview"></div>
-                    <div class="baseline-upload" id="baseline-upload" style="display:none">
-                        <div style="margin-bottom:8px; display:flex; gap:8px; align-items:center">
-                            <input type="file" id="baseline-file-input" accept=".md,.txt,.text" style="font-size:12px; color:var(--text-secondary)">
-                            <button class="btn btn-sm btn-accent" onclick="uploadBaselineFile()">Upload File</button>
-                        </div>
-                        <div style="font-family:var(--font-mono); font-size:9px; color:var(--text-dim); margin-bottom:8px">— or paste below —</div>
-                        <textarea id="baseline-textarea" placeholder="Paste your baseline profile here..."></textarea>
-                        <button class="btn btn-accent btn-sm" onclick="saveBaseline()" style="margin-top:8px">Save Baseline</button>
-                    </div>
-                    <button class="btn btn-sm" id="baseline-toggle-btn" onclick="toggleBaseline()" style="margin-top:8px">Upload / Edit Baseline</button>
+                <div class="section-title">Micro-Assessments</div>
+                <div class="micro-form">
+                    <div class="micro-row"><label>Wellbeing (1-10)</label><input type="number" id="micro-wb" min="1" max="10" value="5"></div>
+                    <div class="micro-row"><label>Interpersonal (1-10)</label><input type="number" id="micro-ip" min="1" max="10" value="5"></div>
+                    <div class="micro-row"><label>Social Role (1-10)</label><input type="number" id="micro-sr" min="1" max="10" value="5"></div>
+                    <div class="micro-row"><label>Overall (1-10)</label><input type="number" id="micro-ov" min="1" max="10" value="5"></div>
+                    <div class="micro-row"><label>Body Sensation</label><input type="text" id="micro-body" placeholder="What do you notice?"></div>
+                    <div class="micro-row"><label>Context</label><input type="text" id="micro-ctx" placeholder="Brief context..."></div>
+                    <button class="btn btn-accent btn-sm" onclick="submitMicro()">Submit Assessment</button>
                 </div>
+                <div id="micro-history" style="margin-top:12px"></div>
+            </div>
+
+            <!-- Show Me Your Model -->
+            <div class="system-section">
+                <div class="section-title">Show Me Your Model</div>
+                <button class="btn btn-accent" id="model-btn" onclick="showModel()">Show Me What You Believe About Me</button>
+                <div id="model-summary" style="margin-top:12px"></div>
             </div>
         </div>
     </div>
@@ -148,41 +223,67 @@
     let currentEntryId = null;
     let entries = [];
     let deleteConfirm = null;
+    let journalMode = 'freeform';
+    let currentLogFilter = 'all';
+
+    const LOG_FILTER_MAP = {
+        'all': null,
+        'memory': 'memory_note,memory_synthesis',
+        'bugs': 'bug_fired,bug_proposed,bug_confirmed,bug_status_change,bug_evolved',
+        'priors': 'prior_updated,prior_added,prior_evidence',
+        'experiments': 'experiment_assigned,experiment_completed,experiment_skipped',
+        'safety': 'crisis_flag,deterioration_flag,rumination_detected,containment_shift,processing_mode_alert',
+        'corrections': 'user_correction'
+    };
 
     // ── Init ─────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('write-date').textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-        document.getElementById('entry-textarea').addEventListener('input', updateWordCount);
+        document.getElementById('write-date').textContent = new Date().toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+        const ta = document.getElementById('entry-textarea');
+        if (ta) ta.addEventListener('input', updateWordCount);
+        ta.addEventListener('keydown', e => { if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();submitEntry();} });
         fetchEntries();
-        fetchBugs();
-        fetchGoals();
-        fetchBaseline();
     });
 
-    // ── Tab Switching ────────────────────────────────────
+    // ── Tabs ─────────────────────────────────────────────
     function switchTab(tab) {
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.getElementById('tab-' + tab).classList.add('active');
-        document.querySelectorAll('.tab-btn').forEach(b => { if(b.textContent.toLowerCase().includes(tab.substring(0,4))) b.classList.add('active'); });
+        event.target.classList.add('active');
         if (tab === 'debugging') fetchBugs();
-        if (tab === 'system') { fetchGoals(); fetchReports(); fetchDocuments(); fetchBaseline(); }
+        if (tab === 'mentorlog') fetchMentorLog();
+        if (tab === 'system') { fetchGoals(); fetchPriors(); fetchPhases(); fetchReports(); fetchDocuments(); fetchBaseline(); fetchMicro(); }
     }
 
-    // ── Word Count ───────────────────────────────────────
+    // ── Journal Mode ─────────────────────────────────────
+    function setMode(mode) {
+        journalMode = mode;
+        document.getElementById('mode-freeform').classList.toggle('active', mode==='freeform');
+        document.getElementById('mode-guided').classList.toggle('active', mode==='guided');
+        document.getElementById('freeform-area').style.display = mode==='freeform' ? 'block' : 'none';
+        document.getElementById('guided-area').style.display = mode==='guided' ? 'block' : 'none';
+    }
+
+    function getEntryText() {
+        if (journalMode === 'freeform') return document.getElementById('entry-textarea').value.trim();
+        const sections = ['g-gratitude','g-body','g-emotional','g-moment','g-compassion','g-intention'];
+        const labels = ['GRATITUDE ANCHOR','BODY CHECK','EMOTIONAL WEATHER','CHOOSE ONE MOMENT','SELF-COMPASSION BRIDGE',"TOMORROW'S INTENTION"];
+        let text = '';
+        sections.forEach((id, i) => {
+            const v = document.getElementById(id).value.trim();
+            if (v) text += `[${labels[i]}]\n${v}\n\n`;
+        });
+        return text.trim();
+    }
+
     function updateWordCount() {
-        const text = document.getElementById('entry-textarea').value.trim();
+        const text = journalMode === 'freeform' ? document.getElementById('entry-textarea').value.trim() : getEntryText();
         const wc = document.getElementById('word-count');
         wc.textContent = text ? text.split(/\s+/).filter(Boolean).length + ' words' : 'cmd+enter to submit';
     }
 
-    function handleEntryKeydown(e) {
-        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); submitEntry(); }
-    }
-
-    function handleDialecticKeydown(e) {
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDialectic(); }
-    }
+    function handleDialecticKeydown(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendDialectic();} }
 
     // ── Entries ──────────────────────────────────────────
     async function fetchEntries() {
@@ -193,72 +294,84 @@
 
     function renderEntryList() {
         const list = document.getElementById('entry-list');
-        if (!entries.length) { list.innerHTML = '<div style="padding:16px 24px; font-size:12px; color:var(--text-dim)">No entries yet</div>'; return; }
-        list.innerHTML = entries.map(e => `
-            <div class="entry-item ${currentEntryId === e.id ? 'selected' : ''}" onclick="selectEntry(${e.id})">
-                <div style="flex:1; min-width:0">
-                    <div class="entry-meta">Entry #${e.entry_number} — ${e.date}</div>
-                    ${e.title ? '<div style="font-weight:500; font-size:13px; color:var(--text); margin-bottom:2px">' + escHtml(e.title) + '</div>' : ''}
-                    <div class="entry-preview">${escHtml(e.preview)}</div>
+        if (!entries.length) { list.innerHTML = '<div style="padding:16px 24px; font-size:12px; color:var(--text-dim)">No entries yet. Write your first journal entry above.</div>'; return; }
+        list.innerHTML = entries.map(e => {
+            const valDot = e.emotional_valence != null ? `<span class="valence-dot v${e.emotional_valence}"></span>` : '';
+            return `<div class="entry-item ${currentEntryId===e.id?'selected':''}" onclick="selectEntry(${e.id})">
+                <div style="flex:1;min-width:0">
+                    <div class="entry-meta">${valDot} Entry #${e.entry_number} — ${e.date} ${e.processing_mode ? '<span class="pm-badge">'+e.processing_mode.replace('_',' ')+'</span>':''}</div>
+                    ${e.title ? '<div class="entry-title-preview">'+esc(e.title)+'</div>' : ''}
+                    <div class="entry-preview">${esc(e.preview)}</div>
                 </div>
-                <button class="entry-delete ${deleteConfirm === e.id ? 'confirming' : ''}" onclick="event.stopPropagation(); deleteEntry(${e.id})">${deleteConfirm === e.id ? 'Confirm?' : '×'}</button>
-            </div>
-        `).join('');
+                <button class="entry-delete ${deleteConfirm===e.id?'confirming':''}" onclick="event.stopPropagation();deleteEntry(${e.id})">${deleteConfirm===e.id?'Confirm?':'×'}</button>
+            </div>`;
+        }).join('');
     }
 
     async function submitEntry() {
-        const textarea = document.getElementById('entry-textarea');
-        const titleInput = document.getElementById('entry-title');
-        const text = textarea.value.trim();
-        const title = titleInput ? titleInput.value.trim() : '';
+        const text = getEntryText();
+        const title = document.getElementById('entry-title').value.trim();
         if (!text) return;
         const btn = document.getElementById('submit-btn');
-        btn.disabled = true;
-        btn.textContent = 'Analyzing...';
+        btn.disabled = true; btn.textContent = 'Analyzing...';
         showLoading();
-
         try {
-            const res = await fetch('/api/entries', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text, title}) });
+            const res = await fetch('/api/entries', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,title,mode:journalMode})});
             const data = await res.json();
             if (data.error) { alert(data.error); return; }
-            textarea.value = '';
-            if (titleInput) titleInput.value = '';
-            updateWordCount();
+            clearWriteArea();
             currentEntryId = data.entry.id;
             updateHeaderButtons();
-            showMentorResponse(data.entry, data.bugs_fired, data.new_bugs);
+            showMentorResponse(data.entry, data);
             fetchEntries();
-        } catch(e) { alert('Error: ' + e.message); }
-        finally { btn.disabled = false; btn.textContent = 'Submit Entry'; }
+        } catch(e) { alert('Error: '+e.message); }
+        finally { btn.disabled=false; btn.textContent='Submit Entry'; }
+    }
+
+    function clearWriteArea() {
+        document.getElementById('entry-title').value = '';
+        if (journalMode==='freeform') { document.getElementById('entry-textarea').value=''; }
+        else { ['g-gratitude','g-body','g-emotional','g-moment','g-compassion','g-intention'].forEach(id=>document.getElementById(id).value=''); }
+        updateWordCount();
     }
 
     async function selectEntry(id) {
         currentEntryId = id;
         renderEntryList();
-        const res = await fetch('/api/entries/' + id);
+        const res = await fetch('/api/entries/'+id);
         const entry = await res.json();
-        // Show entry text on left
         const area = document.getElementById('write-area');
-        area.innerHTML = `<div class="write-date">Entry #${entry.entry_number} — ${entry.date}</div>${entry.title ? '<div style="font-size:18px; font-weight:500; color:var(--text); margin-bottom:12px">' + escHtml(entry.title) + '</div>' : ''}<div style="font-size:14px; line-height:1.8; color:#B8BCC4; white-space:pre-wrap">${escHtml(entry.raw_text)}</div>`;
-        document.getElementById('submit-btn').style.display = 'none';
+        area.innerHTML = `<div class="write-date">Entry #${entry.entry_number} — ${entry.date}</div>
+            ${entry.title?'<div class="entry-view-title">'+esc(entry.title)+'</div>':''}
+            <div class="entry-view-text">${esc(entry.raw_text)}</div>`;
+        document.getElementById('submit-btn').style.display='none';
+        document.querySelector('.mode-toggle').style.display='none';
         updateHeaderButtons();
-        // Show response on right
-        showMentorResponse(entry, [], []);
-        // Load dialectic
-        const dRes = await fetch('/api/entries/' + id + '/dialectic');
-        const msgs = await dRes.json();
-        renderDialectic(msgs);
+        showMentorResponse(entry, {bugs_fired:[], new_bugs:[], experiments_proposed:[], flags:{}});
+        renderDialectic(entry.dialectic || []);
+        renderInlineExperiments(entry.experiments || []);
     }
 
     function showNewEntryMode() {
         currentEntryId = null;
         const area = document.getElementById('write-area');
-        area.innerHTML = `<div class="write-date" id="write-date">${new Date().toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div><input type="text" id="entry-title" placeholder="Title (optional)" style="width:100%; background:transparent; border:none; border-bottom:1px solid var(--border); outline:none; font-size:18px; font-weight:500; color:var(--text); padding:4px 0 8px 0; margin-bottom:16px; caret-color:var(--accent); font-family:var(--font-sans)" onkeydown="handleEntryKeydown(event)"><textarea class="write-textarea" id="entry-textarea" placeholder="What's on your mind..." onkeydown="handleEntryKeydown(event)"></textarea>`;
-        document.getElementById('entry-textarea').addEventListener('input', updateWordCount);
-        document.getElementById('submit-btn').style.display = '';
-        document.getElementById('word-count').textContent = 'cmd+enter to submit';
-        document.getElementById('new-entry-btn').style.display = 'none';
-        document.getElementById('backup-btn').style.display = 'none';
+        area.innerHTML = `<div class="write-date" id="write-date">${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
+            <input type="text" id="entry-title" class="title-input" placeholder="Title (optional)">
+            <div id="freeform-area" style="display:${journalMode==='freeform'?'block':'none'}"><textarea class="write-textarea" id="entry-textarea" placeholder="What's on your mind..."></textarea></div>
+            <div id="guided-area" style="display:${journalMode==='guided'?'block':'none'}">
+                <div class="guided-section"><label>GRATITUDE ANCHOR</label><textarea id="g-gratitude" placeholder="Name one thing you're grateful for today..."></textarea></div>
+                <div class="guided-section"><label>BODY CHECK</label><textarea id="g-body" placeholder="Where in your body do you feel the residue of today?"></textarea></div>
+                <div class="guided-section"><label>EMOTIONAL WEATHER</label><textarea id="g-emotional" placeholder="When did you feel most alive? Most contracted?"></textarea></div>
+                <div class="guided-section"><label>CHOOSE ONE MOMENT</label><textarea id="g-moment" placeholder="What one moment calls for attention?" style="min-height:120px"></textarea></div>
+                <div class="guided-section"><label>SELF-COMPASSION BRIDGE</label><textarea id="g-compassion" placeholder="What would a wise, caring friend say about this?"></textarea></div>
+                <div class="guided-section"><label>TOMORROW'S INTENTION</label><textarea id="g-intention" placeholder="What one thing will you practice differently?"></textarea></div>
+            </div>`;
+        document.getElementById('submit-btn').style.display='';
+        document.querySelector('.mode-toggle').style.display='flex';
+        const ta = document.getElementById('entry-textarea');
+        if(ta){ta.addEventListener('input',updateWordCount);ta.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();submitEntry();}});}
+        document.getElementById('word-count').textContent='cmd+enter to submit';
+        updateHeaderButtons();
         hideMentorPanel();
         renderEntryList();
     }
@@ -269,265 +382,187 @@
     }
 
     async function backupCurrentEntry() {
-        if (!currentEntryId) return;
-        const btn = document.getElementById('backup-btn');
-        btn.textContent = 'Saving...';
-        btn.disabled = true;
+        if(!currentEntryId) return;
+        const btn=document.getElementById('backup-btn');
+        btn.textContent='Saving...'; btn.disabled=true;
         try {
-            const res = await fetch('/api/entries/' + currentEntryId + '/backup', { method:'POST' });
-            const data = await res.json();
-            btn.textContent = data.error ? 'Failed' : 'Saved!';
-            setTimeout(() => { btn.textContent = 'Backup'; btn.disabled = false; }, 3000);
-        } catch {
-            btn.textContent = 'Failed';
-            setTimeout(() => { btn.textContent = 'Backup'; btn.disabled = false; }, 3000);
-        }
+            const res = await fetch('/api/entries/'+currentEntryId+'/backup',{method:'POST'});
+            const d = await res.json();
+            btn.textContent = d.error ? 'Failed' : 'Saved!';
+        } catch { btn.textContent='Failed'; }
+        setTimeout(()=>{btn.textContent='Backup';btn.disabled=false;},3000);
     }
 
     async function deleteEntry(id) {
-        if (deleteConfirm !== id) { deleteConfirm = id; renderEntryList(); setTimeout(() => { deleteConfirm = null; renderEntryList(); }, 4000); return; }
-        await fetch('/api/entries/' + id, { method:'DELETE' });
-        deleteConfirm = null;
-        if (currentEntryId === id) showNewEntryMode();
+        if(deleteConfirm!==id){deleteConfirm=id;renderEntryList();setTimeout(()=>{deleteConfirm=null;renderEntryList();},4000);return;}
+        await fetch('/api/entries/'+id,{method:'DELETE'});
+        deleteConfirm=null;
+        if(currentEntryId===id) showNewEntryMode();
         fetchEntries();
     }
 
     // ── Mentor Panel ─────────────────────────────────────
     function showLoading() {
-        document.getElementById('dialectic-placeholder').style.display = 'none';
-        document.getElementById('mentor-response-area').style.display = 'block';
-        document.getElementById('mentor-response').innerHTML = '<div class="loading"><div class="spinner"></div>Reading between the lines...</div>';
-        document.getElementById('dialectic-header').style.display = 'flex';
-        document.getElementById('dialectic-input').style.display = 'none';
+        document.getElementById('dialectic-placeholder').style.display='none';
+        document.getElementById('mentor-response-area').style.display='block';
+        document.getElementById('mentor-response').innerHTML='<div class="loading"><div class="spinner"></div>Reading between the lines...</div>';
+        document.getElementById('dialectic-header').style.display='flex';
+        document.getElementById('dialectic-input').style.display='none';
+        document.getElementById('experiments-inline').innerHTML='';
+        document.getElementById('new-bugs-inline').innerHTML='';
     }
 
-    function showMentorResponse(entry, bugsFired, newBugs) {
-        document.getElementById('dialectic-placeholder').style.display = 'none';
-        document.getElementById('mentor-response-area').style.display = 'block';
-        document.getElementById('dialectic-header').style.display = 'flex';
-        document.getElementById('dialectic-title').textContent = 'Mentor Read — Entry #' + entry.entry_number;
-        document.getElementById('mentor-response').innerHTML = (entry.mentor_response || '').split('\n\n').map(p => '<p>' + escHtml(p) + '</p>').join('');
-        document.getElementById('dialectic-messages').innerHTML = '';
-        document.getElementById('dialectic-input').style.display = 'flex';
-        // Status
-        let status = '';
-        if (bugsFired && bugsFired.length) status += bugsFired.map(b => '<span class="bug-tag" onclick="switchTab(\'debugging\')">' + escHtml(b) + '</span>').join(' ');
-        if (newBugs && newBugs.length) status += ' <span style="color:var(--amber)">+' + newBugs.length + ' new pattern' + (newBugs.length>1?'s':'') + '</span>';
-        document.getElementById('status-bar').innerHTML = status;
+    function showMentorResponse(entry, data) {
+        document.getElementById('dialectic-placeholder').style.display='none';
+        document.getElementById('mentor-response-area').style.display='block';
+        document.getElementById('dialectic-header').style.display='flex';
+        document.getElementById('dialectic-title').textContent='Mentor Read — Entry #'+entry.entry_number;
+        document.getElementById('mentor-response').innerHTML = (entry.mentor_response||'').split('\n\n').map(p=>'<p>'+esc(p)+'</p>').join('');
+        document.getElementById('dialectic-messages').innerHTML='';
+        document.getElementById('dialectic-input').style.display='flex';
+
+        // Status indicators
+        let status = [];
+        if(data.bugs_fired&&data.bugs_fired.length) status.push(data.bugs_fired.map(b=>'<span class="bug-tag" onclick="switchTab(\'debugging\')">'+esc(b.name||b)+'</span>').join(' '));
+        if(data.flags&&data.flags.containment==='low') status.push('<span class="containment-tag">supportive mode</span>');
+        if(data.flags&&data.flags.rumination) status.push('<span class="rumination-tag">rumination flagged</span>');
+        document.getElementById('status-indicators').innerHTML = status.join(' ');
+
+        // New bugs inline
+        if(data.new_bugs&&data.new_bugs.length) {
+            document.getElementById('new-bugs-inline').innerHTML = data.new_bugs.map(b=>
+                `<div class="inline-card pending-card"><strong>New pattern:</strong> ${esc(b.name)} — ${esc(b.description)} <button class="btn btn-sm btn-accent" onclick="confirmBugByName('${esc(b.name)}')">Confirm</button></div>`
+            ).join('');
+        }
+
+        // Experiments inline
+        if(data.experiments_proposed&&data.experiments_proposed.length) {
+            document.getElementById('experiments-inline').innerHTML = data.experiments_proposed.map(e=>
+                `<div class="inline-card experiment-card"><strong>Experiment:</strong> ${esc(e.belief||e.belief_tested)} → ${esc(e.action||e.experiment)} <span class="due-tag">due: ${esc(e.due||e.due_date||'')}</span></div>`
+            ).join('');
+        }
     }
 
     function hideMentorPanel() {
-        document.getElementById('dialectic-placeholder').style.display = 'flex';
-        document.getElementById('mentor-response-area').style.display = 'none';
-        document.getElementById('dialectic-header').style.display = 'none';
-        document.getElementById('dialectic-input').style.display = 'none';
+        document.getElementById('dialectic-placeholder').style.display='flex';
+        document.getElementById('mentor-response-area').style.display='none';
+        document.getElementById('dialectic-header').style.display='none';
+        document.getElementById('dialectic-input').style.display='none';
     }
 
     function renderDialectic(msgs) {
-        const container = document.getElementById('dialectic-messages');
-        container.innerHTML = msgs.map(m => `<div class="dialectic-msg ${m.role === 'user' ? 'user' : 'mentor'}">${m.content.split('\n\n').map(p => '<p>' + escHtml(p) + '</p>').join('')}</div>`).join('');
-        container.parentElement.scrollTop = container.parentElement.scrollHeight;
+        const c = document.getElementById('dialectic-messages');
+        c.innerHTML = msgs.map(m=>`<div class="dialectic-msg ${m.role==='user'?'user':'mentor'}">${m.content.split('\n\n').map(p=>'<p>'+esc(p)+'</p>').join('')}</div>`).join('');
+        c.parentElement.scrollTop = c.parentElement.scrollHeight;
+    }
+
+    function renderInlineExperiments(exps) {
+        const assigned = exps.filter(e=>e.status==='assigned');
+        if(!assigned.length) return;
+        const el = document.getElementById('experiments-inline');
+        el.innerHTML += assigned.map(e=>
+            `<div class="inline-card experiment-card"><strong>Open experiment:</strong> ${esc(e.belief_tested)} → ${esc(e.experiment)}
+            <div style="margin-top:6px"><button class="btn btn-sm btn-accent" onclick="completeExperiment(${e.id})">Complete</button> <button class="btn btn-sm" onclick="skipExperiment(${e.id})">Skip</button></div></div>`
+        ).join('');
     }
 
     async function sendDialectic() {
-        if (!currentEntryId) return;
-        const ta = document.getElementById('dialectic-textarea');
-        const msg = ta.value.trim();
-        if (!msg) return;
-        ta.value = '';
-
-        const container = document.getElementById('dialectic-messages');
-        container.innerHTML += `<div class="dialectic-msg user"><p>${escHtml(msg)}</p></div>`;
-        container.innerHTML += '<div class="dialectic-msg mentor" id="thinking-msg"><div class="loading"><div class="spinner"></div>Thinking...</div></div>';
-        container.parentElement.scrollTop = container.parentElement.scrollHeight;
-
+        if(!currentEntryId) return;
+        const ta=document.getElementById('dialectic-textarea');
+        const msg=ta.value.trim(); if(!msg) return; ta.value='';
+        const c=document.getElementById('dialectic-messages');
+        c.innerHTML+=`<div class="dialectic-msg user"><p>${esc(msg)}</p></div>`;
+        c.innerHTML+='<div class="dialectic-msg mentor" id="thinking-msg"><div class="loading"><div class="spinner"></div>Thinking...</div></div>';
+        c.parentElement.scrollTop=c.parentElement.scrollHeight;
         try {
-            const res = await fetch('/api/entries/' + currentEntryId + '/dialectic', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message: msg}) });
-            const data = await res.json();
-            const el = document.getElementById('thinking-msg');
-            if (el) el.outerHTML = `<div class="dialectic-msg mentor">${data.response.split('\n\n').map(p => '<p>' + escHtml(p) + '</p>').join('')}</div>`;
-        } catch(e) {
-            const el = document.getElementById('thinking-msg');
-            if (el) el.outerHTML = `<div class="dialectic-msg mentor" style="color:var(--red)">Error: ${e.message}</div>`;
-        }
-        container.parentElement.scrollTop = container.parentElement.scrollHeight;
+            const res=await fetch('/api/entries/'+currentEntryId+'/dialectic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});
+            const d=await res.json();
+            const el=document.getElementById('thinking-msg');
+            if(el) el.outerHTML=`<div class="dialectic-msg mentor">${d.response.split('\n\n').map(p=>'<p>'+esc(p)+'</p>').join('')}</div>`;
+        } catch(e) { const el=document.getElementById('thinking-msg'); if(el) el.outerHTML=`<div class="dialectic-msg mentor" style="color:var(--red)">Error: ${e.message}</div>`; }
+        c.parentElement.scrollTop=c.parentElement.scrollHeight;
     }
+
+    function startCheckIn() { document.getElementById('deterioration-banner').style.display='none'; }
 
     // ── Bugs ─────────────────────────────────────────────
     async function fetchBugs() {
-        const res = await fetch('/api/bugs');
-        const bugs = await res.json();
-        const pending = bugs.filter(b => b.status === 'pending');
-        const active = bugs.filter(b => b.status !== 'pending');
-
-        document.getElementById('pending-bugs').innerHTML = pending.map(b => `
-            <div class="bug-card pending">
-                <div class="bug-status-dot pending"></div>
-                <div class="bug-info">
-                    <div class="bug-name">${escHtml(b.name)}</div>
-                    <div class="bug-desc">${escHtml(b.description)}</div>
-                    <div class="bug-meta"><span>Proposed by mentor</span></div>
-                </div>
-                <div class="bug-actions">
-                    <button class="btn btn-sm btn-accent" onclick="confirmBug(${b.id})">Confirm</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteBug(${b.id})">Dismiss</button>
-                </div>
-            </div>`).join('');
-
-        document.getElementById('bugs-list').innerHTML = active.map(b => {
-            const dotClass = b.fire_count >= 5 ? 'active-high' : b.status === 'declining' ? 'declining' : b.status === 'resolved' ? 'resolved' : 'active';
-            return `<div class="bug-card">
-                <div class="bug-status-dot ${dotClass}"></div>
-                <div class="bug-info">
-                    <div class="bug-name">${escHtml(b.name)}</div>
-                    <div class="bug-desc">${escHtml(b.description)}</div>
-                    <div class="bug-meta">
-                        <span class="bug-fire-badge">${b.fire_count}×</span>
-                        ${b.last_fired_entry ? '<span>Last: #' + b.last_fired_entry + '</span>' : ''}
-                        <span>${b.source || ''}</span>
-                    </div>
-                </div>
-                <div class="bug-actions">
-                    <select class="bug-status-select" onchange="updateBugStatus(${b.id}, this.value)">
-                        <option value="active" ${b.status==='active'?'selected':''}>Active</option>
-                        <option value="declining" ${b.status==='declining'?'selected':''}>Declining</option>
-                        <option value="resolved" ${b.status==='resolved'?'selected':''}>Resolved</option>
-                    </select>
-                    <button class="btn btn-sm btn-danger" onclick="deleteBug(${b.id})">×</button>
-                </div>
-            </div>`;
-        }).join('') || '<div style="padding:16px; font-size:12px; color:var(--text-dim)">No patterns tracked yet. Add one above or let the mentor detect them.</div>';
+        const res=await fetch('/api/bugs'); const bugs=await res.json();
+        const pending=bugs.filter(b=>b.status==='pending');
+        const active=bugs.filter(b=>b.status!=='pending');
+        document.getElementById('pending-bugs').innerHTML=pending.map(b=>`<div class="bug-card pending"><div class="bug-status-dot pending"></div><div class="bug-info"><div class="bug-name">${esc(b.name)}</div><div class="bug-desc">${esc(b.description)}</div><div class="bug-meta"><span>Proposed by mentor</span></div></div><div class="bug-actions"><button class="btn btn-sm btn-accent" onclick="confirmBug(${b.id})">Confirm</button><button class="btn btn-sm btn-danger" onclick="deleteBug(${b.id})">Dismiss</button></div></div>`).join('');
+        document.getElementById('bugs-list').innerHTML=active.map(b=>{
+            const dc=b.fire_count>=5?'active-high':b.status==='declining'?'declining':b.status==='resolved'?'resolved':'active';
+            return `<div class="bug-card"><div class="bug-status-dot ${dc}"></div><div class="bug-info"><div class="bug-name">${esc(b.name)}</div><div class="bug-desc">${esc(b.description)}</div><div class="bug-meta"><span class="bug-fire-badge">${b.fire_count}×</span>${b.last_fired_entry?'<span>Last: #'+b.last_fired_entry+'</span>':''}<span>${b.source||''}</span>${b.parent_id?'<span class="evolved-tag">evolved</span>':''}</div></div><div class="bug-actions"><select class="bug-status-select" onchange="updateBugStatus(${b.id},this.value)"><option value="active" ${b.status==='active'?'selected':''}>Active</option><option value="declining" ${b.status==='declining'?'selected':''}>Declining</option><option value="resolved" ${b.status==='resolved'?'selected':''}>Resolved</option></select><button class="btn btn-sm btn-danger" onclick="deleteBug(${b.id})">×</button></div></div>`;
+        }).join('')||'<div style="padding:16px;font-size:12px;color:var(--text-dim)">No patterns tracked yet.</div>';
     }
+    async function addBug(){const n=document.getElementById('bug-name').value.trim(),d=document.getElementById('bug-desc').value.trim();if(!n||!d)return;await fetch('/api/bugs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,description:d})});document.getElementById('bug-name').value='';document.getElementById('bug-desc').value='';fetchBugs();}
+    async function updateBugStatus(id,s){await fetch('/api/bugs/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:s})});fetchBugs();}
+    async function deleteBug(id){await fetch('/api/bugs/'+id,{method:'DELETE'});fetchBugs();}
+    async function confirmBug(id){await fetch('/api/bugs/'+id+'/confirm',{method:'POST'});fetchBugs();}
+    async function confirmBugByName(name){await fetch('/api/bugs',{method:'GET'});const res=await fetch('/api/bugs');const bugs=await res.json();const b=bugs.find(x=>x.name===name&&x.status==='pending');if(b)await confirmBug(b.id);fetchBugs();}
 
-    async function addBug() {
-        const name = document.getElementById('bug-name').value.trim();
-        const desc = document.getElementById('bug-desc').value.trim();
-        if (!name || !desc) return;
-        await fetch('/api/bugs', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, description: desc}) });
-        document.getElementById('bug-name').value = '';
-        document.getElementById('bug-desc').value = '';
-        fetchBugs();
+    // ── Mentor Log ───────────────────────────────────────
+    async function fetchMentorLog() {
+        let url='/api/mentor-log?limit=200';
+        const types=LOG_FILTER_MAP[currentLogFilter];
+        if(types){const arr=types.split(',');url+='&type='+arr[0];}
+        const res=await fetch(url);let logs=await res.json();
+        if(types&&types.includes(',')){const arr=types.split(',');logs=logs.filter(l=>arr.includes(l.event_type));}
+        const el=document.getElementById('log-list');
+        el.innerHTML=logs.map(l=>{
+            const cat=getLogCategory(l.event_type);
+            return `<div class="log-entry"><div class="log-header"><span class="log-badge ${cat}">${l.event_type.replace(/_/g,' ')}</span><span class="log-time">${l.created_at||''}</span></div><div class="log-summary">${esc(l.summary)}</div>${l.details?'<div class="log-details" onclick="this.classList.toggle(\'expanded\')"><span class="log-expand">details</span><div class="log-details-content">'+esc(l.details)+'</div></div>':''}<button class="log-respond-btn" onclick="respondToLog(${l.id})">Respond</button></div>`;
+        }).join('')||'<div style="padding:16px;font-size:12px;color:var(--text-dim)">No log entries.</div>';
+        // Update pending badge
+        const pending=logs.filter(l=>l.event_type==='bug_proposed').length;
+        const badge=document.getElementById('pending-badge');
+        if(pending>0){badge.textContent=pending;badge.style.display='inline';}else{badge.style.display='none';}
     }
-
-    async function updateBugStatus(id, status) {
-        await fetch('/api/bugs/' + id, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status}) });
-        fetchBugs();
-    }
-
-    async function deleteBug(id) { await fetch('/api/bugs/' + id, { method:'DELETE' }); fetchBugs(); }
-    async function confirmBug(id) { await fetch('/api/bugs/' + id + '/confirm', { method:'POST' }); fetchBugs(); }
+    function getLogCategory(t){if(t.includes('memory'))return'memory';if(t.includes('bug'))return'bugs';if(t.includes('prior'))return'priors';if(t.includes('experiment'))return'experiments';if(['crisis_flag','deterioration_flag','rumination_detected','containment_shift','processing_mode_alert'].includes(t))return'safety';if(t==='user_correction')return'corrections';return'other';}
+    function filterLog(f,btn){currentLogFilter=f;document.querySelectorAll('.log-filter').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active');fetchMentorLog();}
+    async function respondToLog(id){const r=prompt('Your correction or response:');if(!r)return;await fetch('/api/mentor-log/'+id+'/respond',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({response:r})});fetchMentorLog();}
 
     // ── Goals ────────────────────────────────────────────
-    async function fetchGoals() {
-        const res = await fetch('/api/goals');
-        const data = await res.json();
-        ['toward', 'away'].forEach(dir => {
-            const el = document.getElementById('goals-' + dir);
-            el.innerHTML = (data[dir] || []).map(g => `<div class="goal-card"><span>${escHtml(g.description)}</span><button class="entry-delete" onclick="deleteGoal(${g.id})">×</button></div>`).join('') || '<div style="font-size:12px; color:var(--text-dim); padding:8px 0">None set</div>';
-        });
-    }
+    async function fetchGoals(){const res=await fetch('/api/goals');const d=await res.json();['toward','away'].forEach(dir=>{const el=document.getElementById('goals-'+dir);el.innerHTML=(d[dir]||[]).map(g=>`<div class="goal-card"><span>${esc(g.description)}</span><button class="entry-delete" onclick="deleteGoal(${g.id})">×</button></div>`).join('')||'<div style="font-size:12px;color:var(--text-dim);padding:8px 0">None set</div>';});}
+    async function addGoal(dir){const i=document.getElementById('goal-'+dir+'-input');const d=i.value.trim();if(!d)return;await fetch('/api/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({direction:dir,description:d})});i.value='';fetchGoals();}
+    async function deleteGoal(id){await fetch('/api/goals/'+id,{method:'DELETE'});fetchGoals();}
 
-    async function addGoal(direction) {
-        const input = document.getElementById('goal-' + direction + '-input');
-        const desc = input.value.trim();
-        if (!desc) return;
-        await fetch('/api/goals', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({direction, description: desc}) });
-        input.value = '';
-        fetchGoals();
-    }
+    // ── Priors ───────────────────────────────────────────
+    async function fetchPriors(){const res=await fetch('/api/priors');const priors=await res.json();document.getElementById('priors-list').innerHTML=priors.map(p=>`<div class="prior-card"><div class="prior-name">${esc(p.name)}</div><div class="prior-estimate">${esc(p.current_estimate)}</div><div class="prior-meta">Confidence: ${p.confidence} | Evidence: ${p.evidence_count} | Updated: ${(p.last_updated||'').substring(0,10)}</div></div>`).join('')||'<div style="font-size:12px;color:var(--text-dim)">No priors. Click "Seed Initial Priors" after uploading a baseline.</div>';}
+    async function seedPriors(){await fetch('/api/priors/seed',{method:'POST'});fetchPriors();}
 
-    async function deleteGoal(id) { await fetch('/api/goals/' + id, { method:'DELETE' }); fetchGoals(); }
+    // ── Phases ───────────────────────────────────────────
+    async function fetchPhases(){const res=await fetch('/api/phases');const phases=await res.json();document.getElementById('phases-list').innerHTML=phases.map(p=>`<div class="phase-card ${p.end_entry?'':'current'}"><span class="phase-name">${esc(p.name)}</span><span class="phase-range">Entry #${p.start_entry}${p.end_entry?' – #'+p.end_entry:' → now'}</span><div class="phase-desc">${esc(p.description)}</div></div>`).join('')||'<div style="font-size:12px;color:var(--text-dim)">No phases defined yet.</div>';}
+    async function addPhase(){const n=document.getElementById('phase-name').value.trim(),d=document.getElementById('phase-desc').value.trim();if(!n||!d)return;await fetch('/api/phases',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n,description:d})});document.getElementById('phase-name').value='';document.getElementById('phase-desc').value='';fetchPhases();}
 
     // ── Reports ──────────────────────────────────────────
-    async function fetchReports() {
-        const res = await fetch('/api/reports');
-        const reports = await res.json();
-        document.getElementById('reports-list').innerHTML = reports.map(r => `
-            <div class="report-item" onclick="this.querySelector('.report-content').classList.toggle('expanded')">
-                <div class="report-meta">
-                    <span class="report-type-badge ${r.report_type}">${r.report_type}</span>
-                    <span>${escHtml(r.period)}</span>
-                    <span>${r.created_at?.substring(0,10) || ''}</span>
-                </div>
-                <div class="report-content">${escHtml(r.content)}</div>
-            </div>`).join('') || '<div style="font-size:12px; color:var(--text-dim)">No reports generated yet.</div>';
-    }
-
-    async function generateReport(type) {
-        const btn = document.getElementById('gen-' + type + '-btn');
-        btn.disabled = true;
-        btn.textContent = 'Generating...';
-        try {
-            const res = await fetch('/api/reports/' + type, { method:'POST' });
-            const data = await res.json();
-            if (data.error) alert(data.error);
-            fetchReports();
-        } catch(e) { alert('Error: ' + e.message); }
-        finally { btn.disabled = false; btn.textContent = type === 'weekly' ? 'Generate Weekly Report' : 'Generate Monthly Report'; }
-    }
+    async function fetchReports(){const res=await fetch('/api/reports');const reports=await res.json();document.getElementById('reports-list').innerHTML=reports.map(r=>`<div class="report-item" onclick="this.querySelector('.report-content').classList.toggle('expanded')"><div class="report-meta"><span class="report-type-badge ${r.report_type}">${r.report_type}</span><span>${esc(r.period)}</span><span>${(r.created_at||'').substring(0,10)}</span>${r.email_sent?'<span class="email-badge">emailed</span>':''}</div><div class="report-content">${esc(r.content)}</div></div>`).join('')||'<div style="font-size:12px;color:var(--text-dim)">No reports yet.</div>';}
+    async function generateReport(type){const btn=document.getElementById('gen-'+type+'-btn');btn.disabled=true;btn.textContent='Generating...';try{const res=await fetch('/api/reports/'+type,{method:'POST'});const d=await res.json();if(d.error)alert(d.error);fetchReports();}catch(e){alert(e.message);}finally{btn.disabled=false;btn.textContent=type==='weekly'?'Generate Weekly Report':'Generate Monthly Report';}}
 
     // ── Documents ────────────────────────────────────────
-    async function fetchDocuments() {
-        const res = await fetch('/api/documents');
-        const docs = await res.json();
-        const unRes = await fetch('/api/documents/unanalyzed');
-        const unData = await unRes.json();
-        document.getElementById('unanalyzed-count').textContent = unData.count ? unData.count + ' unanalyzed' : '';
-        document.getElementById('documents-list').innerHTML = docs.map(d => `
-            <div class="doc-item">
-                <span>${escHtml(d.filename)}</span>
-                <span class="doc-status ${d.analysis_status === 'unanalyzed' ? 'unanalyzed' : 'analyzed'}">${d.analysis_status}</span>
-            </div>`).join('') || '<div style="font-size:12px; color:var(--text-dim)">No documents uploaded.</div>';
-    }
-
-    async function uploadDocument() {
-        const input = document.getElementById('doc-file-input');
-        if (!input.files.length) return;
-        const form = new FormData();
-        form.append('file', input.files[0]);
-        await fetch('/api/documents/upload', { method:'POST', body: form });
-        input.value = '';
-        fetchDocuments();
-    }
+    async function fetchDocuments(){const res=await fetch('/api/documents');const docs=await res.json();document.getElementById('documents-list').innerHTML=docs.map(d=>`<div class="doc-item"><span>${esc(d.filename)}</span><span class="doc-status ${d.analysis_status==='unanalyzed'?'unanalyzed':'analyzed'}">${d.analysis_status}</span></div>`).join('')||'<div style="font-size:12px;color:var(--text-dim)">No documents.</div>';}
+    async function uploadDocument(){const i=document.getElementById('doc-file-input');if(!i.files.length)return;const f=new FormData();f.append('file',i.files[0]);await fetch('/api/documents/upload',{method:'POST',body:f});i.value='';fetchDocuments();}
 
     // ── Baseline ─────────────────────────────────────────
-    async function fetchBaseline() {
-        const res = await fetch('/api/baseline');
-        const data = await res.json();
-        if (data.exists) {
-            document.getElementById('baseline-status').innerHTML = `<span style="color:var(--green)">Loaded</span> — ${data.word_count} words`;
-            document.getElementById('baseline-preview').textContent = data.preview;
-        } else {
-            document.getElementById('baseline-status').innerHTML = '<span style="color:var(--amber)">Not loaded</span>';
-            document.getElementById('baseline-preview').textContent = '';
-        }
-    }
+    async function fetchBaseline(){const res=await fetch('/api/baseline');const d=await res.json();if(d.exists){document.getElementById('baseline-status').innerHTML=`<span style="color:var(--green)">Loaded (v${d.version})</span> — ${d.word_count} words`;document.getElementById('baseline-preview').textContent=d.preview;}else{document.getElementById('baseline-status').innerHTML='<span style="color:var(--amber)">Not loaded</span>';document.getElementById('baseline-preview').textContent='';}}
+    function toggleBaseline(){const el=document.getElementById('baseline-upload');el.style.display=el.style.display==='none'?'block':'none';}
+    async function saveBaseline(){const c=document.getElementById('baseline-textarea').value;await fetch('/api/baseline/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:c})});document.getElementById('baseline-upload').style.display='none';fetchBaseline();}
+    async function uploadBaselineFile(){const i=document.getElementById('baseline-file-input');if(!i.files.length)return;const f=new FormData();f.append('file',i.files[0]);await fetch('/api/baseline/upload',{method:'POST',body:f});i.value='';document.getElementById('baseline-upload').style.display='none';fetchBaseline();}
 
-    function toggleBaseline() {
-        const el = document.getElementById('baseline-upload');
-        el.style.display = el.style.display === 'none' ? 'block' : 'none';
-    }
+    // ── Micro-Assessments ────────────────────────────────
+    async function fetchMicro(){const res=await fetch('/api/micro-assessments?days=14');const ms=await res.json();document.getElementById('micro-history').innerHTML=ms.map(m=>`<div class="micro-item"><span>${m.date} ${m.time_of_day||''}</span><span>WB:${m.wellbeing} IP:${m.interpersonal} SR:${m.social_role} OV:${m.overall}</span></div>`).join('')||'';}
+    async function submitMicro(){await fetch('/api/micro-assessments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({wellbeing:+document.getElementById('micro-wb').value,interpersonal:+document.getElementById('micro-ip').value,social_role:+document.getElementById('micro-sr').value,overall:+document.getElementById('micro-ov').value,body_sensation:document.getElementById('micro-body').value,context:document.getElementById('micro-ctx').value})});fetchMicro();alert('Assessment saved.');}
 
-    async function saveBaseline() {
-        const content = document.getElementById('baseline-textarea').value;
-        await fetch('/api/baseline/upload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({content}) });
-        document.getElementById('baseline-upload').style.display = 'none';
-        fetchBaseline();
-    }
+    // ── Experiments ───────────────────────────────────────
+    async function completeExperiment(id){const outcome=prompt('What happened?');if(!outcome)return;const rating=prompt('Belief rating after (0-100)?');await fetch('/api/experiments/'+id+'/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({outcome,belief_rating_after:+rating,reflection:''})});if(currentEntryId)selectEntry(currentEntryId);}
+    async function skipExperiment(id){const reason=prompt('Why was it skipped?');await fetch('/api/experiments/'+id+'/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason||''})});if(currentEntryId)selectEntry(currentEntryId);}
 
-    async function uploadBaselineFile() {
-        const input = document.getElementById('baseline-file-input');
-        if (!input.files.length) return;
-        const form = new FormData();
-        form.append('file', input.files[0]);
-        await fetch('/api/baseline/upload', { method:'POST', body: form });
-        input.value = '';
-        document.getElementById('baseline-upload').style.display = 'none';
-        fetchBaseline();
-    }
+    // ── Show Me Your Model ───────────────────────────────
+    async function showModel(){const btn=document.getElementById('model-btn');btn.disabled=true;btn.textContent='Generating...';try{const res=await fetch('/api/system/model-summary');const d=await res.json();document.getElementById('model-summary').innerHTML='<div class="model-text">'+d.summary.split('\n\n').map(p=>'<p>'+esc(p)+'</p>').join('')+'</div>';}catch(e){document.getElementById('model-summary').innerHTML='<div style="color:var(--red)">Error: '+e.message+'</div>';}finally{btn.disabled=false;btn.textContent='Show Me What You Believe About Me';}}
 
     // ── Utility ──────────────────────────────────────────
-    function escHtml(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
     </script>
 </body>
 </html>
