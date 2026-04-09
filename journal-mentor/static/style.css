@@ -851,3 +851,10 @@ body {
   background: var(--accent-bg);
   border-radius: 0 2px 2px 0;
 }
+
+/* ── Goal domains & principles ── */
+.goal-domain { font-family: var(--font-mono); font-size: 8px; text-transform: uppercase; padding: 1px 5px; border: 1px solid var(--border); border-radius: 2px; color: var(--text-dim); margin-right: 6px; flex-shrink: 0; }
+.goal-status-badge { font-family: var(--font-mono); font-size: 8px; padding: 1px 5px; border-radius: 2px; margin-left: 6px; flex-shrink: 0; }
+.goal-status-badge.achieved { background: var(--green-bg); color: var(--green); }
+.goal-status-badge.paused { background: var(--amber-bg); color: var(--amber); }
+.principle-card { padding: 10px 12px; border-left: 2px solid var(--accent); margin-bottom: 6px; font-size: 13px; color: var(--text-secondary); font-style: italic; display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); }

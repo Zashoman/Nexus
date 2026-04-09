@@ -132,19 +132,42 @@
             <!-- Goals -->
             <div class="system-section">
                 <div class="section-title">Goals</div>
-                <div class="info-box">What you're actively moving toward and what you're moving away from. The mentor references these in every analysis and weekly reports track your adherence.</div>
+                <div class="info-box">Three layers: <strong>Objectives</strong> are trackable outcomes scored in weekly reports. <strong>Behavioral commitments</strong> are daily/weekly habits the mentor notes. <strong>Guiding principles</strong> are your compass — never turned into a checklist.</div>
+
+                <!-- Objectives -->
+                <div style="font-family:var(--font-mono); font-size:10px; color:var(--accent); margin:12px 0 8px; text-transform:uppercase; letter-spacing:0.1em">Objectives</div>
                 <div class="goals-layout">
                     <div class="goals-column">
-                        <div class="goals-column-header">Moving Toward</div>
-                        <div id="goals-toward"></div>
-                        <div class="goal-add"><input id="goal-toward-input" placeholder="Add goal..." onkeydown="if(event.key==='Enter')addGoal('toward')"><button class="btn btn-sm" onclick="addGoal('toward')">+</button></div>
+                        <div class="goals-column-header">Toward</div>
+                        <div id="obj-toward"></div>
+                        <div class="goal-add"><input id="obj-toward-input" placeholder="Add objective..." onkeydown="if(event.key==='Enter')addGoalNew('objective','toward',this)"><button class="btn btn-sm" onclick="addGoalNew('objective','toward',document.getElementById('obj-toward-input'))">+</button></div>
                     </div>
                     <div class="goals-column">
-                        <div class="goals-column-header">Moving Away From</div>
-                        <div id="goals-away"></div>
-                        <div class="goal-add"><input id="goal-away-input" placeholder="Add goal..." onkeydown="if(event.key==='Enter')addGoal('away')"><button class="btn btn-sm" onclick="addGoal('away')">+</button></div>
+                        <div class="goals-column-header">Away From</div>
+                        <div id="obj-away"></div>
+                        <div class="goal-add"><input id="obj-away-input" placeholder="Add objective..." onkeydown="if(event.key==='Enter')addGoalNew('objective','away',this)"><button class="btn btn-sm" onclick="addGoalNew('objective','away',document.getElementById('obj-away-input'))">+</button></div>
                     </div>
                 </div>
+
+                <!-- Behavioral -->
+                <div style="font-family:var(--font-mono); font-size:10px; color:var(--accent); margin:16px 0 8px; text-transform:uppercase; letter-spacing:0.1em">Behavioral Commitments</div>
+                <div class="goals-layout">
+                    <div class="goals-column">
+                        <div class="goals-column-header">Toward</div>
+                        <div id="beh-toward"></div>
+                        <div class="goal-add"><input id="beh-toward-input" placeholder="Add commitment..." onkeydown="if(event.key==='Enter')addGoalNew('behavioral','toward',this)"><button class="btn btn-sm" onclick="addGoalNew('behavioral','toward',document.getElementById('beh-toward-input'))">+</button></div>
+                    </div>
+                    <div class="goals-column">
+                        <div class="goals-column-header">Away From</div>
+                        <div id="beh-away"></div>
+                        <div class="goal-add"><input id="beh-away-input" placeholder="Add commitment..." onkeydown="if(event.key==='Enter')addGoalNew('behavioral','away',this)"><button class="btn btn-sm" onclick="addGoalNew('behavioral','away',document.getElementById('beh-away-input'))">+</button></div>
+                    </div>
+                </div>
+
+                <!-- Principles -->
+                <div style="font-family:var(--font-mono); font-size:10px; color:var(--accent); margin:16px 0 8px; text-transform:uppercase; letter-spacing:0.1em">Guiding Principles</div>
+                <div id="principles-list"></div>
+                <div class="goal-add"><input id="principle-input" placeholder="Add principle..." onkeydown="if(event.key==='Enter')addGoalNew('principle',null,this)"><button class="btn btn-sm" onclick="addGoalNew('principle',null,document.getElementById('principle-input'))">+</button></div>
             </div>
 
             <!-- Priors -->
@@ -642,8 +665,28 @@
     async function respondToLog(id){const r=prompt('Your correction or response:');if(!r)return;await fetch('/api/mentor-log/'+id+'/respond',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({response:r})});fetchMentorLog();}
 
     // ── Goals ────────────────────────────────────────────
-    async function fetchGoals(){const res=await fetch('/api/goals');const d=await res.json();['toward','away'].forEach(dir=>{const el=document.getElementById('goals-'+dir);el.innerHTML=(d[dir]||[]).map(g=>`<div class="goal-card"><span>${esc(g.description)}</span><button class="entry-delete" onclick="deleteGoal(${g.id})">×</button></div>`).join('')||'<div style="font-size:12px;color:var(--text-dim);padding:8px 0">None set</div>';});}
-    async function addGoal(dir){const i=document.getElementById('goal-'+dir+'-input');const d=i.value.trim();if(!d)return;await fetch('/api/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({direction:dir,description:d})});i.value='';fetchGoals();}
+    async function fetchGoals(){
+        const res=await fetch('/api/goals');const d=await res.json();
+        function renderGoalList(goals,elId,empty){
+            const el=document.getElementById(elId);if(!el)return;
+            el.innerHTML=goals.map(g=>{
+                const domain=g.domain?`<span class="goal-domain">${g.domain}</span>`:'';
+                const status=g.status!=='active'?`<span class="goal-status-badge ${g.status}">${g.status}</span>`:'';
+                return`<div class="goal-card">${domain}<span>${esc(g.description)}</span>${status}<button class="entry-delete" onclick="deleteGoal(${g.id})">×</button></div>`;
+            }).join('')||(empty||'');
+        }
+        const objToward=(d.objectives||[]).filter(g=>g.direction==='toward');
+        const objAway=(d.objectives||[]).filter(g=>g.direction==='away');
+        const behToward=(d.behavioral||[]).filter(g=>g.direction==='toward');
+        const behAway=(d.behavioral||[]).filter(g=>g.direction==='away');
+        renderGoalList(objToward,'obj-toward','<div style="font-size:12px;color:var(--text-dim);padding:4px 0">None</div>');
+        renderGoalList(objAway,'obj-away','<div style="font-size:12px;color:var(--text-dim);padding:4px 0">None</div>');
+        renderGoalList(behToward,'beh-toward','<div style="font-size:12px;color:var(--text-dim);padding:4px 0">None</div>');
+        renderGoalList(behAway,'beh-away','<div style="font-size:12px;color:var(--text-dim);padding:4px 0">None</div>');
+        const pl=document.getElementById('principles-list');
+        if(pl)pl.innerHTML=(d.principles||[]).map(g=>`<div class="principle-card">${esc(g.description)}<button class="entry-delete" onclick="deleteGoal(${g.id})">×</button></div>`).join('')||'<div style="font-size:12px;color:var(--text-dim);padding:4px 0">None</div>';
+    }
+    async function addGoalNew(layer,direction,inputEl){const d=inputEl.value.trim();if(!d)return;await fetch('/api/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({layer,direction,description:d})});inputEl.value='';fetchGoals();}
     async function deleteGoal(id){await fetch('/api/goals/'+id,{method:'DELETE'});fetchGoals();}
 
     // ── Priors ───────────────────────────────────────────

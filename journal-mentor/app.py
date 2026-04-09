@@ -103,8 +103,11 @@ def init_db():
 
         CREATE TABLE IF NOT EXISTS goals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            direction TEXT NOT NULL,
+            layer TEXT NOT NULL,
+            domain TEXT,
+            direction TEXT,
             description TEXT NOT NULL,
+            status TEXT DEFAULT 'active',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -218,7 +221,37 @@ def init_db():
     if count == 0:
         conn.execute("INSERT INTO mentor_log (event_type, summary) VALUES ('memory_note', 'System initialized')")
         conn.commit()
+    # Seed default goals if empty
+    goal_count = conn.execute("SELECT COUNT(*) as c FROM goals").fetchone()['c']
+    if goal_count == 0:
+        for g in DEFAULT_GOALS:
+            conn.execute("INSERT INTO goals (layer, domain, direction, description) VALUES (?,?,?,?)", g)
+        conn.commit()
     conn.close()
+
+
+DEFAULT_GOALS = [
+    ("objective", "financial", "toward", "Protect existing financial assets and grow them — 20% is a win"),
+    ("objective", "cognitive", "toward", "Think from first principles always — biggest cognitive gap and biggest consistent problem throughout entire adult life"),
+    ("objective", "cognitive", "toward", "Move from consuming to thinking — defined by writing, reflecting, planning, and researching"),
+    ("objective", "cognitive", "toward", "Let intelligence augment and commoditize upwards — focus on building agency and decision-making"),
+    ("objective", "social", "toward", "2 new high-quality friends in Dubai — takes sacrifice and consistent effort to build community"),
+    ("objective", "social", "toward", "Massively improve friends and community"),
+    ("objective", "purpose", "toward", "Find meaning beyond blind speculation — prime years of exploration intellectually, focusing solely on money is a lack of purpose"),
+    ("objective", "purpose", "toward", "Work on something with focused intent, exponential payoff, and high level of personal challenge"),
+    ("objective", "behavioral", "away", "Infinite comparison and FOMO — either start winning through discipline and calculated risk, or fully decide not to care"),
+    ("objective", "behavioral", "away", "Massively reduce Twitter usage — one of the biggest failures of the last two years"),
+    ("behavioral", "behavioral", "toward", "Get out of the house min 2, max 3 times a week to work elsewhere for better focus"),
+    ("behavioral", "social", "toward", "Phone calls sometimes with friends"),
+    ("behavioral", "behavioral", "away", "When mindlessly scrolling — STOP"),
+    ("behavioral", "identity", "toward", "Move toward pain — got too comfortable in the last 12 months"),
+    ("principle", "identity", None, "Maximize time with Kian. One day it will all be gone."),
+    ("principle", "identity", None, "Love yourself. First time making this a priority. Love yourself unconditionally."),
+    ("principle", "identity", None, "Only compare yourself to yourself."),
+    ("principle", "identity", None, "The universe always provides what you need. Openness and acceptance. Everything that comes to you is data to move forward."),
+    ("principle", "cognitive", None, "My ability to trade and make decisions is based strongly off my ability to NOT torture myself. This applies to nearly everything."),
+    ("principle", "identity", None, "I always create some big problem thing that I think is haunting me — heart problems, money problems, girl problems. The problem changes, the pattern doesn't."),
+]
 
 
 # ── Memory Management ──────────────────────────────────────
@@ -283,12 +316,17 @@ def get_active_bugs():
     return [dict(b) for b in bugs]
 
 
-def get_goals(direction=None):
+def get_goals(layer=None, direction=None):
     conn = get_db()
+    q = "SELECT * FROM goals WHERE status='active'"
+    params = []
+    if layer:
+        q += " AND layer=?"
+        params.append(layer)
     if direction:
-        rows = conn.execute("SELECT * FROM goals WHERE direction=?", (direction,)).fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM goals").fetchall()
+        q += " AND direction=?"
+        params.append(direction)
+    rows = conn.execute(q, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -524,11 +562,8 @@ TRACKED PRIORS:
 CURRENT DEVELOPMENTAL PHASE:
 {PHASE_CONTEXT}
 
-GOALS — MOVING TOWARD:
-{TOWARD_GOALS}
-
-GOALS — MOVING AWAY FROM:
-{AWAY_GOALS}
+ORIENTATION:
+{ORIENTATION}
 
 OPEN BEHAVIORAL EXPERIMENTS:
 {EXPERIMENTS_CONTEXT}
@@ -596,7 +631,14 @@ Processing mode: [X]% abstract / [Y]% concrete
 Prior evidence: [any updates]
 ===END_WRITEBACK===
 
-GOALS: {goals}
+OBJECTIVES — TRACK THESE THIS WEEK:
+TOWARD: {toward_objectives}
+AWAY FROM: {away_objectives}
+
+BEHAVIORAL COMMITMENTS: {behavioral_goals}
+
+GUIDING PRINCIPLES (for context, not scoring): {principles}
+
 ACTIVE BUGS: {bugs}
 TRACKED PRIORS: {priors}
 CURRENT PHASE: {phase}
@@ -637,7 +679,17 @@ PHASE_ASSESSMENT: [assessment]
 GOAL_RECOMMENDATIONS: - [goal]: [action] — [rationale]
 ===END_AUDIT===
 
-GOALS: {goals}
+OBJECTIVES — TOWARD: {toward_objectives}
+OBJECTIVES — AWAY FROM: {away_objectives}
+BEHAVIORAL COMMITMENTS: {behavioral_goals}
+GUIDING PRINCIPLES: {principles}
+
+GOAL RELEVANCE CHECK:
+- Are the current objectives still the right objectives?
+- Should any be marked as achieved, paused, or removed?
+- Are there new objectives that should be added based on this month's entries?
+- Have the guiding principles shifted or deepened?
+
 ACTIVE BUGS: {bugs}
 TRACKED PRIORS: {priors}
 CURRENT PHASE: {phase}
@@ -719,11 +771,13 @@ def build_system_prompt():
     phase_text = f"{phase['name']}: {phase['description']} (since Entry #{phase['start_entry']})" if phase else "No developmental phases defined yet."
     prompt = prompt.replace("{PHASE_CONTEXT}", phase_text)
 
-    # Goals
-    toward = get_goals("toward")
-    away = get_goals("away")
-    prompt = prompt.replace("{TOWARD_GOALS}", "\n".join([f"- {g['description']}" for g in toward]) or "None set.")
-    prompt = prompt.replace("{AWAY_GOALS}", "\n".join([f"- {g['description']}" for g in away]) or "None set.")
+    # Orientation (short paragraph for daily prompt instead of full goal list)
+    orientation = """This person is oriented toward self-knowledge, first-principles thinking, and closing the gap between insight and action. He is building a life around agency, meaning, and genuine connection — and moving away from comparison, self-torture, mindless consumption, and using money as the sole measure of self-worth. He is a new father entering midlife who has identified that the same energy drives all his suffering: a voice that says he didn't do the right thing, that he's not enough, that he should be further along. He knows this. Knowing it hasn't stopped it yet.
+
+His guiding principles — which he has written himself — include: "Until death all defeat is in your mind." "I'm torturing myself for no reason in every area of life — trading was just the spark that let me see the bigger fire burning." "The voice of doubt, the recurring thought of not doing the right thing, self-doubt — it's ALL the same energy, always."
+
+Do not turn any of this into a checklist or scorecard. This context helps you READ him more accurately, not GRADE him."""
+    prompt = prompt.replace("{ORIENTATION}", orientation)
 
     # Experiments
     experiments = get_open_experiments()
@@ -1297,16 +1351,34 @@ def evolve_bug(bid):
 @app.route('/api/goals', methods=['GET'])
 def list_goals():
     conn = get_db()
-    toward = conn.execute("SELECT * FROM goals WHERE direction='toward'").fetchall()
-    away = conn.execute("SELECT * FROM goals WHERE direction='away'").fetchall()
+    objectives = conn.execute("SELECT * FROM goals WHERE layer='objective' ORDER BY direction, domain").fetchall()
+    behavioral = conn.execute("SELECT * FROM goals WHERE layer='behavioral' ORDER BY direction").fetchall()
+    principles = conn.execute("SELECT * FROM goals WHERE layer='principle'").fetchall()
     conn.close()
-    return jsonify({"toward": [dict(g) for g in toward], "away": [dict(g) for g in away]})
+    return jsonify({
+        "objectives": [dict(g) for g in objectives],
+        "behavioral": [dict(g) for g in behavioral],
+        "principles": [dict(g) for g in principles]
+    })
 
 @app.route('/api/goals', methods=['POST'])
 def add_goal():
     data = request.json
     conn = get_db()
-    conn.execute("INSERT INTO goals (direction, description) VALUES (?,?)", (data['direction'], data['description']))
+    conn.execute("INSERT INTO goals (layer, domain, direction, description) VALUES (?,?,?,?)",
+                 (data.get('layer', 'objective'), data.get('domain'), data.get('direction'), data['description']))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+@app.route('/api/goals/<int:gid>', methods=['PUT'])
+def update_goal(gid):
+    data = request.json
+    conn = get_db()
+    if 'status' in data:
+        conn.execute("UPDATE goals SET status=? WHERE id=?", (data['status'], gid))
+    if 'description' in data:
+        conn.execute("UPDATE goals SET description=? WHERE id=?", (data['description'], gid))
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
@@ -1704,13 +1776,19 @@ def generate_weekly():
 
     memory = load_memory()
     bugs = get_active_bugs()
-    goals_data = get_goals()
+    toward_obj = get_goals(layer='objective', direction='toward')
+    away_obj = get_goals(layer='objective', direction='away')
+    behavioral = get_goals(layer='behavioral')
+    principles = get_goals(layer='principle')
     priors = get_active_priors()
     phase = get_current_phase()
     experiments = get_open_experiments()
 
     prompt = WEEKLY_REPORT_PROMPT
-    prompt = prompt.replace("{goals}", "\n".join([f"- [{g['direction']}] {g['description']}" for g in goals_data]) or "None.")
+    prompt = prompt.replace("{toward_objectives}", "\n".join([f"- [{g.get('domain','')}] {g['description']}" for g in toward_obj]) or "None.")
+    prompt = prompt.replace("{away_objectives}", "\n".join([f"- [{g.get('domain','')}] {g['description']}" for g in away_obj]) or "None.")
+    prompt = prompt.replace("{behavioral_goals}", "\n".join([f"- [{g.get('direction','toward')}] {g['description']}" for g in behavioral]) or "None.")
+    prompt = prompt.replace("{principles}", "\n".join([f"- {g['description']}" for g in principles]) or "None.")
     prompt = prompt.replace("{bugs}", "\n".join([f"- {b['name']}: {b['description']} (fired {b['fire_count']}x)" for b in bugs]) or "None.")
     prompt = prompt.replace("{priors}", "\n".join([f"- {p['name']}: {p['current_estimate']}" for p in priors]) or "None.")
     prompt = prompt.replace("{phase}", f"{phase['name']}: {phase['description']}" if phase else "None defined.")
@@ -1757,12 +1835,18 @@ def generate_monthly():
 
     memory = load_memory()
     bugs = get_active_bugs()
-    goals_data = get_goals()
+    toward_obj = get_goals(layer='objective', direction='toward')
+    away_obj = get_goals(layer='objective', direction='away')
+    behavioral = get_goals(layer='behavioral')
+    principles = get_goals(layer='principle')
     priors = get_active_priors()
     phase = get_current_phase()
 
     prompt = MONTHLY_REPORT_PROMPT
-    prompt = prompt.replace("{goals}", "\n".join([f"- [{g['direction']}] {g['description']}" for g in goals_data]) or "None.")
+    prompt = prompt.replace("{toward_objectives}", "\n".join([f"- [{g.get('domain','')}] {g['description']}" for g in toward_obj]) or "None.")
+    prompt = prompt.replace("{away_objectives}", "\n".join([f"- [{g.get('domain','')}] {g['description']}" for g in away_obj]) or "None.")
+    prompt = prompt.replace("{behavioral_goals}", "\n".join([f"- [{g.get('direction','toward')}] {g['description']}" for g in behavioral]) or "None.")
+    prompt = prompt.replace("{principles}", "\n".join([f"- {g['description']}" for g in principles]) or "None.")
     prompt = prompt.replace("{bugs}", "\n".join([f"- {b['name']}: {b['description']} (fired {b['fire_count']}x)" for b in bugs]) or "None.")
     prompt = prompt.replace("{priors}", "\n".join([f"- {p['name']}: {p['current_estimate']}" for p in priors]) or "None.")
     prompt = prompt.replace("{phase}", f"{phase['name']}: {phase['description']}" if phase else "None.")
