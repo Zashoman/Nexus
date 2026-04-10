@@ -32,6 +32,17 @@
 
     <!-- ═══ JOURNAL TAB ═══ -->
     <div id="tab-journal" class="tab-content active">
+        <!-- Progress Bar -->
+        <div class="session-progress" id="session-progress">
+            <div class="progress-info">
+                <span class="progress-label">Journey</span>
+                <span class="progress-count" id="progress-count">0 / 300</span>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+            </div>
+            <span class="progress-pct" id="progress-pct">0%</span>
+        </div>
         <div class="journal-layout">
             <div class="journal-left">
                 <!-- Mode toggle -->
@@ -424,6 +435,7 @@
         if (ta) ta.addEventListener('input', updateWordCount);
         ta.addEventListener('keydown', e => { if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();submitEntry();} });
         fetchEntries();
+        updateProgress();
     });
 
     // ── Tabs ─────────────────────────────────────────────
@@ -440,6 +452,18 @@
     }
 
     // ── Right Panel Toggle ────────────────────────────────
+    // ── Progress ─────────────────────────────────────────
+    const SESSION_GOAL = 300;
+    async function updateProgress() {
+        const res = await fetch('/api/system/stats');
+        const stats = await res.json();
+        const count = stats.total_entries || 0;
+        const pct = Math.min(100, Math.round((count / SESSION_GOAL) * 100));
+        document.getElementById('progress-count').textContent = count + ' / ' + SESSION_GOAL;
+        document.getElementById('progress-fill').style.width = pct + '%';
+        document.getElementById('progress-pct').textContent = pct + '%';
+    }
+
     // ── History ──────────────────────────────────────────
     async function fetchHistoryEntries() {
         const res = await fetch('/api/entries');
@@ -559,6 +583,7 @@
             updateHeaderButtons();
             showMentorResponse(data.entry, data);
             fetchEntries();
+            updateProgress();
         } catch(e) { alert('Error: '+e.message); }
         finally { btn.disabled=false; btn.textContent='Submit Entry'; }
     }
