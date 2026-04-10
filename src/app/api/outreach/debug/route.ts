@@ -8,31 +8,52 @@ export async function GET() {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  const checks = {
+  const checks: Record<string, unknown> = {
     url_set: !!url,
-    url_preview: url ? `${url.substring(0, 30)}...` : 'MISSING',
+    url_value: url || 'MISSING',
     anon_key_set: !!anonKey,
-    anon_key_preview: anonKey ? `${anonKey.substring(0, 20)}...` : 'MISSING',
+    anon_key_length: anonKey?.length || 0,
+    anon_key_starts_with: anonKey?.substring(0, 30) || 'MISSING',
     service_key_set: !!serviceKey,
-    service_key_preview: serviceKey ? `${serviceKey.substring(0, 20)}...` : 'MISSING',
-    connection_test: 'pending',
+    service_key_length: serviceKey?.length || 0,
   };
 
-  // Try to actually connect
+  // Test with anon key
   if (url && anonKey) {
     try {
       const supabase = createClient(url, anonKey);
       const { error } = await supabase.from('campaigns').select('id').limit(1);
-      if (error) {
-        checks.connection_test = `ERROR: ${error.message}`;
-      } else {
-        checks.connection_test = 'SUCCESS — connected to Supabase';
-      }
+      checks.anon_test = error ? `ERROR: ${error.message} (code: ${error.code})` : 'SUCCESS';
     } catch (err: unknown) {
-      checks.connection_test = `EXCEPTION: ${err instanceof Error ? err.message : String(err)}`;
+      checks.anon_test = `EXCEPTION: ${err instanceof Error ? err.message : String(err)}`;
     }
-  } else {
-    checks.connection_test = 'SKIPPED — missing URL or key';
+  }
+
+  // Test with service role key
+  if (url && serviceKey) {
+    try {
+      const supabase = createClient(url, serviceKey);
+      const { error } = await supabase.from('campaigns').select('id').limit(1);
+      checks.service_test = error ? `ERROR: ${error.message} (code: ${error.code})` : 'SUCCESS';
+    } catch (err: unknown) {
+      checks.service_test = `EXCEPTION: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  // Test a raw fetch to see the actual HTTP response
+  if (url && anonKey) {
+    try {
+      const res = await fetch(`${url}/rest/v1/campaigns?select=id&limit=1`, {
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${anonKey}`,
+        },
+      });
+      checks.raw_fetch_status = res.status;
+      checks.raw_fetch_body = await res.text();
+    } catch (err: unknown) {
+      checks.raw_fetch = `EXCEPTION: ${err instanceof Error ? err.message : String(err)}`;
+    }
   }
 
   return NextResponse.json(checks, { status: 200 });
