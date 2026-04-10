@@ -4,14 +4,14 @@ import { postReplyToSlack, postBatchHeader } from '@/lib/outreach/slack';
 // POST: push classified replies with drafts to Slack
 export async function POST(request: Request) {
   try {
-    const { replies } = await request.json();
+    const { replies, accounts, campaigns } = await request.json();
 
     if (!replies || !Array.isArray(replies) || replies.length === 0) {
       return NextResponse.json({ error: 'replies array is required' }, { status: 400 });
     }
 
-    // Post batch header first
-    await postBatchHeader(replies.length);
+    // Post batch header with date and inbox info
+    await postBatchHeader(replies.length, accounts, campaigns);
 
     // Post each reply
     const results = [];

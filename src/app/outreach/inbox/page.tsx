@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import {
   Search,
+  FileText,
   Filter,
   RefreshCw,
   Mail,
@@ -374,6 +376,11 @@ export default function InboxPage() {
         subtitle={loading ? 'Loading...' : `${emails.length} replies from ${totalFetched} emails`}
         action={
           <div className="flex items-center gap-2">
+            <Link href="/outreach/inbox/review">
+              <Button variant="secondary" size="sm" icon={<FileText className="w-3.5 h-3.5" />}>
+                Daily Review
+              </Button>
+            </Link>
             {!isClassified && emails.length > 0 && (
               <Button
                 variant="primary"
