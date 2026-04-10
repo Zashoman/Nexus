@@ -51,68 +51,37 @@ export async function postReplyToSlack(params: {
   const channel = getChannel();
 
   const priorityEmoji = params.priority === 'high' ? '🔴' : params.priority === 'medium' ? '🟡' : '⚪';
+  const replySnippet = params.reply_preview.substring(0, 200).replace(/\n/g, ' ');
+  const draftSnippet = params.draft_reply.substring(0, 500).replace(/\n/g, ' ');
 
   const blocks = [
     {
-      type: 'header',
-      text: {
-        type: 'plain_text',
-        text: `${priorityEmoji} New Reply — ${params.sender_name}`,
-      },
-    },
-    {
       type: 'section',
-      fields: [
-        { type: 'mrkdwn', text: `*From:*\n${params.sender_name}\n<mailto:${params.sender_email}|${params.sender_email}>` },
-        { type: 'mrkdwn', text: `*Campaign:*\n${params.campaign_name}` },
-        { type: 'mrkdwn', text: `*Classification:*\n${params.classification} (${Math.round(params.confidence * 100)}%)` },
-        { type: 'mrkdwn', text: `*Account:*\n${params.account_email}` },
-      ],
+      text: {
+        type: 'mrkdwn',
+        text: `${priorityEmoji} *${params.sender_name}* — ${params.classification}\n${params.sender_email} · ${params.campaign_name} · via ${params.account_email}`,
+      },
     },
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*Subject:* ${params.subject}`,
+        text: `>${replySnippet}`,
+      },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `✏️ *Draft:* ${draftSnippet}`,
       },
     },
     { type: 'divider' },
-    {
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `*💬 Their Reply:*\n>${params.reply_preview.substring(0, 500).replace(/\n/g, '\n>')}`,
-      },
-    },
-    {
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `*🤖 AI Summary:*\n${params.ai_summary}`,
-      },
-    },
-    { type: 'divider' },
-    {
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `*✏️ Suggested Reply:*\n\`\`\`${params.draft_reply.substring(0, 2500)}\`\`\``,
-      },
-    },
-    {
-      type: 'context',
-      elements: [
-        {
-          type: 'mrkdwn',
-          text: `📧 Reply via *${params.account_email}* | Priority: *${params.priority}*`,
-        },
-      ],
-    },
   ];
 
   return slackPost('/chat.postMessage', {
     channel,
-    text: `${priorityEmoji} New reply from ${params.sender_name} — ${params.classification}`,
+    text: `${priorityEmoji} ${params.sender_name} — ${params.classification}`,
     blocks,
     unfurl_links: false,
     unfurl_media: false,
@@ -124,44 +93,19 @@ export async function postBatchHeader(count: number, accounts?: string[], campai
   const channel = getChannel();
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
+  const inboxList = accounts?.length ? accounts.join(', ') : 'all';
+  const campaignList = campaigns?.length ? campaigns.join(', ') : 'all';
+
   const blocks: Record<string, unknown>[] = [
-    {
-      type: 'header',
-      text: {
-        type: 'plain_text',
-        text: `📬 Daily Reply Summary — ${today}`,
-      },
-    },
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `Blue Tree Brain found *${count}* replies that need a response. Each one is posted below with an AI-drafted reply.\n\nReview, edit if needed, and send.`,
+        text: `📬 *${today}* — *${count}* replies need attention\nInboxes: ${inboxList}\nCampaigns: ${campaignList}`,
       },
     },
+    { type: 'divider' },
   ];
-
-  if (accounts && accounts.length > 0) {
-    blocks.push({
-      type: 'context',
-      elements: [{
-        type: 'mrkdwn',
-        text: `📧 *Inboxes:* ${accounts.join(', ')}`,
-      }],
-    });
-  }
-
-  if (campaigns && campaigns.length > 0) {
-    blocks.push({
-      type: 'context',
-      elements: [{
-        type: 'mrkdwn',
-        text: `📋 *Campaigns:* ${campaigns.join(', ')}`,
-      }],
-    });
-  }
-
-  blocks.push({ type: 'divider' });
 
   return slackPost('/chat.postMessage', {
     channel,
