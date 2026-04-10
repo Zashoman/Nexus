@@ -1366,7 +1366,16 @@ def send_dialectic(eid):
     except Exception as e:
         return jsonify({"error": str(e)}), 502
 
-    reply = response.content[0].text
+    reply_raw = response.content[0].text
+
+    # Strip structured delimiters from dialectic replies (same parser as entry responses)
+    parsed = parse_mentor_response(reply_raw)
+    reply = parsed["clean_response"]
+
+    # If there's a memory update in the dialectic, save it
+    if parsed["memory_update"]:
+        append_raw_note(eid, f"Dialectic followup: {parsed['memory_update']}")
+
     conn = get_db()
     conn.execute("INSERT INTO dialectic (entry_id, role, content) VALUES (?,'user',?)", (eid, message))
     conn.execute("INSERT INTO dialectic (entry_id, role, content) VALUES (?,'mentor',?)", (eid, reply))

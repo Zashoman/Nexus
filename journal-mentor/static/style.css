@@ -1298,3 +1298,9 @@ body {
   white-space: nowrap;
   flex-shrink: 0;
 }
+
+/* ── Backed up indicator in mentor header ── */
+.backed-up-indicator {
+  color: var(--green);
+  font-size: 9px;
+}

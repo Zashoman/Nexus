@@ -658,6 +658,7 @@
 
         // Status indicators
         let status = [];
+        if(entry.backed_up || (data.entry && data.entry.backed_up)) status.push('<span class="backed-up-indicator">✓ Backed up</span>');
         if(data.bugs_fired&&data.bugs_fired.length) status.push(data.bugs_fired.map(b=>'<span class="bug-tag" onclick="switchTab(\'debugging\')">'+esc(b.name||b)+'</span>').join(' '));
         if(data.flags&&data.flags.containment==='low') status.push('<span class="containment-tag">supportive mode</span>');
         if(data.flags&&data.flags.rumination) status.push('<span class="rumination-tag">rumination flagged</span>');
