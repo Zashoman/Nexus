@@ -9,6 +9,10 @@ import {
   ChevronDown,
   Loader2,
   Inbox as InboxIcon,
+  Clock,
+  User,
+  Building2,
+  ArrowRight,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card from '@/components/outreach/ui/Card';
@@ -20,26 +24,35 @@ interface InstantlyEmail {
   id: string;
   from_address_email?: string;
   from_address?: string;
+  to_address_email_list?: string;
   to_address_email?: string;
-  to_address?: string;
   from_name?: string;
   to_name?: string;
   subject?: string;
-  body?: string;
+  body?: unknown;
   text_body?: string;
   html_body?: string;
   timestamp?: string;
   timestamp_created?: string;
+  timestamp_email?: string;
   created_at?: string;
   date?: string;
   is_read?: boolean;
+  is_unread?: number;
   campaign_id?: string;
   campaign_name?: string;
   thread_id?: string;
   message_type?: string;
   direction?: string;
   lead_email?: string;
+  lead?: string;
   account_email?: string;
+  eaccount?: string;
+  ue_type?: number;
+  i_status?: number;
+  content_preview?: string;
+  from_address_json?: Array<{ address: string; name: string }>;
+  to_address_json?: Array<{ address: string; name: string }>;
   [key: string]: unknown;
 }
 
@@ -50,28 +63,42 @@ interface InstantlyCampaign {
 }
 
 function getEmailTime(email: InstantlyEmail): string {
-  const ts = email.timestamp || email.timestamp_created || email.created_at || email.date;
+  const ts = email.timestamp_email || email.timestamp_created || email.timestamp || email.created_at || email.date;
   if (!ts) return '';
-  const d = new Date(ts);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHr = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+  try {
+    const d = new Date(ts);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffHr = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMin < 1) return 'Just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHr < 24) return `${diffHr}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (diffMin < 1) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHr < 24) return `${diffHr}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch {
+    return '';
+  }
 }
 
 function getSenderName(email: InstantlyEmail): string {
-  return email.from_name || email.from_address_email || email.from_address || email.lead_email || 'Unknown';
+  if (email.from_address_json?.[0]?.name) return email.from_address_json[0].name;
+  return email.from_name || email.from_address_email || email.from_address || email.lead || 'Unknown';
 }
 
 function getSenderEmail(email: InstantlyEmail): string {
-  return email.from_address_email || email.from_address || email.lead_email || '';
+  if (email.from_address_json?.[0]?.address) return email.from_address_json[0].address;
+  return email.from_address_email || email.from_address || email.lead || '';
+}
+
+function getLeadEmail(email: InstantlyEmail): string {
+  return email.lead || email.lead_email || getSenderEmail(email);
+}
+
+function getAccountEmail(email: InstantlyEmail): string {
+  return email.eaccount || email.account_email || '';
 }
 
 function getEmailBody(email: InstantlyEmail): string {
@@ -99,6 +126,16 @@ function getSubject(email: InstantlyEmail): string {
   return email.subject || '(no subject)';
 }
 
+function getReplyStatusBadge(email: InstantlyEmail): { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'default' } {
+  const iStatus = email.i_status;
+  if (iStatus === 1) return { label: 'Action needed', variant: 'warning' };
+  if (iStatus === 0) return { label: 'Auto-reply', variant: 'default' };
+  return { label: 'New reply', variant: 'info' };
+}
+
+// Campaign name cache
+const campaignNameCache: Record<string, string> = {};
+
 export default function InboxPage() {
   const [emails, setEmails] = useState<InstantlyEmail[]>([]);
   const [campaigns, setCampaigns] = useState<InstantlyCampaign[]>([]);
@@ -107,12 +144,13 @@ export default function InboxPage() {
   const [selectedEmail, setSelectedEmail] = useState<InstantlyEmail | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<string>('');
   const [search, setSearch] = useState('');
+  const [totalFetched, setTotalFetched] = useState(0);
 
   const fetchEmails = async (campaignId?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ limit: '50' });
+      const params = new URLSearchParams({ limit: '100', replies_only: 'true' });
       if (campaignId) params.set('campaign_id', campaignId);
 
       const res = await fetch(`/api/outreach/instantly/replies?${params}`);
@@ -122,9 +160,15 @@ export default function InboxPage() {
         setError(data.error);
         setEmails([]);
       } else {
-        setEmails(data.emails || []);
-        if (data.emails?.length > 0) {
-          setSelectedEmail(data.emails[0]);
+        const sortedEmails = (data.emails || []).sort((a: InstantlyEmail, b: InstantlyEmail) => {
+          const aTs = a.timestamp_email || a.timestamp_created || '';
+          const bTs = b.timestamp_email || b.timestamp_created || '';
+          return new Date(bTs).getTime() - new Date(aTs).getTime();
+        });
+        setEmails(sortedEmails);
+        setTotalFetched(data.total_fetched || 0);
+        if (sortedEmails.length > 0 && !selectedEmail) {
+          setSelectedEmail(sortedEmails[0]);
         }
       }
     } catch {
@@ -138,20 +182,31 @@ export default function InboxPage() {
     try {
       const res = await fetch('/api/outreach/instantly/campaigns');
       const data = await res.json();
-      setCampaigns(data.campaigns || []);
+      const campaignList = data.campaigns || [];
+      setCampaigns(campaignList);
+      campaignList.forEach((c: InstantlyCampaign) => {
+        campaignNameCache[c.id] = c.name;
+      });
     } catch {
-      // silently fail — campaigns are just for filtering
+      // silently fail
     }
   };
 
   useEffect(() => {
     fetchCampaigns();
     fetchEmails();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCampaignFilter = (campaignId: string) => {
     setSelectedCampaign(campaignId);
+    setSelectedEmail(null);
     fetchEmails(campaignId || undefined);
+  };
+
+  const getCampaignName = (campaignId?: string): string => {
+    if (!campaignId) return '';
+    return campaignNameCache[campaignId] || campaignId.substring(0, 8) + '...';
   };
 
   const filtered = search
@@ -167,8 +222,8 @@ export default function InboxPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Inbox"
-        subtitle={`${emails.length} emails from Instantly — READ-ONLY`}
+        title="Inbox — Replies"
+        subtitle={loading ? 'Loading...' : `${emails.length} replies found (from ${totalFetched} total emails)`}
         action={
           <Button
             variant="secondary"
@@ -190,7 +245,7 @@ export default function InboxPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search emails..."
+            placeholder="Search replies..."
             className="w-full h-9 pl-9 pr-4 rounded-lg border border-bt-border bg-bt-surface text-sm text-bt-text placeholder:text-bt-text-tertiary focus:outline-none focus:ring-2 focus:ring-bt-primary focus:border-transparent transition-shadow"
           />
         </div>
@@ -215,7 +270,7 @@ export default function InboxPage() {
         <div className="flex items-center justify-center py-20">
           <div className="flex items-center gap-3">
             <Loader2 className="w-5 h-5 text-bt-primary animate-spin" />
-            <span className="text-sm text-bt-text-secondary">Loading emails from Instantly...</span>
+            <span className="text-sm text-bt-text-secondary">Loading replies from Instantly...</span>
           </div>
         </div>
       )}
@@ -225,9 +280,7 @@ export default function InboxPage() {
         <Card>
           <div className="text-center py-8">
             <p className="text-sm text-bt-red mb-2">{error}</p>
-            <Button variant="secondary" size="sm" onClick={() => fetchEmails()}>
-              Try again
-            </Button>
+            <Button variant="secondary" size="sm" onClick={() => fetchEmails()}>Try again</Button>
           </div>
         </Card>
       )}
@@ -236,25 +289,22 @@ export default function InboxPage() {
       {!loading && !error && emails.length === 0 && (
         <EmptyState
           icon={<InboxIcon className="w-8 h-8" />}
-          title="No emails found"
-          description="No emails were returned from Instantly. Try selecting a different campaign or check that your campaigns have replies."
-          action={
-            <Button variant="secondary" size="sm" onClick={() => fetchEmails()}>
-              Refresh
-            </Button>
-          }
+          title="No replies found"
+          description="No inbound replies were found. Try selecting a different campaign or check back later."
+          action={<Button variant="secondary" size="sm" onClick={() => fetchEmails()}>Refresh</Button>}
         />
       )}
 
-      {/* Split view: email list + detail */}
+      {/* Split view: reply list + detail */}
       {!loading && !error && filtered.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 min-h-[600px]">
-          {/* Email list */}
+          {/* Reply list */}
           <div className="lg:col-span-2">
             <Card padding="none" className="h-full overflow-hidden">
               <div className="divide-y divide-bt-border overflow-y-auto max-h-[700px]">
                 {filtered.map((email) => {
                   const isSelected = selectedEmail?.id === email.id;
+                  const statusBadge = getReplyStatusBadge(email);
                   return (
                     <button
                       key={email.id}
@@ -264,30 +314,50 @@ export default function InboxPage() {
                         ${isSelected ? 'bg-bt-primary-bg/50' : 'hover:bg-bt-surface-hover'}
                       `}
                     >
+                      {/* Sender + time */}
                       <div className="flex items-start justify-between mb-1">
                         <div className="flex items-center gap-2 min-w-0">
-                          {!email.is_read && (
-                            <span className="w-2 h-2 rounded-full bg-bt-primary shrink-0" />
-                          )}
-                          <span className="text-sm font-semibold text-bt-text truncate">
-                            {getSenderName(email)}
-                          </span>
+                          <div className="w-7 h-7 rounded-full bg-bt-bg-alt flex items-center justify-center shrink-0">
+                            <User className="w-3.5 h-3.5 text-bt-text-tertiary" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-sm font-semibold text-bt-text truncate block">
+                              {getSenderName(email)}
+                            </span>
+                            <span className="text-[11px] text-bt-text-tertiary truncate block">
+                              {getSenderEmail(email)}
+                            </span>
+                          </div>
                         </div>
-                        <span className="text-[11px] text-bt-text-tertiary shrink-0 ml-2">
-                          {getEmailTime(email)}
-                        </span>
+                        <div className="flex flex-col items-end gap-1 shrink-0 ml-2">
+                          <span className="text-[11px] text-bt-text-tertiary">
+                            {getEmailTime(email)}
+                          </span>
+                          <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
+                        </div>
                       </div>
-                      <p className="text-xs text-bt-text-secondary truncate mb-1">
+
+                      {/* Subject */}
+                      <p className="text-xs text-bt-text truncate mt-1">
                         {getSubject(email)}
                       </p>
-                      <p className="text-xs text-bt-text-tertiary truncate">
-                        {getEmailBody(email).substring(0, 120)}
+
+                      {/* Preview */}
+                      <p className="text-xs text-bt-text-tertiary mt-1 line-clamp-2">
+                        {getEmailBody(email).substring(0, 150)}
                       </p>
-                      {email.campaign_name && (
-                        <Badge variant="default" size="sm" className="mt-1.5">
-                          {email.campaign_name}
+
+                      {/* Campaign tag */}
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <Badge variant="default" size="sm">
+                          {getCampaignName(email.campaign_id)}
                         </Badge>
-                      )}
+                        {email.eaccount && (
+                          <Badge variant="info" size="sm">
+                            via {email.eaccount?.split('@')[0]}
+                          </Badge>
+                        )}
+                      </div>
                     </button>
                   );
                 })}
@@ -295,65 +365,84 @@ export default function InboxPage() {
             </Card>
           </div>
 
-          {/* Email detail */}
+          {/* Reply detail */}
           <div className="lg:col-span-3">
             {selectedEmail ? (
               <Card padding="none" className="h-full flex flex-col">
                 {/* Header */}
                 <div className="p-5 border-b border-bt-border">
-                  <h3 className="text-sm font-semibold text-bt-text mb-1">
-                    {getSubject(selectedEmail)}
-                  </h3>
-                  <div className="flex items-center gap-3 text-xs text-bt-text-secondary">
-                    <span>
-                      <span className="text-bt-text font-medium">{getSenderName(selectedEmail)}</span>
-                      {' '}&lt;{getSenderEmail(selectedEmail)}&gt;
-                    </span>
-                    <span className="text-bt-text-tertiary">{getEmailTime(selectedEmail)}</span>
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-bt-text">
+                      {getSubject(selectedEmail)}
+                    </h3>
+                    <Badge variant={getReplyStatusBadge(selectedEmail).variant} size="sm">
+                      {getReplyStatusBadge(selectedEmail).label}
+                    </Badge>
                   </div>
-                  {selectedEmail.to_address_email && (
-                    <p className="text-xs text-bt-text-tertiary mt-1">
-                      To: {selectedEmail.to_name || selectedEmail.to_address_email || selectedEmail.to_address || selectedEmail.account_email}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2 mt-2">
-                    {selectedEmail.campaign_name && (
-                      <Badge variant="primary" size="sm">{selectedEmail.campaign_name}</Badge>
+
+                  {/* Sender info */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 rounded-full bg-bt-bg-alt flex items-center justify-center">
+                      <User className="w-4 h-4 text-bt-text-tertiary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-bt-text">{getSenderName(selectedEmail)}</p>
+                      <p className="text-xs text-bt-text-secondary">{getSenderEmail(selectedEmail)}</p>
+                    </div>
+                  </div>
+
+                  {/* Meta info */}
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-bt-text-tertiary">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {getEmailTime(selectedEmail)}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Building2 className="w-3 h-3" />
+                      {getCampaignName(selectedEmail.campaign_id)}
+                    </span>
+                    {selectedEmail.eaccount && (
+                      <span className="flex items-center gap-1">
+                        <ArrowRight className="w-3 h-3" />
+                        Sent via {selectedEmail.eaccount}
+                      </span>
                     )}
-                    {selectedEmail.campaign_id && !selectedEmail.campaign_name && (
-                      <Badge variant="default" size="sm" className="font-mono">{selectedEmail.campaign_id}</Badge>
-                    )}
+                    <span className="flex items-center gap-1">
+                      <Mail className="w-3 h-3" />
+                      Lead: {getLeadEmail(selectedEmail)}
+                    </span>
                   </div>
                 </div>
 
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto p-5">
-                  <div className="prose prose-sm max-w-none">
-                    <div
-                      className="text-sm text-bt-text leading-relaxed whitespace-pre-wrap"
-                    >
-                      {getEmailBody(selectedEmail)}
-                    </div>
+                  <div className="text-sm text-bt-text leading-relaxed whitespace-pre-wrap">
+                    {getEmailBody(selectedEmail)}
                   </div>
                 </div>
 
-                {/* Raw data (collapsible, for debugging) */}
-                <details className="border-t border-bt-border">
-                  <summary className="px-5 py-2.5 text-[11px] text-bt-text-tertiary cursor-pointer hover:text-bt-text-secondary transition-colors">
-                    View raw email data
-                  </summary>
-                  <div className="px-5 pb-4">
-                    <pre className="text-[10px] text-bt-text-tertiary bg-bt-bg-alt rounded-lg p-3 overflow-x-auto max-h-60">
-                      {JSON.stringify(selectedEmail, null, 2)}
-                    </pre>
+                {/* Account info */}
+                <div className="px-5 py-3 border-t border-bt-border bg-bt-bg/50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-bt-text-tertiary">
+                      Account: {getAccountEmail(selectedEmail)} &middot; Thread: {selectedEmail.thread_id?.substring(0, 12)}...
+                    </span>
+                    <details className="text-[11px]">
+                      <summary className="text-bt-text-tertiary cursor-pointer hover:text-bt-text-secondary">
+                        Raw data
+                      </summary>
+                      <pre className="mt-2 text-[10px] text-bt-text-tertiary bg-bt-bg-alt rounded-lg p-3 overflow-x-auto max-h-48 absolute right-4 bottom-12 w-[500px] z-10 border border-bt-border shadow-lg">
+                        {JSON.stringify(selectedEmail, null, 2)}
+                      </pre>
+                    </details>
                   </div>
-                </details>
+                </div>
               </Card>
             ) : (
               <Card className="h-full flex items-center justify-center">
                 <div className="text-center">
                   <Mail className="w-10 h-10 text-bt-text-tertiary mx-auto mb-3" />
-                  <p className="text-sm text-bt-text-secondary">Select an email to view details</p>
+                  <p className="text-sm text-bt-text-secondary">Select a reply to view details</p>
                 </div>
               </Card>
             )}
