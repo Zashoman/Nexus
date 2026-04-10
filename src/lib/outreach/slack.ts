@@ -120,29 +120,53 @@ export async function postReplyToSlack(params: {
 }
 
 /** Post a batch summary header to Slack */
-export async function postBatchHeader(count: number) {
+export async function postBatchHeader(count: number, accounts?: string[], campaigns?: string[]) {
   const channel = getChannel();
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  const blocks: Record<string, unknown>[] = [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: `📬 Daily Reply Summary — ${today}`,
+      },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `Blue Tree Brain found *${count}* replies that need a response. Each one is posted below with an AI-drafted reply.\n\nReview, edit if needed, and send.`,
+      },
+    },
+  ];
+
+  if (accounts && accounts.length > 0) {
+    blocks.push({
+      type: 'context',
+      elements: [{
+        type: 'mrkdwn',
+        text: `📧 *Inboxes:* ${accounts.join(', ')}`,
+      }],
+    });
+  }
+
+  if (campaigns && campaigns.length > 0) {
+    blocks.push({
+      type: 'context',
+      elements: [{
+        type: 'mrkdwn',
+        text: `📋 *Campaigns:* ${campaigns.join(', ')}`,
+      }],
+    });
+  }
+
+  blocks.push({ type: 'divider' });
 
   return slackPost('/chat.postMessage', {
     channel,
-    text: `📬 ${count} new replies need attention`,
-    blocks: [
-      {
-        type: 'header',
-        text: {
-          type: 'plain_text',
-          text: `📬 ${count} Replies Need Attention`,
-        },
-      },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `Blue Tree Brain found *${count}* new replies that need a response. Each one is posted below with an AI-drafted reply. Review, edit if needed, and send.`,
-        },
-      },
-      { type: 'divider' },
-    ],
+    text: `📬 Daily Reply Summary — ${today} — ${count} replies need attention`,
+    blocks,
     unfurl_links: false,
   });
 }
