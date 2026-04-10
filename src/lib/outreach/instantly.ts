@@ -58,7 +58,6 @@ export async function listCampaigns(): Promise<InstantlyCampaign[]> {
     skip: '0',
   });
 
-  // v2 API may return { items: [...] } or [...]
   if (Array.isArray(data)) return data;
   if ('items' in data) return data.items;
   return [];
@@ -70,42 +69,86 @@ export async function getCampaignSummary(campaignId: string) {
 }
 
 // -----------------------------------------------------------
-// Inbox / Reply endpoints (READ-ONLY)
+// Inbox / Email endpoints (READ-ONLY)
 // -----------------------------------------------------------
 
 export interface InstantlyEmail {
   id: string;
+  from_address_email?: string;
   from_address?: string;
+  to_address_email?: string;
   to_address?: string;
   from_name?: string;
   to_name?: string;
   subject?: string;
   body?: string;
+  text_body?: string;
+  html_body?: string;
   timestamp?: string;
+  timestamp_created?: string;
+  created_at?: string;
+  date?: string;
   is_read?: boolean;
   campaign_id?: string;
+  campaign_name?: string;
   thread_id?: string;
+  message_type?: string;
+  direction?: string;
+  lead_email?: string;
+  account_email?: string;
+  // Catch any other fields
+  [key: string]: unknown;
 }
 
-/** Read emails from the unibox (inbox) */
+/** Read emails from the unibox — all campaigns or filtered */
 export async function listEmails(params?: {
   campaign_id?: string;
-  email_type?: 'all' | 'received' | 'sent';
+  email_type?: string;
   limit?: number;
   skip?: number;
 }): Promise<InstantlyEmail[]> {
-  const queryParams: Record<string, string> = {};
+  const queryParams: Record<string, string> = {
+    limit: String(params?.limit || 50),
+  };
 
   if (params?.campaign_id) queryParams.campaign_id = params.campaign_id;
   if (params?.email_type) queryParams.email_type = params.email_type;
-  if (params?.limit) queryParams.limit = String(params.limit);
   if (params?.skip) queryParams.skip = String(params.skip);
 
-  const data = await instantlyGet<{ items: InstantlyEmail[] } | InstantlyEmail[]>('/emails', queryParams);
+  const data = await instantlyGet<{ items: InstantlyEmail[] } | InstantlyEmail[] | { data: InstantlyEmail[] }>('/emails', queryParams);
 
   if (Array.isArray(data)) return data;
-  if ('items' in data) return data.items;
+  if ('items' in data && Array.isArray((data as { items: unknown }).items)) return (data as { items: InstantlyEmail[] }).items;
+  if ('data' in data && Array.isArray((data as { data: unknown }).data)) return (data as { data: InstantlyEmail[] }).data;
   return [];
+}
+
+/** Read unibox emails — the main inbox view */
+export async function listUniboxEmails(params?: {
+  campaign_id?: string;
+  limit?: number;
+  skip?: number;
+  email_type?: string;
+}): Promise<InstantlyEmail[]> {
+  const queryParams: Record<string, string> = {
+    limit: String(params?.limit || 50),
+  };
+
+  if (params?.campaign_id) queryParams.campaign_id = params.campaign_id;
+  if (params?.skip) queryParams.skip = String(params.skip);
+  if (params?.email_type) queryParams.email_type = params.email_type;
+
+  // Try unibox endpoint first, fall back to emails
+  try {
+    const data = await instantlyGet<{ items: InstantlyEmail[] } | InstantlyEmail[] | { data: InstantlyEmail[] }>('/unibox/emails', queryParams);
+    if (Array.isArray(data)) return data;
+    if ('items' in data && Array.isArray((data as { items: unknown }).items)) return (data as { items: InstantlyEmail[] }).items;
+    if ('data' in data && Array.isArray((data as { data: unknown }).data)) return (data as { data: InstantlyEmail[] }).data;
+    return [];
+  } catch {
+    // Fall back to /emails endpoint
+    return listEmails(params);
+  }
 }
 
 // -----------------------------------------------------------

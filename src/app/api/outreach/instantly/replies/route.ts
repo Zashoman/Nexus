@@ -1,25 +1,23 @@
 import { NextResponse } from 'next/server';
-import { listEmails } from '@/lib/outreach/instantly';
+import { listUniboxEmails } from '@/lib/outreach/instantly';
 
-// GET-only: list replies for a specific campaign
+// GET-only: list emails from Instantly unibox
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const campaignId = searchParams.get('campaign_id');
+    const campaignId = searchParams.get('campaign_id') || undefined;
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const skip = parseInt(searchParams.get('skip') || '0');
 
-    if (!campaignId) {
-      return NextResponse.json({ error: 'campaign_id is required' }, { status: 400 });
-    }
-
-    const emails = await listEmails({
+    const emails = await listUniboxEmails({
       campaign_id: campaignId,
-      email_type: 'received',
-      limit: 50,
+      limit,
+      skip,
     });
 
-    return NextResponse.json({ emails });
+    return NextResponse.json({ emails, count: emails.length });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to fetch replies';
+    const message = err instanceof Error ? err.message : 'Failed to fetch emails';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
