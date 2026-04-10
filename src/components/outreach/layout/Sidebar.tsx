@@ -13,6 +13,7 @@ import {
   LogOut,
   TreePine,
 } from 'lucide-react';
+import { useAuth } from '@/components/outreach/AuthProvider';
 
 const navigation = [
   { name: 'Overview', href: '/outreach', icon: LayoutDashboard },
@@ -27,13 +28,28 @@ const bottomNav = [
   { name: 'Settings', href: '/outreach/settings', icon: Settings },
 ];
 
+function getInitials(name: string | null, email: string | null): string {
+  if (name) {
+    return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+  }
+  if (email) return email[0].toUpperCase();
+  return 'BT';
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user, profile, signOut } = useAuth();
 
   const isActive = (href: string) => {
     if (href === '/outreach') return pathname === '/outreach';
     return pathname.startsWith(href);
   };
+
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
+  const displayRole = profile?.role
+    ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1).replace('_', ' ')
+    : 'Team';
+  const initials = getInitials(profile?.full_name ?? null, user?.email ?? null);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 w-64 bg-bt-sidebar flex flex-col">
@@ -103,13 +119,17 @@ export default function Sidebar() {
         <div className="pt-3 mt-1 border-t border-white/10">
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-bt-primary to-bt-teal flex items-center justify-center text-xs font-bold text-white">
-              BT
+              {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white/90 truncate">Blue Tree</p>
-              <p className="text-[11px] text-white/40 truncate">Admin</p>
+              <p className="text-sm font-medium text-white/90 truncate">{displayName}</p>
+              <p className="text-[11px] text-white/40 truncate">{displayRole}</p>
             </div>
-            <button className="p-1.5 rounded-md text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors">
+            <button
+              onClick={signOut}
+              className="p-1.5 rounded-md text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
+              title="Sign out"
+            >
               <LogOut className="w-4 h-4" />
             </button>
           </div>

@@ -1,19 +1,50 @@
 'use client';
 
-import { useState } from 'react';
-import { TreePine, Mail, Lock, ArrowRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { TreePine, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 import Button from '@/components/outreach/ui/Button';
+import { useAuth } from '@/components/outreach/AuthProvider';
+import { signIn, signInWithGoogle } from '@/lib/outreach/auth';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const { user } = useAuth();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      router.push('/outreach');
+    }
+  }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Auth integration in Phase 2
-    setTimeout(() => setLoading(false), 1500);
+    setError(null);
+
+    try {
+      await signIn(email, password);
+      router.push('/outreach');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to sign in';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to sign in with Google';
+      setError(message);
+    }
   };
 
   return (
@@ -90,6 +121,14 @@ export default function LoginPage() {
             Sign in to your account to continue
           </p>
 
+          {/* Error message */}
+          {error && (
+            <div className="flex items-center gap-2 p-3 mb-4 rounded-lg bg-bt-red-bg border border-bt-red/20">
+              <AlertCircle className="w-4 h-4 text-bt-red shrink-0" />
+              <p className="text-sm text-bt-red">{error}</p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
@@ -138,7 +177,7 @@ export default function LoginPage() {
               loading={loading}
               className="w-full"
               size="lg"
-              iconRight={!loading && <ArrowRight className="w-4 h-4" />}
+              iconRight={!loading ? <ArrowRight className="w-4 h-4" /> : undefined}
             >
               Sign in
             </Button>
@@ -159,6 +198,7 @@ export default function LoginPage() {
             variant="secondary"
             className="w-full"
             size="lg"
+            onClick={handleGoogleSignIn}
             icon={
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path
