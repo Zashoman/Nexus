@@ -98,3 +98,65 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Email body rendering — style HTML emails in dark theme */
+.email-body {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.email-body div,
+.email-body p,
+.email-body span,
+.email-body td,
+.email-body th,
+.email-body li,
+.email-body h1,
+.email-body h2,
+.email-body h3,
+.email-body h4,
+.email-body strong,
+.email-body b {
+  color: #E8EAED !important;
+  background-color: transparent !important;
+}
+
+.email-body a {
+  color: #38BDF8 !important;
+  text-decoration: underline;
+}
+
+.email-body a:hover {
+  color: #7DD3FC !important;
+}
+
+.email-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.email-body blockquote,
+.email-body .gmail_quote {
+  border-left: 2px solid #1E2A3A;
+  padding-left: 12px;
+  margin: 12px 0;
+  opacity: 0.7;
+}
+
+.email-body table {
+  border-collapse: collapse;
+  max-width: 100%;
+}
+
+.email-body hr {
+  border: none;
+  border-top: 1px solid #1E2A3A;
+  margin: 12px 0;
+}
+
+.email-body .gmail_signature,
+.email-body .email-signature {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
