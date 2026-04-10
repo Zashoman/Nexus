@@ -12,57 +12,48 @@ export async function POST(request: Request) {
 
     const client = new Anthropic();
 
-    const systemPrompt = `You are a professional email reply writer for Blue Tree Digital PR, a digital PR agency that helps SaaS and tech companies grow through editorial placements in major publications, strategic backlinks, and content marketing.
+    const systemPrompt = `You are a professional email reply writer for Blue Tree Digital PR, a digital PR agency.
 
-Blue Tree's core services:
-- Securing guest post placements on high-authority publications (TechCrunch, Wired, Harvard Business Review, etc.)
-- Building high-quality backlinks that boost organic search rankings
-- Digital PR campaigns that drive organic traffic growth
-- Content marketing strategy for B2B SaaS companies
+Blue Tree's services:
+- Securing editorial placements in major publications (TechCrunch, Wired, HBR, ComputerWeekly, etc.)
+- Building high-quality backlinks that boost organic search rankings and AI search visibility
+- Digital PR campaigns for B2B SaaS companies
+- They've helped companies like Hostinger achieve 211%+ organic growth
 
-Context: You're replying to someone who responded to one of Blue Tree's outreach emails. The full email thread is provided so you understand the conversation history.
+CRITICAL INSTRUCTIONS:
+1. You will receive a FULL EMAIL THREAD in HTML format. This contains the original outreach email from Blue Tree AND the reply from the prospect. Read the ENTIRE thread carefully.
+2. The most recent message is at the TOP. Older messages are in blockquotes or quoted sections below.
+3. Identify: (a) What Blue Tree originally pitched, (b) What the prospect replied, (c) What the logical next step is.
+4. Write a reply that DIRECTLY addresses what the prospect said. If they asked for more info, give specific info. If they want a call, propose times. If they asked a question, answer it.
+5. Be concise (3-6 sentences). Sound human and warm. Use their first name.
+6. Sign off as the person whose email account is specified.
+7. Do NOT say their message was "cut off" — it wasn't. Short replies like "Could you share more info?" are complete messages.
+8. Do NOT include a subject line. Just the email body.`;
 
-Your reply should:
-- Directly address what the person asked or said in their reply
-- Be brief and actionable (3-6 sentences for most replies)
-- Move the conversation forward — suggest a call, offer to share specific examples, answer their question
-- Reference specifics from the thread (their company name, what was discussed)
-- Sound human, warm, and professional — not robotic or salesy
-- Use the sender's first name
-- Sign off as the person whose email account sent the original outreach
+    // Send the raw HTML thread to Claude - it can parse HTML better than stripped text
+    // Remove script/style tags but keep the HTML structure for thread parsing
+    const cleanHtml = (full_thread_html || '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<img[^>]*>/gi, '[image]')
+      .substring(0, 6000);
 
-Do NOT include a subject line. Just write the email body.
-Do NOT include "Dear" — use "Hi [name]" or "Hey [name]" matching the thread's tone.
-Do NOT repeat what was already said in the thread. Build on it.
-Do NOT be vague — if they asked for more info, give them something specific or concrete next step.`;
-
-    // Strip HTML for the thread context but keep structure
-    const threadContext = full_thread_html
-      ? full_thread_html
-          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-          .replace(/<[^>]*>/g, ' ')
-          .replace(/&nbsp;/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim()
-          .substring(0, 4000)
-      : '';
-
-    const userPrompt = `Reply to this email thread:
+    const userPrompt = `Draft a reply to this email thread.
 
 From: ${sender_name} <${sender_email}>
 Subject: ${subject}
 Campaign: ${campaign_name || 'Blue Tree outreach'}
-Replying from account: ${account_email || 'Blue Tree team'}
-${classification_summary ? `AI classification: ${classification_summary}` : ''}
+Replying as: ${account_email || 'Blue Tree team'}
+${classification_summary ? `Context: ${classification_summary}` : ''}
 
-Their latest reply:
-"${reply_text || '(see full thread below)'}"
+The prospect's latest reply (plain text): "${reply_text || '(see thread below)'}"
 
-Full email thread (includes the original outreach and all replies):
-${threadContext}
+Full email thread (HTML — read the entire thread to understand context):
+---
+${cleanHtml}
+---
 
-Write a draft reply that directly addresses what ${sender_name.split(' ')[0]} said. Just the email body, nothing else.`;
+Write a reply that directly addresses what ${sender_name.split(' ')[0]} said. Just the email body.`;
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
