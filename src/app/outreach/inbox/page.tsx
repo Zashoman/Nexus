@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Search,
   Filter,
@@ -13,6 +13,12 @@ import {
   User,
   Building2,
   ArrowRight,
+  Sparkles,
+  MessageCircle,
+  CalendarCheck,
+  XCircle,
+  Clock3,
+  BotMessageSquare,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card from '@/components/outreach/ui/Card';
@@ -25,35 +31,36 @@ interface InstantlyEmail {
   from_address_email?: string;
   from_address?: string;
   to_address_email_list?: string;
-  to_address_email?: string;
   from_name?: string;
-  to_name?: string;
   subject?: string;
   body?: unknown;
   text_body?: string;
   html_body?: string;
-  timestamp?: string;
-  timestamp_created?: string;
   timestamp_email?: string;
+  timestamp_created?: string;
+  timestamp?: string;
   created_at?: string;
   date?: string;
-  is_read?: boolean;
   is_unread?: number;
   campaign_id?: string;
-  campaign_name?: string;
   thread_id?: string;
-  message_type?: string;
-  direction?: string;
-  lead_email?: string;
   lead?: string;
-  account_email?: string;
+  lead_email?: string;
   eaccount?: string;
+  account_email?: string;
   ue_type?: number;
   i_status?: number;
   content_preview?: string;
   from_address_json?: Array<{ address: string; name: string }>;
-  to_address_json?: Array<{ address: string; name: string }>;
   [key: string]: unknown;
+}
+
+interface Classification {
+  category: string;
+  confidence: number;
+  summary: string;
+  needs_reply: boolean;
+  priority: 'high' | 'medium' | 'low' | 'none';
 }
 
 interface InstantlyCampaign {
@@ -61,6 +68,32 @@ interface InstantlyCampaign {
   name: string;
   status: string;
 }
+
+type InboxTab = 'needs_reply' | 'auto_ooo' | 'not_interested' | 'all';
+
+const tabs: { id: InboxTab; label: string; icon: typeof MessageCircle }[] = [
+  { id: 'needs_reply', label: 'Needs Reply', icon: MessageCircle },
+  { id: 'auto_ooo', label: 'Auto / OOO', icon: BotMessageSquare },
+  { id: 'not_interested', label: 'Not Interested', icon: XCircle },
+  { id: 'all', label: 'All Replies', icon: Mail },
+];
+
+const categoryConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'default' | 'primary' | 'teal'; icon: typeof MessageCircle; tab: InboxTab }> = {
+  interested: { label: 'Interested', variant: 'success', icon: MessageCircle, tab: 'needs_reply' },
+  meeting_request: { label: 'Meeting Request', variant: 'teal', icon: CalendarCheck, tab: 'needs_reply' },
+  question: { label: 'Question', variant: 'info', icon: MessageCircle, tab: 'needs_reply' },
+  not_now_later: { label: 'Not Now', variant: 'warning', icon: Clock3, tab: 'needs_reply' },
+  not_interested: { label: 'Not Interested', variant: 'danger', icon: XCircle, tab: 'not_interested' },
+  unsubscribe: { label: 'Unsubscribe', variant: 'danger', icon: XCircle, tab: 'not_interested' },
+  out_of_office: { label: 'Out of Office', variant: 'default', icon: BotMessageSquare, tab: 'auto_ooo' },
+  auto_reply: { label: 'Auto-reply', variant: 'default', icon: BotMessageSquare, tab: 'auto_ooo' },
+  wrong_person: { label: 'Wrong Person', variant: 'warning', icon: User, tab: 'needs_reply' },
+  unclassified: { label: 'Unclassified', variant: 'default', icon: Mail, tab: 'all' },
+};
+
+const campaignNameCache: Record<string, string> = {};
+
+// --- Helper functions ---
 
 function getEmailTime(email: InstantlyEmail): string {
   const ts = email.timestamp_email || email.timestamp_created || email.timestamp || email.created_at || email.date;
@@ -72,193 +105,279 @@ function getEmailTime(email: InstantlyEmail): string {
     const diffMin = Math.floor(diffMs / 60000);
     const diffHr = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-
     if (diffMin < 1) return 'Just now';
     if (diffMin < 60) return `${diffMin}m ago`;
     if (diffHr < 24) return `${diffHr}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  } catch {
-    return '';
-  }
+  } catch { return ''; }
 }
 
 function getSenderName(email: InstantlyEmail): string {
   if (email.from_address_json?.[0]?.name) return email.from_address_json[0].name;
-  return email.from_name || email.from_address_email || email.from_address || email.lead || 'Unknown';
+  return email.from_name || email.from_address_email || email.lead || 'Unknown';
 }
 
 function getSenderEmail(email: InstantlyEmail): string {
   if (email.from_address_json?.[0]?.address) return email.from_address_json[0].address;
-  return email.from_address_email || email.from_address || email.lead || '';
-}
-
-function getLeadEmail(email: InstantlyEmail): string {
-  return email.lead || email.lead_email || getSenderEmail(email);
-}
-
-function getAccountEmail(email: InstantlyEmail): string {
-  return email.eaccount || email.account_email || '';
+  return email.from_address_email || email.lead || '';
 }
 
 function getEmailBodyPlain(email: InstantlyEmail): string {
   try {
+    if (email.content_preview && typeof email.content_preview === 'string') return email.content_preview;
     let raw = '';
-    if (email.content_preview && typeof email.content_preview === 'string') {
-      return email.content_preview;
-    }
-    if (email.text_body && typeof email.text_body === 'string') {
-      raw = email.text_body;
-    } else if (email.body && typeof email.body === 'object' && email.body !== null) {
-      const bodyObj = email.body as Record<string, string>;
-      raw = bodyObj.text || bodyObj.html || '';
-    } else if (email.body && typeof email.body === 'string') {
-      raw = email.body;
-    } else if (email.html_body && typeof email.html_body === 'string') {
-      raw = email.html_body;
-    }
+    if (email.text_body && typeof email.text_body === 'string') raw = email.text_body;
+    else if (email.body && typeof email.body === 'object' && email.body !== null) {
+      const b = email.body as Record<string, string>;
+      raw = b.text || b.html || '';
+    } else if (typeof email.body === 'string') raw = email.body;
+    else if (typeof email.html_body === 'string') raw = email.html_body;
     return raw.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-  } catch {
-    return String(email.content_preview || '');
-  }
+  } catch { return String(email.content_preview || ''); }
 }
 
 function getEmailBodyHtml(email: InstantlyEmail): string {
   try {
     if (email.body && typeof email.body === 'object' && email.body !== null) {
-      const bodyObj = email.body as Record<string, string>;
-      if (bodyObj.html) return bodyObj.html;
-      if (bodyObj.text) return bodyObj.text.replace(/\n/g, '<br>');
+      const b = email.body as Record<string, string>;
+      if (b.html) return b.html;
+      if (b.text) return b.text.replace(/\n/g, '<br>');
     }
-    if (email.html_body && typeof email.html_body === 'string') {
-      return email.html_body;
-    }
-    if (email.body && typeof email.body === 'string') {
-      return email.body;
-    }
-    if (email.text_body && typeof email.text_body === 'string') {
-      return email.text_body.replace(/\n/g, '<br>');
-    }
+    if (typeof email.html_body === 'string') return email.html_body;
+    if (typeof email.body === 'string') return email.body;
+    if (typeof email.text_body === 'string') return email.text_body.replace(/\n/g, '<br>');
     return String(email.content_preview || '').replace(/\n/g, '<br>');
-  } catch {
-    return String(email.content_preview || '');
-  }
+  } catch { return String(email.content_preview || ''); }
 }
 
 function getSubject(email: InstantlyEmail): string {
   return email.subject || '(no subject)';
 }
 
-function getReplyStatusBadge(email: InstantlyEmail): { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'default' } {
-  const iStatus = email.i_status;
-  if (iStatus === 1) return { label: 'Action needed', variant: 'warning' };
-  if (iStatus === 0) return { label: 'Auto-reply', variant: 'default' };
-  return { label: 'New reply', variant: 'info' };
+function getCampaignName(campaignId?: string): string {
+  if (!campaignId) return '';
+  return campaignNameCache[campaignId] || campaignId.substring(0, 8) + '...';
 }
 
-// Campaign name cache
-const campaignNameCache: Record<string, string> = {};
+// --- Main component ---
 
 export default function InboxPage() {
   const [emails, setEmails] = useState<InstantlyEmail[]>([]);
   const [campaigns, setCampaigns] = useState<InstantlyCampaign[]>([]);
+  const [classifications, setClassifications] = useState<Record<string, Classification>>({});
   const [loading, setLoading] = useState(true);
+  const [classifying, setClassifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<InstantlyEmail | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<InboxTab>('needs_reply');
   const [search, setSearch] = useState('');
   const [totalFetched, setTotalFetched] = useState(0);
 
-  const fetchEmails = async (campaignId?: string) => {
+  const fetchEmails = useCallback(async (campaignId?: string) => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ limit: '100', replies_only: 'true' });
       if (campaignId) params.set('campaign_id', campaignId);
-
       const res = await fetch(`/api/outreach/instantly/replies?${params}`);
       const data = await res.json();
-
-      if (data.error) {
-        setError(data.error);
-        setEmails([]);
-      } else {
-        const sortedEmails = (data.emails || []).sort((a: InstantlyEmail, b: InstantlyEmail) => {
+      if (data.error) { setError(data.error); setEmails([]); }
+      else {
+        const sorted = (data.emails || []).sort((a: InstantlyEmail, b: InstantlyEmail) => {
           const aTs = a.timestamp_email || a.timestamp_created || '';
           const bTs = b.timestamp_email || b.timestamp_created || '';
           return new Date(bTs).getTime() - new Date(aTs).getTime();
         });
-        setEmails(sortedEmails);
+        setEmails(sorted);
         setTotalFetched(data.total_fetched || 0);
-        if (sortedEmails.length > 0 && !selectedEmail) {
-          setSelectedEmail(sortedEmails[0]);
-        }
       }
-    } catch {
-      setError('Failed to fetch emails');
-    } finally {
-      setLoading(false);
-    }
-  };
+    } catch { setError('Failed to fetch emails'); }
+    finally { setLoading(false); }
+  }, []);
 
-  const fetchCampaigns = async () => {
+  const fetchCampaigns = useCallback(async () => {
     try {
       const res = await fetch('/api/outreach/instantly/campaigns');
       const data = await res.json();
-      const campaignList = data.campaigns || [];
-      setCampaigns(campaignList);
-      campaignList.forEach((c: InstantlyCampaign) => {
-        campaignNameCache[c.id] = c.name;
+      const list = data.campaigns || [];
+      setCampaigns(list);
+      list.forEach((c: InstantlyCampaign) => { campaignNameCache[c.id] = c.name; });
+    } catch { /* silent */ }
+  }, []);
+
+  const classifyEmails = async () => {
+    if (emails.length === 0) return;
+    setClassifying(true);
+    try {
+      const replies = emails.map((e) => ({
+        id: e.id,
+        senderName: getSenderName(e),
+        senderEmail: getSenderEmail(e),
+        subject: getSubject(e),
+        body: getEmailBodyPlain(e).substring(0, 1500),
+        campaignContext: getCampaignName(e.campaign_id),
+      }));
+
+      const res = await fetch('/api/outreach/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ replies }),
       });
-    } catch {
-      // silently fail
+      const data = await res.json();
+      if (data.classifications) {
+        setClassifications(data.classifications);
+      }
+    } catch (err) {
+      console.error('Classification failed:', err);
+    } finally {
+      setClassifying(false);
     }
   };
 
   useEffect(() => {
     fetchCampaigns();
     fetchEmails();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchCampaigns, fetchEmails]);
 
   const handleCampaignFilter = (campaignId: string) => {
     setSelectedCampaign(campaignId);
     setSelectedEmail(null);
+    setClassifications({});
     fetchEmails(campaignId || undefined);
   };
 
-  const getCampaignName = (campaignId?: string): string => {
-    if (!campaignId) return '';
-    return campaignNameCache[campaignId] || campaignId.substring(0, 8) + '...';
+  const getEmailCategory = (email: InstantlyEmail): string => {
+    if (classifications[email.id]) return classifications[email.id].category;
+    return 'unclassified';
   };
 
-  const filtered = search
-    ? emails.filter((e) => {
-        const name = getSenderName(e).toLowerCase();
-        const subject = getSubject(e).toLowerCase();
-        const body = getEmailBodyPlain(e).toLowerCase();
+  const getEmailTab = (email: InstantlyEmail): InboxTab => {
+    const category = getEmailCategory(email);
+    return categoryConfig[category]?.tab || 'all';
+  };
+
+  const isClassified = Object.keys(classifications).length > 0;
+
+  // Filter by tab, then by search
+  const tabFiltered = activeTab === 'all'
+    ? emails
+    : isClassified
+      ? emails.filter((e) => getEmailTab(e) === activeTab)
+      : emails; // If not classified yet, show all in every tab
+
+  const searchFiltered = search
+    ? tabFiltered.filter((e) => {
         const q = search.toLowerCase();
-        return name.includes(q) || subject.includes(q) || body.includes(q);
+        return getSenderName(e).toLowerCase().includes(q) ||
+               getSubject(e).toLowerCase().includes(q) ||
+               getEmailBodyPlain(e).toLowerCase().includes(q);
       })
-    : emails;
+    : tabFiltered;
+
+  // Tab counts
+  const tabCounts: Record<InboxTab, number> = {
+    needs_reply: isClassified ? emails.filter((e) => getEmailTab(e) === 'needs_reply').length : 0,
+    auto_ooo: isClassified ? emails.filter((e) => getEmailTab(e) === 'auto_ooo').length : 0,
+    not_interested: isClassified ? emails.filter((e) => getEmailTab(e) === 'not_interested').length : 0,
+    all: emails.length,
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Inbox — Replies"
-        subtitle={loading ? 'Loading...' : `${emails.length} replies found (from ${totalFetched} total emails)`}
+        title="Inbox"
+        subtitle={loading ? 'Loading...' : `${emails.length} replies from ${totalFetched} emails`}
         action={
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => fetchEmails(selectedCampaign || undefined)}
-            loading={loading}
-            icon={<RefreshCw className="w-3.5 h-3.5" />}
-          >
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            {!isClassified && emails.length > 0 && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={classifyEmails}
+                loading={classifying}
+                icon={<Sparkles className="w-3.5 h-3.5" />}
+              >
+                Classify with AI
+              </Button>
+            )}
+            {isClassified && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={classifyEmails}
+                loading={classifying}
+                icon={<Sparkles className="w-3.5 h-3.5" />}
+              >
+                Re-classify
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => fetchEmails(selectedCampaign || undefined)}
+              loading={loading}
+              icon={<RefreshCw className="w-3.5 h-3.5" />}
+            >
+              Refresh
+            </Button>
+          </div>
         }
       />
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 p-1 bg-bt-bg-alt rounded-lg w-fit">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const count = tabCounts[tab.id];
+          return (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setSelectedEmail(null); }}
+              className={`
+                flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                ${activeTab === tab.id
+                  ? 'bg-bt-surface text-bt-text shadow-sm'
+                  : 'text-bt-text-secondary hover:text-bt-text'
+                }
+              `}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {tab.label}
+              {(isClassified || tab.id === 'all') && (
+                <span className={`
+                  text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums
+                  ${activeTab === tab.id
+                    ? 'bg-bt-primary text-white'
+                    : 'bg-bt-border text-bt-text-secondary'
+                  }
+                `}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Classifying banner */}
+      {classifying && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-bt-primary-bg/50 border border-bt-primary/20">
+          <Loader2 className="w-4 h-4 text-bt-primary animate-spin" />
+          <span className="text-sm text-bt-text">Classifying {emails.length} replies with AI...</span>
+        </div>
+      )}
+
+      {/* Not classified hint */}
+      {!isClassified && !classifying && emails.length > 0 && activeTab !== 'all' && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-bt-bg-alt border border-bt-border">
+          <Sparkles className="w-4 h-4 text-bt-text-tertiary" />
+          <span className="text-sm text-bt-text-secondary">
+            Click <strong>&quot;Classify with AI&quot;</strong> to sort replies into tabs automatically.
+          </span>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-3">
@@ -300,84 +419,66 @@ export default function InboxPage() {
 
       {/* Error */}
       {!loading && error && (
-        <Card>
-          <div className="text-center py-8">
-            <p className="text-sm text-bt-red mb-2">{error}</p>
-            <Button variant="secondary" size="sm" onClick={() => fetchEmails()}>Try again</Button>
-          </div>
-        </Card>
+        <Card><div className="text-center py-8">
+          <p className="text-sm text-bt-red mb-2">{error}</p>
+          <Button variant="secondary" size="sm" onClick={() => fetchEmails()}>Try again</Button>
+        </div></Card>
       )}
 
-      {/* Empty state */}
-      {!loading && !error && emails.length === 0 && (
+      {/* Empty */}
+      {!loading && !error && searchFiltered.length === 0 && (
         <EmptyState
           icon={<InboxIcon className="w-8 h-8" />}
-          title="No replies found"
-          description="No inbound replies were found. Try selecting a different campaign or check back later."
-          action={<Button variant="secondary" size="sm" onClick={() => fetchEmails()}>Refresh</Button>}
+          title={activeTab === 'all' ? 'No replies found' : `No replies in "${tabs.find(t => t.id === activeTab)?.label}"`}
+          description={isClassified ? 'Try a different tab or campaign filter.' : 'Click "Classify with AI" to sort replies into tabs.'}
+          action={activeTab !== 'all' ? <Button variant="ghost" size="sm" onClick={() => setActiveTab('all')}>View all replies</Button> : undefined}
         />
       )}
 
-      {/* Split view: reply list + detail */}
-      {!loading && !error && filtered.length > 0 && (
+      {/* Split view */}
+      {!loading && !error && searchFiltered.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 min-h-[600px]">
           {/* Reply list */}
           <div className="lg:col-span-2">
             <Card padding="none" className="h-full overflow-hidden">
               <div className="divide-y divide-bt-border overflow-y-auto max-h-[700px]">
-                {filtered.map((email) => {
+                {searchFiltered.map((email) => {
                   const isSelected = selectedEmail?.id === email.id;
-                  const statusBadge = getReplyStatusBadge(email);
+                  const cat = getEmailCategory(email);
+                  const config = categoryConfig[cat] || categoryConfig.unclassified;
+                  const classification = classifications[email.id];
                   return (
                     <button
                       key={email.id}
                       onClick={() => setSelectedEmail(email)}
-                      className={`
-                        w-full text-left px-4 py-3.5 transition-colors
-                        ${isSelected ? 'bg-bt-primary-bg/50' : 'hover:bg-bt-surface-hover'}
-                      `}
+                      className={`w-full text-left px-4 py-3.5 transition-colors ${isSelected ? 'bg-bt-primary-bg/50' : 'hover:bg-bt-surface-hover'}`}
                     >
-                      {/* Sender + time */}
                       <div className="flex items-start justify-between mb-1">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="w-7 h-7 rounded-full bg-bt-bg-alt flex items-center justify-center shrink-0">
                             <User className="w-3.5 h-3.5 text-bt-text-tertiary" />
                           </div>
                           <div className="min-w-0">
-                            <span className="text-sm font-semibold text-bt-text truncate block">
-                              {getSenderName(email)}
-                            </span>
-                            <span className="text-[11px] text-bt-text-tertiary truncate block">
-                              {getSenderEmail(email)}
-                            </span>
+                            <span className="text-sm font-semibold text-bt-text truncate block">{getSenderName(email)}</span>
+                            <span className="text-[11px] text-bt-text-tertiary truncate block">{getSenderEmail(email)}</span>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 shrink-0 ml-2">
-                          <span className="text-[11px] text-bt-text-tertiary">
-                            {getEmailTime(email)}
-                          </span>
-                          <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
+                          <span className="text-[11px] text-bt-text-tertiary">{getEmailTime(email)}</span>
+                          <Badge variant={config.variant} size="sm">{config.label}</Badge>
                         </div>
                       </div>
-
-                      {/* Subject */}
-                      <p className="text-xs text-bt-text truncate mt-1">
-                        {getSubject(email)}
-                      </p>
-
-                      {/* Preview */}
-                      <p className="text-xs text-bt-text-tertiary mt-1 line-clamp-2">
-                        {getEmailBodyPlain(email).substring(0, 150)}
-                      </p>
-
-                      {/* Campaign tag */}
+                      <p className="text-xs text-bt-text truncate mt-1">{getSubject(email)}</p>
+                      {classification?.summary ? (
+                        <p className="text-xs text-bt-primary mt-1 truncate">{classification.summary}</p>
+                      ) : (
+                        <p className="text-xs text-bt-text-tertiary mt-1 line-clamp-2">{getEmailBodyPlain(email).substring(0, 150)}</p>
+                      )}
                       <div className="flex items-center gap-1.5 mt-2">
-                        <Badge variant="default" size="sm">
-                          {getCampaignName(email.campaign_id)}
-                        </Badge>
-                        {email.eaccount && (
-                          <Badge variant="info" size="sm">
-                            via {email.eaccount?.split('@')[0]}
+                        <Badge variant="default" size="sm">{getCampaignName(email.campaign_id)}</Badge>
+                        {classification && (
+                          <Badge variant={classification.priority === 'high' ? 'success' : classification.priority === 'medium' ? 'warning' : 'default'} size="sm">
+                            {classification.priority} priority
                           </Badge>
                         )}
                       </div>
@@ -388,22 +489,19 @@ export default function InboxPage() {
             </Card>
           </div>
 
-          {/* Reply detail */}
+          {/* Detail */}
           <div className="lg:col-span-3">
             {selectedEmail ? (
               <Card padding="none" className="h-full flex flex-col">
-                {/* Header */}
                 <div className="p-5 border-b border-bt-border">
                   <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-sm font-semibold text-bt-text">
-                      {getSubject(selectedEmail)}
-                    </h3>
-                    <Badge variant={getReplyStatusBadge(selectedEmail).variant} size="sm">
-                      {getReplyStatusBadge(selectedEmail).label}
-                    </Badge>
+                    <h3 className="text-sm font-semibold text-bt-text">{getSubject(selectedEmail)}</h3>
+                    {classifications[selectedEmail.id] && (
+                      <Badge variant={categoryConfig[classifications[selectedEmail.id].category]?.variant || 'default'} size="sm">
+                        {categoryConfig[classifications[selectedEmail.id].category]?.label || classifications[selectedEmail.id].category}
+                      </Badge>
+                    )}
                   </div>
-
-                  {/* Sender info */}
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-9 h-9 rounded-full bg-bt-bg-alt flex items-center justify-center">
                       <User className="w-4 h-4 text-bt-text-tertiary" />
@@ -413,48 +511,46 @@ export default function InboxPage() {
                       <p className="text-xs text-bt-text-secondary">{getSenderEmail(selectedEmail)}</p>
                     </div>
                   </div>
-
-                  {/* Meta info */}
+                  {/* AI classification summary */}
+                  {classifications[selectedEmail.id] && (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-bt-primary-bg/30 border border-bt-primary/10 mb-3">
+                      <Sparkles className="w-4 h-4 text-bt-primary shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-medium text-bt-primary">AI Classification</p>
+                        <p className="text-sm text-bt-text mt-0.5">{classifications[selectedEmail.id].summary}</p>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <Badge variant={categoryConfig[classifications[selectedEmail.id].category]?.variant || 'default'} size="sm">
+                            {categoryConfig[classifications[selectedEmail.id].category]?.label}
+                          </Badge>
+                          <span className="text-[10px] text-bt-text-tertiary">
+                            {Math.round(classifications[selectedEmail.id].confidence * 100)}% confidence
+                          </span>
+                          {classifications[selectedEmail.id].needs_reply && (
+                            <Badge variant="success" size="sm" dot>Needs reply</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-3 text-xs text-bt-text-tertiary">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {getEmailTime(selectedEmail)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Building2 className="w-3 h-3" />
-                      {getCampaignName(selectedEmail.campaign_id)}
-                    </span>
+                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{getEmailTime(selectedEmail)}</span>
+                    <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{getCampaignName(selectedEmail.campaign_id)}</span>
                     {selectedEmail.eaccount && (
-                      <span className="flex items-center gap-1">
-                        <ArrowRight className="w-3 h-3" />
-                        Sent via {selectedEmail.eaccount}
-                      </span>
+                      <span className="flex items-center gap-1"><ArrowRight className="w-3 h-3" />via {selectedEmail.eaccount}</span>
                     )}
-                    <span className="flex items-center gap-1">
-                      <Mail className="w-3 h-3" />
-                      Lead: {getLeadEmail(selectedEmail)}
-                    </span>
+                    <span className="flex items-center gap-1"><Mail className="w-3 h-3" />Lead: {selectedEmail.lead || getSenderEmail(selectedEmail)}</span>
                   </div>
                 </div>
-
-                {/* Body */}
                 <div className="flex-1 overflow-y-auto p-5">
-                  <div
-                    className="email-body text-sm text-bt-text leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: getEmailBodyHtml(selectedEmail) }}
-                  />
+                  <div className="email-body text-sm text-bt-text leading-relaxed" dangerouslySetInnerHTML={{ __html: getEmailBodyHtml(selectedEmail) }} />
                 </div>
-
-                {/* Account info */}
                 <div className="px-5 py-3 border-t border-bt-border bg-bt-bg/50">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] text-bt-text-tertiary">
-                      Account: {getAccountEmail(selectedEmail)} &middot; Thread: {selectedEmail.thread_id?.substring(0, 12)}...
+                      Account: {selectedEmail.eaccount || selectedEmail.account_email} &middot; Thread: {selectedEmail.thread_id?.substring(0, 12)}...
                     </span>
                     <details className="text-[11px]">
-                      <summary className="text-bt-text-tertiary cursor-pointer hover:text-bt-text-secondary">
-                        Raw data
-                      </summary>
+                      <summary className="text-bt-text-tertiary cursor-pointer hover:text-bt-text-secondary">Raw data</summary>
                       <pre className="mt-2 text-[10px] text-bt-text-tertiary bg-bt-bg-alt rounded-lg p-3 overflow-x-auto max-h-48 absolute right-4 bottom-12 w-[500px] z-10 border border-bt-border shadow-lg">
                         {JSON.stringify(selectedEmail, null, 2)}
                       </pre>
