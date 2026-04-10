@@ -75,9 +75,22 @@ function getSenderEmail(email: InstantlyEmail): string {
 }
 
 function getEmailBody(email: InstantlyEmail): string {
-  const raw = email.text_body || email.body || email.html_body || '';
+  // body can be a string or an object like { html: "...", text: "..." }
+  let raw = '';
+  if (email.text_body && typeof email.text_body === 'string') {
+    raw = email.text_body;
+  } else if (email.body && typeof email.body === 'object' && email.body !== null) {
+    const bodyObj = email.body as Record<string, string>;
+    raw = bodyObj.text || bodyObj.html || '';
+  } else if (email.body && typeof email.body === 'string') {
+    raw = email.body;
+  } else if (email.html_body && typeof email.html_body === 'string') {
+    raw = email.html_body;
+  } else if (email.content_preview && typeof email.content_preview === 'string') {
+    return email.content_preview as string;
+  }
   // Strip HTML tags for display
-  return raw.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+  return raw.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function getSubject(email: InstantlyEmail): string {
