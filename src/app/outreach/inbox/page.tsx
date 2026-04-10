@@ -101,9 +101,12 @@ function getAccountEmail(email: InstantlyEmail): string {
   return email.eaccount || email.account_email || '';
 }
 
-function getEmailBody(email: InstantlyEmail): string {
+function getEmailBodyPlain(email: InstantlyEmail): string {
   try {
     let raw = '';
+    if (email.content_preview && typeof email.content_preview === 'string') {
+      return email.content_preview;
+    }
     if (email.text_body && typeof email.text_body === 'string') {
       raw = email.text_body;
     } else if (email.body && typeof email.body === 'object' && email.body !== null) {
@@ -113,10 +116,30 @@ function getEmailBody(email: InstantlyEmail): string {
       raw = email.body;
     } else if (email.html_body && typeof email.html_body === 'string') {
       raw = email.html_body;
-    } else if (typeof email.content_preview === 'string') {
-      return email.content_preview;
     }
     return raw.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  } catch {
+    return String(email.content_preview || '');
+  }
+}
+
+function getEmailBodyHtml(email: InstantlyEmail): string {
+  try {
+    if (email.body && typeof email.body === 'object' && email.body !== null) {
+      const bodyObj = email.body as Record<string, string>;
+      if (bodyObj.html) return bodyObj.html;
+      if (bodyObj.text) return bodyObj.text.replace(/\n/g, '<br>');
+    }
+    if (email.html_body && typeof email.html_body === 'string') {
+      return email.html_body;
+    }
+    if (email.body && typeof email.body === 'string') {
+      return email.body;
+    }
+    if (email.text_body && typeof email.text_body === 'string') {
+      return email.text_body.replace(/\n/g, '<br>');
+    }
+    return String(email.content_preview || '').replace(/\n/g, '<br>');
   } catch {
     return String(email.content_preview || '');
   }
@@ -213,7 +236,7 @@ export default function InboxPage() {
     ? emails.filter((e) => {
         const name = getSenderName(e).toLowerCase();
         const subject = getSubject(e).toLowerCase();
-        const body = getEmailBody(e).toLowerCase();
+        const body = getEmailBodyPlain(e).toLowerCase();
         const q = search.toLowerCase();
         return name.includes(q) || subject.includes(q) || body.includes(q);
       })
@@ -344,7 +367,7 @@ export default function InboxPage() {
 
                       {/* Preview */}
                       <p className="text-xs text-bt-text-tertiary mt-1 line-clamp-2">
-                        {getEmailBody(email).substring(0, 150)}
+                        {getEmailBodyPlain(email).substring(0, 150)}
                       </p>
 
                       {/* Campaign tag */}
@@ -416,9 +439,10 @@ export default function InboxPage() {
 
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto p-5">
-                  <div className="text-sm text-bt-text leading-relaxed whitespace-pre-wrap">
-                    {getEmailBody(selectedEmail)}
-                  </div>
+                  <div
+                    className="email-body text-sm text-bt-text leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: getEmailBodyHtml(selectedEmail) }}
+                  />
                 </div>
 
                 {/* Account info */}
