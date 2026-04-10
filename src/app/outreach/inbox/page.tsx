@@ -166,12 +166,14 @@ export default function InboxPage() {
   const [emails, setEmails] = useState<InstantlyEmail[]>([]);
   const [campaigns, setCampaigns] = useState<InstantlyCampaign[]>([]);
   const [classifications, setClassifications] = useState<Record<string, Classification>>({});
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [draftLoading, setDraftLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [classifying, setClassifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<InstantlyEmail | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<InboxTab>('needs_reply');
+  const [activeTab, setActiveTab] = useState<InboxTab>('all');
   const [search, setSearch] = useState('');
   const [totalFetched, setTotalFetched] = useState(0);
 
@@ -236,6 +238,32 @@ export default function InboxPage() {
     }
   };
 
+  const generateDraft = async (email: InstantlyEmail) => {
+    setDraftLoading(email.id);
+    try {
+      const res = await fetch('/api/outreach/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender_name: getSenderName(email),
+          sender_email: getSenderEmail(email),
+          subject: getSubject(email),
+          email_body: getEmailBodyPlain(email),
+          campaign_name: getCampaignName(email.campaign_id),
+          account_email: email.eaccount || email.account_email || '',
+        }),
+      });
+      const data = await res.json();
+      if (data.draft) {
+        setDrafts((prev) => ({ ...prev, [email.id]: data.draft }));
+      }
+    } catch (err) {
+      console.error('Draft generation failed:', err);
+    } finally {
+      setDraftLoading(null);
+    }
+  };
+
   useEffect(() => {
     fetchCampaigns();
     fetchEmails();
@@ -245,6 +273,7 @@ export default function InboxPage() {
     setSelectedCampaign(campaignId);
     setSelectedEmail(null);
     setClassifications({});
+    setDrafts({});
     fetchEmails(campaignId || undefined);
   };
 
@@ -254,8 +283,12 @@ export default function InboxPage() {
   };
 
   const getEmailTab = (email: InstantlyEmail): InboxTab => {
-    const category = getEmailCategory(email);
-    return categoryConfig[category]?.tab || 'all';
+    const cat = getEmailCategory(email);
+    const config = categoryConfig[cat];
+    if (!config) return 'all';
+    // Also use needs_reply flag from classification
+    if (classifications[email.id]?.needs_reply) return 'needs_reply';
+    return config.tab;
   };
 
   const isClassified = Object.keys(classifications).length > 0;
@@ -265,7 +298,7 @@ export default function InboxPage() {
     ? emails
     : isClassified
       ? emails.filter((e) => getEmailTab(e) === activeTab)
-      : emails; // If not classified yet, show all in every tab
+      : emails;
 
   const searchFiltered = search
     ? tabFiltered.filter((e) => {
@@ -544,6 +577,46 @@ export default function InboxPage() {
                 <div className="flex-1 overflow-y-auto p-5">
                   <div className="email-body text-sm text-bt-text leading-relaxed" dangerouslySetInnerHTML={{ __html: getEmailBodyHtml(selectedEmail) }} />
                 </div>
+                {/* Draft Reply section */}
+                <div className="px-5 py-4 border-t border-bt-border">
+                  {drafts[selectedEmail.id] ? (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-bt-teal" />
+                          <span className="text-xs font-semibold text-bt-teal">AI Draft Reply</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => generateDraft(selectedEmail)}
+                          loading={draftLoading === selectedEmail.id}
+                          icon={<RefreshCw className="w-3 h-3" />}
+                        >
+                          Regenerate
+                        </Button>
+                      </div>
+                      <div className="bg-bt-teal/5 border border-bt-teal/20 rounded-lg p-4">
+                        <div className="text-sm text-bt-text leading-relaxed whitespace-pre-wrap">
+                          {drafts[selectedEmail.id]}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => generateDraft(selectedEmail)}
+                      loading={draftLoading === selectedEmail.id}
+                      icon={<Sparkles className="w-3.5 h-3.5" />}
+                      className="w-full"
+                    >
+                      {draftLoading === selectedEmail.id ? 'Generating draft...' : 'Draft Reply'}
+                    </Button>
+                  )}
+                </div>
+
+                {/* Footer */}
                 <div className="px-5 py-3 border-t border-bt-border bg-bt-bg/50">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] text-bt-text-tertiary">
