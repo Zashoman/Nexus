@@ -6,6 +6,7 @@ import {
   Filter,
   RefreshCw,
   Mail,
+  Send,
   ChevronDown,
   Loader2,
   Inbox as InboxIcon,
@@ -168,6 +169,8 @@ export default function InboxPage() {
   const [classifications, setClassifications] = useState<Record<string, Classification>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [draftLoading, setDraftLoading] = useState<string | null>(null);
+  const [pushingToSlack, setPushingToSlack] = useState(false);
+  const [slackResult, setSlackResult] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [classifying, setClassifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -198,6 +201,50 @@ export default function InboxPage() {
     } catch { setError('Failed to fetch emails'); }
     finally { setLoading(false); }
   }, []);
+
+  const pushToSlack = async () => {
+    // Only push replies that have both a classification and a draft
+    const repliesWithDrafts = emails.filter((e) => classifications[e.id] && drafts[e.id]);
+    if (repliesWithDrafts.length === 0) {
+      setSlackResult('No replies with drafts to send. Classify and draft replies first.');
+      return;
+    }
+
+    setPushingToSlack(true);
+    setSlackResult(null);
+    try {
+      const payload = repliesWithDrafts.map((e) => ({
+        id: e.id,
+        sender_name: getSenderName(e),
+        sender_email: getSenderEmail(e),
+        subject: getSubject(e),
+        reply_preview: getEmailBodyPlain(e),
+        campaign_name: getCampaignName(e.campaign_id),
+        classification: categoryConfig[classifications[e.id]?.category]?.label || classifications[e.id]?.category,
+        confidence: classifications[e.id]?.confidence || 0,
+        priority: classifications[e.id]?.priority || 'medium',
+        ai_summary: classifications[e.id]?.summary || '',
+        draft_reply: drafts[e.id],
+        account_email: e.eaccount || e.account_email || '',
+      }));
+
+      const res = await fetch('/api/outreach/slack/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ replies: payload }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setSlackResult(`Error: ${data.error}`);
+      } else {
+        setSlackResult(`Sent ${data.sent} replies to #bluetree-ai`);
+      }
+    } catch {
+      setSlackResult('Failed to push to Slack');
+    } finally {
+      setPushingToSlack(false);
+    }
+  };
 
   const fetchCampaigns = useCallback(async () => {
     try {
@@ -349,6 +396,17 @@ export default function InboxPage() {
                 Re-classify
               </Button>
             )}
+            {Object.keys(drafts).length > 0 && (
+              <Button
+                variant="success"
+                size="sm"
+                onClick={pushToSlack}
+                loading={pushingToSlack}
+                icon={<Send className="w-3.5 h-3.5" />}
+              >
+                Send to Slack ({Object.keys(drafts).length})
+              </Button>
+            )}
             <Button
               variant="secondary"
               size="sm"
@@ -402,6 +460,14 @@ export default function InboxPage() {
         <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-bt-primary-bg/50 border border-bt-primary/20">
           <Loader2 className="w-4 h-4 text-bt-primary animate-spin" />
           <span className="text-sm text-bt-text">Classifying {emails.length} replies with AI...</span>
+        </div>
+      )}
+
+      {/* Slack result banner */}
+      {slackResult && (
+        <div className={`flex items-center justify-between gap-3 px-4 py-3 rounded-lg ${slackResult.startsWith('Error') || slackResult.startsWith('Failed') ? 'bg-bt-red-bg/50 border border-bt-red/20' : slackResult.startsWith('No replies') ? 'bg-bt-amber-bg/50 border border-bt-amber/20' : 'bg-bt-green-bg/50 border border-bt-green/20'}`}>
+          <span className="text-sm text-bt-text">{slackResult}</span>
+          <button onClick={() => setSlackResult(null)} className="text-xs text-bt-text-tertiary hover:text-bt-text">Dismiss</button>
         </div>
       )}
 
