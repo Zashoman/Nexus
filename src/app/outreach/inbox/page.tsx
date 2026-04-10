@@ -241,6 +241,7 @@ export default function InboxPage() {
   const generateDraft = async (email: InstantlyEmail) => {
     setDraftLoading(email.id);
     try {
+      const classification = classifications[email.id];
       const res = await fetch('/api/outreach/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -248,9 +249,11 @@ export default function InboxPage() {
           sender_name: getSenderName(email),
           sender_email: getSenderEmail(email),
           subject: getSubject(email),
-          email_body: getEmailBodyPlain(email),
+          reply_text: getEmailBodyPlain(email),
+          full_thread_html: getEmailBodyHtml(email),
           campaign_name: getCampaignName(email.campaign_id),
           account_email: email.eaccount || email.account_email || '',
+          classification_summary: classification?.summary || '',
         }),
       });
       const data = await res.json();
