@@ -6,7 +6,7 @@
 // No emails can be sent through this client.
 // ============================================================
 
-const INSTANTLY_API_BASE = 'https://api.instantly.ai/api/v1';
+const INSTANTLY_API_V2 = 'https://api.instantly.ai/api/v2';
 
 function getApiKey(): string {
   const key = process.env.INSTANTLY_API_KEY;
@@ -15,8 +15,7 @@ function getApiKey(): string {
 }
 
 async function instantlyGet<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
-  const url = new URL(`${INSTANTLY_API_BASE}${endpoint}`);
-  url.searchParams.set('api_key', getApiKey());
+  const url = new URL(`${INSTANTLY_API_V2}${endpoint}`);
 
   if (params) {
     for (const [key, value] of Object.entries(params)) {
@@ -26,7 +25,10 @@ async function instantlyGet<T>(endpoint: string, params?: Record<string, string>
 
   const res = await fetch(url.toString(), {
     method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getApiKey()}`,
+    },
   });
 
   if (!res.ok) {
@@ -44,25 +46,27 @@ async function instantlyGet<T>(endpoint: string, params?: Record<string, string>
 export interface InstantlyCampaign {
   id: string;
   name: string;
-  status: string; // 'active', 'paused', 'completed', 'draft'
+  status: string;
   created_at?: string;
   updated_at?: string;
 }
 
 /** List all campaigns in the Instantly workspace */
 export async function listCampaigns(): Promise<InstantlyCampaign[]> {
-  const data = await instantlyGet<InstantlyCampaign[]>('/campaign/list', {
+  const data = await instantlyGet<{ items: InstantlyCampaign[] } | InstantlyCampaign[]>('/campaigns', {
     limit: '100',
     skip: '0',
   });
-  return data;
+
+  // v2 API may return { items: [...] } or [...]
+  if (Array.isArray(data)) return data;
+  if ('items' in data) return data.items;
+  return [];
 }
 
 /** Get campaign summary/status */
 export async function getCampaignSummary(campaignId: string) {
-  return instantlyGet<Record<string, unknown>>('/analytics/campaign/summary', {
-    campaign_id: campaignId,
-  });
+  return instantlyGet<Record<string, unknown>>(`/campaigns/${campaignId}/analytics`, {});
 }
 
 // -----------------------------------------------------------
@@ -89,7 +93,6 @@ export async function listEmails(params?: {
   email_type?: 'all' | 'received' | 'sent';
   limit?: number;
   skip?: number;
-  is_read?: boolean;
 }): Promise<InstantlyEmail[]> {
   const queryParams: Record<string, string> = {};
 
@@ -97,9 +100,12 @@ export async function listEmails(params?: {
   if (params?.email_type) queryParams.email_type = params.email_type;
   if (params?.limit) queryParams.limit = String(params.limit);
   if (params?.skip) queryParams.skip = String(params.skip);
-  if (params?.is_read !== undefined) queryParams.is_read = String(params.is_read);
 
-  return instantlyGet<InstantlyEmail[]>('/unibox/emails', queryParams);
+  const data = await instantlyGet<{ items: InstantlyEmail[] } | InstantlyEmail[]>('/emails', queryParams);
+
+  if (Array.isArray(data)) return data;
+  if ('items' in data) return data.items;
+  return [];
 }
 
 // -----------------------------------------------------------
