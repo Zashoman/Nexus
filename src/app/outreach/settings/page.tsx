@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Zap,
-  Search as SearchIcon,
   Globe,
   MessageSquare,
   Users,
@@ -12,6 +11,8 @@ import {
   CheckCircle2,
   XCircle,
   ExternalLink,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card, { CardHeader } from '@/components/outreach/ui/Card';
@@ -27,53 +28,60 @@ const settingsTabs: { id: SettingsTab; label: string; icon: typeof Zap }[] = [
   { id: 'notifications', label: 'Notifications', icon: Bell },
 ];
 
-interface Integration {
+interface InstantlyCampaign {
+  id: string;
   name: string;
-  description: string;
-  icon: typeof Zap;
-  connected: boolean;
-  status?: string;
+  status: string;
 }
 
-const integrations: Integration[] = [
-  {
-    name: 'Instantly',
-    description: 'Email automation platform for campaign management and inbox monitoring',
-    icon: Zap,
-    connected: false,
-    status: 'Not connected',
-  },
-  {
-    name: 'Apollo',
-    description: 'Prospect enrichment and contact data for sales campaigns',
-    icon: SearchIcon,
-    connected: false,
-    status: 'Not connected',
-  },
-  {
-    name: 'HubSpot',
-    description: 'CRM for contact management, deal tracking, and activity logging',
-    icon: Globe,
-    connected: false,
-    status: 'Not connected',
-  },
-  {
-    name: 'Slack',
-    description: 'Team notifications, draft approvals, and command interface',
-    icon: MessageSquare,
-    connected: false,
-    status: 'Not connected',
-  },
-];
-
 const mockTeam = [
-  { name: 'Zack Oman', email: 'zack@bluetree.digital', role: 'Admin', status: 'Active' },
-  { name: 'Manila Team Lead', email: 'lead@bluetree.digital', role: 'Manager', status: 'Active' },
-  { name: 'Team Member 1', email: 'team1@bluetree.digital', role: 'Team Member', status: 'Invited' },
+  { name: 'Blue Tree', email: 'admin@bluetree.digital', role: 'Admin', status: 'Active' },
 ];
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('integrations');
+
+  // Instantly connection state
+  const [instantlyConnected, setInstantlyConnected] = useState(false);
+  const [instantlyLoading, setInstantlyLoading] = useState(false);
+  const [instantlyError, setInstantlyError] = useState<string | null>(null);
+  const [instantlyCampaigns, setInstantlyCampaigns] = useState<InstantlyCampaign[]>([]);
+  const [campaignCount, setCampaignCount] = useState<number>(0);
+
+  const testInstantly = async () => {
+    setInstantlyLoading(true);
+    setInstantlyError(null);
+    try {
+      const res = await fetch('/api/outreach/instantly/test');
+      const data = await res.json();
+      if (data.ok) {
+        setInstantlyConnected(true);
+        setCampaignCount(data.campaign_count || 0);
+      } else {
+        setInstantlyError(data.error || 'Connection failed');
+        setInstantlyConnected(false);
+      }
+    } catch {
+      setInstantlyError('Failed to reach API');
+      setInstantlyConnected(false);
+    } finally {
+      setInstantlyLoading(false);
+    }
+  };
+
+  const loadInstantlyCampaigns = async () => {
+    try {
+      const res = await fetch('/api/outreach/instantly/campaigns');
+      const data = await res.json();
+      setInstantlyCampaigns(data.campaigns || []);
+    } catch {
+      setInstantlyError('Failed to load campaigns');
+    }
+  };
+
+  useEffect(() => {
+    testInstantly();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -108,41 +116,156 @@ export default function SettingsPage() {
       {/* Integrations tab */}
       {activeTab === 'integrations' && (
         <div className="space-y-4">
-          {integrations.map((integration) => {
-            const Icon = integration.icon;
-            return (
-              <Card key={integration.name}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-lg bg-bt-bg-alt">
-                      <Icon className="w-5 h-5 text-bt-text-secondary" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-bt-text">{integration.name}</h3>
-                        {integration.connected ? (
-                          <Badge variant="success" size="sm" dot>Connected</Badge>
-                        ) : (
-                          <Badge variant="default" size="sm" dot>Not connected</Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-bt-text-secondary mt-0.5">{integration.description}</p>
-                    </div>
+          {/* Instantly — LIVE */}
+          <Card>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-bt-bg-alt">
+                  <Zap className="w-5 h-5 text-bt-text-secondary" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-bt-text">Instantly</h3>
+                    {instantlyLoading ? (
+                      <Badge variant="default" size="sm"><Loader2 className="w-3 h-3 animate-spin" /> Checking...</Badge>
+                    ) : instantlyConnected ? (
+                      <Badge variant="success" size="sm" dot>Connected — {campaignCount} campaigns</Badge>
+                    ) : (
+                      <Badge variant="danger" size="sm" dot>Not connected</Badge>
+                    )}
                   </div>
+                  <p className="text-xs text-bt-text-secondary mt-0.5">
+                    Email automation platform — READ-ONLY mode (no emails will be sent)
+                  </p>
+                  {instantlyError && (
+                    <p className="text-xs text-bt-red mt-1">{instantlyError}</p>
+                  )}
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={testInstantly}
+                loading={instantlyLoading}
+                icon={<RefreshCw className="w-3.5 h-3.5" />}
+              >
+                Test
+              </Button>
+            </div>
+
+            {/* Show campaigns when connected */}
+            {instantlyConnected && (
+              <div className="mt-4 pt-4 border-t border-bt-border">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-semibold text-bt-text-secondary uppercase tracking-wider">
+                    Instantly Campaigns
+                  </h4>
                   <Button
-                    variant={integration.connected ? 'secondary' : 'primary'}
+                    variant="ghost"
                     size="sm"
-                    icon={integration.connected
-                      ? <CheckCircle2 className="w-3.5 h-3.5" />
-                      : <ExternalLink className="w-3.5 h-3.5" />
-                    }
+                    onClick={loadInstantlyCampaigns}
+                    icon={<RefreshCw className="w-3 h-3" />}
                   >
-                    {integration.connected ? 'Configure' : 'Connect'}
+                    Load campaigns
                   </Button>
                 </div>
-              </Card>
-            );
-          })}
+
+                {instantlyCampaigns.length === 0 ? (
+                  <p className="text-xs text-bt-text-tertiary">
+                    Click &quot;Load campaigns&quot; to see your Instantly campaigns
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {instantlyCampaigns.map((campaign) => (
+                      <div
+                        key={campaign.id}
+                        className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-bt-bg-alt"
+                      >
+                        <div>
+                          <p className="text-sm text-bt-text">{campaign.name}</p>
+                          <p className="text-[10px] text-bt-text-tertiary font-mono">{campaign.id}</p>
+                        </div>
+                        <Badge
+                          variant={
+                            campaign.status === 'active' ? 'success' :
+                            campaign.status === 'paused' ? 'warning' :
+                            campaign.status === 'completed' ? 'info' :
+                            'default'
+                          }
+                          size="sm"
+                        >
+                          {campaign.status || 'unknown'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+
+          {/* Apollo — not connected yet */}
+          <Card>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-bt-bg-alt">
+                  <Globe className="w-5 h-5 text-bt-text-secondary" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-bt-text">Apollo</h3>
+                    <Badge variant="default" size="sm" dot>Not connected</Badge>
+                  </div>
+                  <p className="text-xs text-bt-text-secondary mt-0.5">Prospect enrichment and contact data for sales campaigns</p>
+                </div>
+              </div>
+              <Button variant="primary" size="sm" icon={<ExternalLink className="w-3.5 h-3.5" />}>
+                Connect
+              </Button>
+            </div>
+          </Card>
+
+          {/* HubSpot — not connected yet */}
+          <Card>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-bt-bg-alt">
+                  <Globe className="w-5 h-5 text-bt-text-secondary" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-bt-text">HubSpot</h3>
+                    <Badge variant="default" size="sm" dot>Not connected</Badge>
+                  </div>
+                  <p className="text-xs text-bt-text-secondary mt-0.5">CRM for contact management, deal tracking, and activity logging</p>
+                </div>
+              </div>
+              <Button variant="primary" size="sm" icon={<ExternalLink className="w-3.5 h-3.5" />}>
+                Connect
+              </Button>
+            </div>
+          </Card>
+
+          {/* Slack — not connected yet */}
+          <Card>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-bt-bg-alt">
+                  <MessageSquare className="w-5 h-5 text-bt-text-secondary" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-bt-text">Slack</h3>
+                    <Badge variant="default" size="sm" dot>Not connected</Badge>
+                  </div>
+                  <p className="text-xs text-bt-text-secondary mt-0.5">Team notifications, draft approvals, and command interface</p>
+                </div>
+              </div>
+              <Button variant="primary" size="sm" icon={<ExternalLink className="w-3.5 h-3.5" />}>
+                Connect
+              </Button>
+            </div>
+          </Card>
         </div>
       )}
 
@@ -177,16 +300,12 @@ export default function SettingsPage() {
                     </td>
                     <td className="px-4 py-3.5 text-sm text-bt-text-secondary">{member.email}</td>
                     <td className="px-4 py-3.5">
-                      <Badge variant={member.role === 'Admin' ? 'primary' : member.role === 'Manager' ? 'info' : 'default'} size="sm">
+                      <Badge variant={member.role === 'Admin' ? 'primary' : 'default'} size="sm">
                         {member.role}
                       </Badge>
                     </td>
                     <td className="px-4 py-3.5">
-                      {member.status === 'Active' ? (
-                        <Badge variant="success" size="sm" dot>Active</Badge>
-                      ) : (
-                        <Badge variant="warning" size="sm" dot>Invited</Badge>
-                      )}
+                      <Badge variant="success" size="sm" dot>{member.status}</Badge>
                     </td>
                     <td className="px-4 py-3.5">
                       <Button variant="ghost" size="sm">Edit</Button>
