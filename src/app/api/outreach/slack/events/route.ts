@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { acknowledgeMessage, postThreadReply } from '@/lib/outreach/slack';
 import { getSlackDraft, updateSlackDraft, updateDraftStatus } from '@/lib/outreach/draft-store';
 import { getServiceSupabase } from '@/lib/outreach/supabase';
@@ -46,19 +46,26 @@ export async function POST(request: Request) {
         bot_id: event?.bot_id,
       });
 
-      // Reaction added to a message
+      // Reaction added to a message — use after() to continue processing
+      // after responding to Slack (Vercel kills serverless functions otherwise)
       if (event?.type === 'reaction_added') {
-        handleReaction(event).catch(async (err) => {
-          console.error('Reaction handler error:', err);
-          await logEvent('reaction_error', { error: String(err) });
+        after(async () => {
+          try {
+            await handleReaction(event);
+          } catch (err) {
+            await logEvent('reaction_error', { error: String(err) });
+          }
         });
       }
 
       // Message in a channel (might be a thread reply with revision instructions)
       if (event?.type === 'message' && event.thread_ts && !event.bot_id && !event.subtype) {
-        handleThreadReply(event).catch(async (err) => {
-          console.error('Thread reply handler error:', err);
-          await logEvent('thread_reply_error', { error: String(err) });
+        after(async () => {
+          try {
+            await handleThreadReply(event);
+          } catch (err) {
+            await logEvent('thread_reply_error', { error: String(err), stack: err instanceof Error ? err.stack : undefined });
+          }
         });
       }
     }
