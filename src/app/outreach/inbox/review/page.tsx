@@ -24,6 +24,7 @@ interface ReviewReply {
   sender_email: string;
   subject: string;
   reply_text: string;
+  thread_html?: string;
   campaign_name: string;
   campaign_id: string;
   account_email: string;
@@ -143,6 +144,7 @@ export default function ReviewPage() {
         sender_email: r.sender_email,
         subject: r.subject,
         reply_preview: r.reply_text,
+        thread_html: r.thread_html || r.reply_text,
         campaign_name: r.campaign_name,
         classification: categoryLabels[r.classification.category] || r.classification.category,
         confidence: r.classification.confidence,

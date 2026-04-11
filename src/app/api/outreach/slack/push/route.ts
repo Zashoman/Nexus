@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { postReplyToSlack, postBatchHeader } from '@/lib/outreach/slack';
+import { saveSlackDraft } from '@/lib/outreach/draft-store';
 
 // POST: push classified replies with drafts to Slack
 export async function POST(request: Request) {
@@ -10,6 +11,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'replies array is required' }, { status: 400 });
     }
 
+    const channel = (process.env.SLACK_CHANNEL || '').replace(/^#/, '');
+
     // Post batch header with date and inbox info
     await postBatchHeader(replies.length, accounts, campaigns);
 
@@ -17,7 +20,7 @@ export async function POST(request: Request) {
     const results = [];
     for (const reply of replies) {
       try {
-        await postReplyToSlack({
+        const slackResult = await postReplyToSlack({
           sender_name: reply.sender_name || 'Unknown',
           sender_email: reply.sender_email || '',
           subject: reply.subject || '(no subject)',
@@ -30,13 +33,30 @@ export async function POST(request: Request) {
           draft_reply: reply.draft_reply || 'No draft generated',
           account_email: reply.account_email || '',
         });
+
+        // Save draft context for thread feedback
+        if (slackResult.ts && channel) {
+          await saveSlackDraft({
+            slack_channel: channel,
+            slack_message_ts: slackResult.ts,
+            email_id: reply.id,
+            sender_name: reply.sender_name || 'Unknown',
+            sender_email: reply.sender_email || '',
+            subject: reply.subject || '(no subject)',
+            reply_text: reply.reply_preview || '',
+            thread_html: reply.thread_html || reply.reply_preview || '',
+            campaign_name: reply.campaign_name || 'Unknown campaign',
+            account_email: reply.account_email || '',
+            current_draft: reply.draft_reply || '',
+          });
+        }
+
         results.push({ id: reply.id, status: 'sent' });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Failed';
         results.push({ id: reply.id, status: 'error', error: msg });
       }
 
-      // Small delay between messages to avoid Slack rate limits
       await new Promise((r) => setTimeout(r, 500));
     }
 
