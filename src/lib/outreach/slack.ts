@@ -58,41 +58,26 @@ export async function postReplyToSlack(params: {
   const channel = getChannel();
 
   const priorityEmoji = params.priority === 'high' ? '🔴' : params.priority === 'medium' ? '🟡' : '⚪';
-  const replySnippet = params.reply_preview.substring(0, 220).replace(/\n+/g, ' ').trim();
+  const replySnippet = params.reply_preview.substring(0, 100).replace(/\n+/g, ' ').trim();
   const draftText = params.draft_reply.trim();
+  const draftFirstLine = draftText.split('\n').find((l) => l.trim().length > 0) || '';
+  const draftPreview = draftFirstLine.substring(0, 120);
 
+  // Ultra-compact main message: 2 lines total
   const blocks = [
-    // Header: sender + classification
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `${priorityEmoji} *${params.sender_name}* _${params.classification}_\n<mailto:${params.sender_email}|${params.sender_email}> · ${params.campaign_name}`,
+        text: `${priorityEmoji} *${params.sender_name}* · _${params.classification}_ · ${params.campaign_name}\n>💬 ${replySnippet}${params.reply_preview.length > 100 ? '...' : ''}\n>✏️ ${draftPreview}${draftText.length > 120 ? '...' : ''}`,
       },
     },
-    // Their reply (quoted)
-    {
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `>💬 ${replySnippet}`,
-      },
-    },
-    // The draft
-    {
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `\`\`\`${draftText.substring(0, 1500)}\`\`\``,
-      },
-    },
-    // Action hint
     {
       type: 'context',
       elements: [
         {
           type: 'mrkdwn',
-          text: `React: ✅ send · ✏️ revise · ❌ skip · 💤 later · via \`${params.account_email}\``,
+          text: `<mailto:${params.sender_email}|${params.sender_email}> · via \`${params.account_email}\` · 👇 full draft in thread`,
         },
       ],
     },
@@ -106,12 +91,54 @@ export async function postReplyToSlack(params: {
     unfurl_media: false,
   });
 
-  // Add reaction shortcuts to make it easy to click
+  // Post full context as thread reply (team clicks to expand)
   if (result.ts) {
+    // Add reactions first so they appear instantly
     await addReaction(channel, result.ts, 'white_check_mark');
     await addReaction(channel, result.ts, 'pencil2');
     await addReaction(channel, result.ts, 'x');
     await addReaction(channel, result.ts, 'zzz');
+
+    // Then post the full details as a thread reply
+    await slackPost('/chat.postMessage', {
+      channel,
+      thread_ts: result.ts,
+      text: `Full details`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Subject:* ${params.subject}\n*AI Summary:* ${params.ai_summary}`,
+          },
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*💬 Their full reply:*\n\`\`\`${params.reply_preview.substring(0, 2500)}\`\`\``,
+          },
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*✏️ Full draft:*\n\`\`\`${draftText.substring(0, 2500)}\`\`\``,
+          },
+        },
+        {
+          type: 'context',
+          elements: [
+            {
+              type: 'mrkdwn',
+              text: `_Reply in this thread with feedback to revise (e.g. "make it shorter", "mention our case study")_`,
+            },
+          ],
+        },
+      ],
+      unfurl_links: false,
+      unfurl_media: false,
+    });
   }
 
   return result;
