@@ -154,6 +154,7 @@ export async function GET() {
         sender_email: senderEmail,
         subject,
         reply_text: plain.substring(0, 500),
+        thread_html: html.substring(0, 8000),
         campaign_name: campaignName,
         campaign_id: String(raw.campaign_id || ''),
         account_email: accountEmail,
