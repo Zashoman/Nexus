@@ -3,6 +3,7 @@ import { listUniboxEmails, listCampaigns } from '@/lib/outreach/instantly';
 import { classifyReply } from '@/lib/outreach/classifier';
 import { postBatchHeader, postInboxSectionHeader, postReplyToSlack } from '@/lib/outreach/slack';
 import { saveSlackDraft } from '@/lib/outreach/draft-store';
+import { getRelevantRevisions, formatLearnings } from '@/lib/outreach/learning';
 import Anthropic from '@anthropic-ai/sdk';
 
 // Cron endpoint — runs daily to fetch, classify, draft, and push to Slack
@@ -67,6 +68,14 @@ async function generateDraft(
     .replace(/<img[^>]*>/gi, '[image]')
     .substring(0, 8000);
 
+  // Pull past team feedback for this campaign/account
+  const pastRevisions = await getRelevantRevisions({
+    campaign_name: campaignName,
+    account_email: accountEmail,
+    limit: 10,
+  });
+  const learningsBlock = formatLearnings(pastRevisions);
+
   const message = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
@@ -98,7 +107,7 @@ PROSPECT'S REPLY (complete message — NOT cut off):
 
 FULL THREAD:
 ${cleanHtml}
-
+${learningsBlock ? '\n' + learningsBlock + '\n' : ''}
 Write the reply. Just the email body.`,
     }],
   });

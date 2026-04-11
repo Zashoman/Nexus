@@ -12,6 +12,9 @@ import {
   Settings,
   LogOut,
   TreePine,
+  Brain,
+  Database,
+  Target,
 } from 'lucide-react';
 import { useAuth } from '@/components/outreach/AuthProvider';
 
@@ -19,7 +22,10 @@ const navigation = [
   { name: 'Overview', href: '/outreach', icon: LayoutDashboard },
   { name: 'Campaigns', href: '/outreach/campaigns', icon: Megaphone },
   { name: 'Inbox', href: '/outreach/inbox', icon: Inbox },
+  { name: 'Sales Prospects', href: '/outreach/sales', icon: Target },
   { name: 'Personas', href: '/outreach/personas', icon: Users },
+  { name: 'Learning', href: '/outreach/learning', icon: Brain },
+  { name: 'Training', href: '/outreach/training', icon: Database },
   { name: 'Analytics', href: '/outreach/analytics', icon: BarChart3 },
   { name: 'Feedback', href: '/outreach/feedback', icon: MessageSquareHeart },
 ];
