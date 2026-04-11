@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { listUniboxEmails, listCampaigns } from '@/lib/outreach/instantly';
 import { classifyReply } from '@/lib/outreach/classifier';
+import { getRelevantRevisions, formatLearnings } from '@/lib/outreach/learning';
 import Anthropic from '@anthropic-ai/sdk';
 
 const BLUE_TREE_DOMAINS = [
@@ -63,6 +64,14 @@ async function generateDraft(
     .replace(/<img[^>]*>/gi, '[image]')
     .substring(0, 8000);
 
+  // Pull past team feedback for learning
+  const pastRevisions = await getRelevantRevisions({
+    campaign_name: campaignName,
+    account_email: accountEmail,
+    limit: 10,
+  });
+  const learningsBlock = formatLearnings(pastRevisions);
+
   const message = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
@@ -92,7 +101,7 @@ PROSPECT'S REPLY (complete message — NOT cut off):
 
 FULL THREAD:
 ${cleanHtml}
-
+${learningsBlock ? '\n' + learningsBlock + '\n' : ''}
 Write the reply. Just the email body.`,
     }],
   });

@@ -2,6 +2,7 @@ import { NextResponse, after } from 'next/server';
 import { acknowledgeMessage, postThreadReply } from '@/lib/outreach/slack';
 import { getSlackDraft, updateSlackDraft, updateDraftStatus } from '@/lib/outreach/draft-store';
 import { getServiceSupabase } from '@/lib/outreach/supabase';
+import { logRevision, getRelevantRevisions, formatLearnings } from '@/lib/outreach/learning';
 import Anthropic from '@anthropic-ai/sdk';
 
 // Log every incoming event to Supabase for debugging
@@ -164,6 +165,14 @@ async function handleThreadReply(event: {
   );
 
   try {
+    // Pull past learnings for this persona/campaign
+    const pastRevisions = await getRelevantRevisions({
+      campaign_name: draft.campaign_name,
+      account_email: draft.account_email,
+      limit: 10,
+    });
+    const learningsBlock = formatLearnings(pastRevisions);
+
     // Generate revised draft
     const client = new Anthropic();
 
@@ -210,7 +219,7 @@ ${draft.current_draft}
 
 TEAM FEEDBACK:
 ${cleanText}
-
+${learningsBlock ? '\n' + learningsBlock + '\n' : ''}
 Write the revised draft. Just the email body.`,
       }],
     });
@@ -221,6 +230,19 @@ Write the revised draft. Just the email body.`,
       await postThreadReply(channel, thread_ts, `⚠️ Couldn't generate a revised draft. Try again with different instructions.`);
       return;
     }
+
+    // Log this revision for future learning
+    await logRevision({
+      slack_draft_id: draft.id,
+      revision_number: (draft.revision_count || 0) + 1,
+      original_draft: draft.current_draft,
+      revised_draft: newDraft,
+      feedback_text: cleanText,
+      campaign_name: draft.campaign_name,
+      account_email: draft.account_email,
+      sender_email: draft.sender_email,
+      slack_user_id: user,
+    });
 
     // Save the new draft
     await updateSlackDraft(channel, thread_ts, newDraft);
