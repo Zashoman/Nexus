@@ -11,11 +11,19 @@ const WEEKLY_KPI_KEYS: { key: string; field: keyof WeeklyData; label: string }[]
   { key: 'listing_inventory', field: 'listing_inventory', label: 'Listing Inventory' },
 ];
 
+// A row counts as "has data" if at least one metric field is non-null
+function hasData(w: WeeklyData): boolean {
+  return WEEKLY_KPI_KEYS.some(({ field }) => (w[field] as number | null) != null);
+}
+
 export function computeKPIs(weeklyData: WeeklyData[], baselines: Baseline[]): KPIStat[] {
   const baselineMap = new Map(baselines.map(b => [b.metric_key, b.baseline_value]));
   const sorted = [...weeklyData].sort((a, b) => new Date(b.week_date).getTime() - new Date(a.week_date).getTime());
-  const latest = sorted[0];
-  const recent8 = sorted.slice(0, 8).reverse();
+
+  // Skip rows that are entirely empty — find the most recent row with actual data
+  const nonEmpty = sorted.filter(hasData);
+  const latest = nonEmpty[0];
+  const recent8 = nonEmpty.slice(0, 8).reverse();
 
   return WEEKLY_KPI_KEYS.map(({ key, field, label }) => {
     const value = latest ? (latest[field] as number | null) : null;
@@ -23,7 +31,9 @@ export function computeKPIs(weeklyData: WeeklyData[], baselines: Baseline[]): KP
     const changePercent = value != null && baseline > 0
       ? ((value - baseline) / baseline) * 100
       : null;
-    const trend = recent8.map(w => (w[field] as number | null) ?? 0);
+    const trend = recent8
+      .map(w => (w[field] as number | null))
+      .filter((v): v is number => v != null);
 
     return { key, label, value, baseline, changePercent, trend };
   });
