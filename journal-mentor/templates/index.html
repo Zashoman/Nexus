@@ -449,7 +449,7 @@
         if (tab === 'mentorlog') fetchMentorLog();
         if (tab === 'system') { fetchGoals(); fetchPriors(); fetchPhases(); fetchReports(); fetchDocuments(); fetchBaseline(); fetchMicro(); }
         if (tab === 'history') fetchHistoryEntries();
-        if (tab === 'ideation') fetchTopics();
+        if (tab === 'ideation') { fetchTopics(); startTopicAutoRefresh(); } else { stopTopicAutoRefresh(); }
     }
 
     // ── Right Panel Toggle ────────────────────────────────
@@ -888,6 +888,9 @@
     async function copyTopics(){const res=await fetch('/api/topics/export');const d=await res.json();navigator.clipboard.writeText(d.text);alert('Copied '+d.count+' topics to clipboard');}
     async function syncToAppleNotes(){const btn=document.getElementById('sync-notes-btn');btn.disabled=true;btn.textContent='Pushing...';try{const res=await fetch('/api/topics/sync-notes',{method:'POST'});const d=await res.json();btn.textContent=d.error?'Failed':'Pushed!';} catch{btn.textContent='Failed';}setTimeout(()=>{btn.textContent='Push to Notes';btn.disabled=false;},3000);}
     async function pullFromAppleNotes(){const btn=document.getElementById('pull-notes-btn');btn.disabled=true;btn.textContent='Pulling...';try{const res=await fetch('/api/topics/pull-from-notes',{method:'POST'});const d=await res.json();if(d.error){btn.textContent='Failed';alert(d.error);}else{btn.textContent='+'+d.added+' new';fetchTopics();}} catch{btn.textContent='Failed';}setTimeout(()=>{btn.textContent='Pull from Notes';btn.disabled=false;},3000);}
+    let topicAutoRefreshTimer=null;
+    function startTopicAutoRefresh(){stopTopicAutoRefresh();topicAutoRefreshTimer=setInterval(fetchTopics,30000);}
+    function stopTopicAutoRefresh(){if(topicAutoRefreshTimer){clearInterval(topicAutoRefreshTimer);topicAutoRefreshTimer=null;}}
 
     function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
     </script>
