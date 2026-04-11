@@ -35,9 +35,11 @@ export async function POST(request: Request) {
         });
 
         // Save draft context for thread feedback
-        if (slackResult.ts && channel) {
+        // Use channel ID from Slack response (not the name) — events return channel IDs
+        const actualChannelId = slackResult.channel || channel;
+        if (slackResult.ts && actualChannelId) {
           await saveSlackDraft({
-            slack_channel: channel,
+            slack_channel: actualChannelId,
             slack_message_ts: slackResult.ts,
             email_id: reply.id,
             sender_name: reply.sender_name || 'Unknown',

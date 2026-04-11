@@ -42,18 +42,30 @@ export async function saveSlackDraft(ctx: SlackDraftContext) {
   }
 }
 
-/** Look up a draft by Slack channel + message timestamp */
+/** Look up a draft by Slack channel + message timestamp.
+ *  Tries multiple channel formats since Slack events use channel IDs
+ *  but our older records might have channel names. */
 export async function getSlackDraft(channel: string, ts: string): Promise<SlackDraftContext & { id: string; revision_count: number; original_draft: string } | null> {
   const supabase = getServiceSupabase();
-  const { data, error } = await supabase
+
+  // Try exact match first
+  const { data } = await supabase
     .from('slack_drafts')
     .select('*')
     .eq('slack_channel', channel)
     .eq('slack_message_ts', ts)
     .maybeSingle();
 
-  if (error || !data) return null;
-  return data;
+  if (data) return data;
+
+  // Fall back: match only by ts (handles channel name vs ID mismatch)
+  const { data: fallback } = await supabase
+    .from('slack_drafts')
+    .select('*')
+    .eq('slack_message_ts', ts)
+    .maybeSingle();
+
+  return fallback || null;
 }
 
 /** Update the draft after a revision */
