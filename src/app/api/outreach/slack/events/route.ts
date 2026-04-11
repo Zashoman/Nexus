@@ -95,8 +95,17 @@ async function handleThreadReply(event: {
   // Skip empty messages or system messages
   if (!text || text.trim().length === 0) return;
 
-  // Acknowledge we're processing
+  // Clean the feedback text (remove Slack formatting)
+  const cleanText = text.replace(/<@[A-Z0-9]+>/g, '').trim();
+  if (!cleanText) return;
+
+  // Acknowledge immediately with a text message — feels conversational
   await acknowledgeMessage(channel, event.ts, 'eyes');
+  await postThreadReply(
+    channel,
+    thread_ts,
+    `👀 Got it, <@${user}> — revising now...`,
+  );
 
   try {
     // Generate revised draft
@@ -115,7 +124,16 @@ async function handleThreadReply(event: {
 
 Blue Tree helps SaaS/tech companies grow through editorial placements, backlinks, and digital PR campaigns.
 
-You're revising an existing draft based on team feedback. Apply the feedback exactly. Keep it concise, warm, professional. NEVER say the message "got cut off". Just the email body, no preamble.`,
+Context: You're revising a draft based on team feedback.
+
+CRITICAL:
+- Read the team feedback carefully and apply it exactly
+- Understand the type of email this is — recruitment outreach declines, digital PR pitches, sales inquiries all need different responses
+- If the prospect declined an employment opportunity, write a polite graceful decline response, not a sales pitch
+- NEVER say the message "got cut off"
+- Keep it concise (3-6 sentences), warm, professional
+- Sign off as the person in "REPLYING AS"
+- Just the email body, no preamble, no subject line`,
       messages: [{
         role: 'user',
         content: `Revise this draft based on team feedback.
@@ -125,17 +143,17 @@ SUBJECT: ${draft.subject}
 CAMPAIGN: ${draft.campaign_name}
 REPLYING AS: ${draft.account_email}
 
-PROSPECT'S REPLY (their complete message):
+PROSPECT'S REPLY:
 "${draft.reply_text}"
 
 FULL THREAD:
 ${cleanHtml}
 
-PREVIOUS DRAFT:
+PREVIOUS DRAFT (this may be wrong — listen to the feedback):
 ${draft.current_draft}
 
 TEAM FEEDBACK:
-${text}
+${cleanText}
 
 Write the revised draft. Just the email body.`,
       }],
@@ -155,13 +173,17 @@ Write the revised draft. Just the email body.`,
     await postThreadReply(
       channel,
       thread_ts,
-      `✏️ *Revised draft based on <@${user}>'s feedback:*\n\`\`\`${newDraft}\`\`\`\n_React with ✅ to approve, or reply again with more changes._`,
+      `✏️ *Here's the revised draft:*\n\`\`\`${newDraft}\`\`\`\n_React ✅ to approve, or reply again with more changes._`,
     );
 
-    // Acknowledge with a checkmark on the original feedback message
+    // Acknowledge with a checkmark on the feedback message
     await acknowledgeMessage(channel, event.ts, 'white_check_mark');
   } catch (err) {
     console.error('Revision error:', err);
-    await postThreadReply(channel, thread_ts, `⚠️ Failed to generate revision: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    await postThreadReply(
+      channel,
+      thread_ts,
+      `⚠️ Sorry, something went wrong: ${err instanceof Error ? err.message : 'Unknown error'}. Try again.`,
+    );
   }
 }
