@@ -144,38 +144,94 @@ export async function postReplyToSlack(params: {
   return result;
 }
 
-/** Post a batch summary header to Slack */
-export async function postBatchHeader(count: number, accounts?: string[], campaigns?: string[]) {
+/** Post a polished daily summary header with priority breakdown */
+export async function postBatchHeader(
+  count: number,
+  accounts?: string[],
+  campaigns?: string[],
+  priorityCounts?: { high: number; medium: number; low: number },
+) {
   const channel = getChannel();
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-  const inboxLine = accounts?.length ? `*Inboxes:* ${accounts.join(', ')}` : '';
-  const campaignLine = campaigns?.length ? `*Campaigns:* ${campaigns.slice(0, 6).join(', ')}${campaigns.length > 6 ? ` +${campaigns.length - 6} more` : ''}` : '';
+  const high = priorityCounts?.high || 0;
+  const medium = priorityCounts?.medium || 0;
+  const low = priorityCounts?.low || 0;
+
+  const priorityLine = priorityCounts
+    ? `${high > 0 ? `🔴 *${high}* urgent  ` : ''}${medium > 0 ? `🟡 *${medium}* medium  ` : ''}${low > 0 ? `⚪ *${low}* low` : ''}`.trim()
+    : '';
 
   const blocks: Record<string, unknown>[] = [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: `📬 Daily Review — ${today}`,
+      },
+    },
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `📬 *Daily Review — ${today}*\n*${count}* replies need attention${inboxLine ? '\n' + inboxLine : ''}${campaignLine ? '\n' + campaignLine : ''}`,
+        text: `*${count}* ${count === 1 ? 'reply needs' : 'replies need'} your attention${priorityLine ? `\n${priorityLine}` : ''}`,
       },
     },
-    {
-      type: 'context',
-      elements: [
-        {
-          type: 'mrkdwn',
-          text: 'React to each draft: ✅ send as-is · ✏️ revise in thread · ❌ skip · 💤 remind later',
-        },
-      ],
-    },
-    { type: 'divider' },
   ];
+
+  if (accounts?.length || campaigns?.length) {
+    const fields: Record<string, unknown>[] = [];
+    if (accounts?.length) {
+      fields.push({
+        type: 'mrkdwn',
+        text: `*Inboxes scanned:*\n${accounts.map((a) => `• \`${a}\``).join('\n')}`,
+      });
+    }
+    if (campaigns?.length) {
+      const display = campaigns.slice(0, 8);
+      fields.push({
+        type: 'mrkdwn',
+        text: `*Campaigns:*\n${display.map((c) => `• ${c}`).join('\n')}${campaigns.length > 8 ? `\n_+${campaigns.length - 8} more_` : ''}`,
+      });
+    }
+    blocks.push({ type: 'section', fields });
+  }
+
+  blocks.push({
+    type: 'context',
+    elements: [
+      {
+        type: 'mrkdwn',
+        text: '👇 Each reply below has the AI draft ready · React to take action: ✅ send · ✏️ revise · ❌ skip · 💤 later',
+      },
+    ],
+  });
+  blocks.push({ type: 'divider' });
 
   return slackPost('/chat.postMessage', {
     channel,
     text: `📬 Daily Review — ${today} — ${count} replies need attention`,
     blocks,
+    unfurl_links: false,
+  });
+}
+
+/** Post a section header for grouping replies by inbox */
+export async function postInboxSectionHeader(inbox: string, count: number) {
+  const channel = getChannel();
+
+  return slackPost('/chat.postMessage', {
+    channel,
+    text: `Inbox: ${inbox} (${count})`,
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `📥 *${inbox}* — ${count} ${count === 1 ? 'reply' : 'replies'}`,
+        },
+      },
+    ],
     unfurl_links: false,
   });
 }
