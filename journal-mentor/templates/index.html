@@ -308,7 +308,8 @@
                     <p class="ideation-subtitle">Ideas, curiosities, threads to pull on</p>
                 </div>
                 <div style="display:flex; gap:8px">
-                    <button class="btn btn-sm" onclick="syncToAppleNotes()" id="sync-notes-btn">Sync to Apple Notes</button>
+                    <button class="btn btn-sm" onclick="pullFromAppleNotes()" id="pull-notes-btn">Pull from Notes</button>
+                    <button class="btn btn-sm" onclick="syncToAppleNotes()" id="sync-notes-btn">Push to Notes</button>
                     <button class="btn btn-sm" onclick="copyTopics()">Copy All</button>
                 </div>
             </div>
@@ -885,7 +886,8 @@
     async function reopenTopic(id){await fetch('/api/topics/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'open'})});fetchTopics();}
     async function editTopicNote(id,current){const n=prompt('Add a note:',current);if(n===null)return;await fetch('/api/topics/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes:n})});fetchTopics();}
     async function copyTopics(){const res=await fetch('/api/topics/export');const d=await res.json();navigator.clipboard.writeText(d.text);alert('Copied '+d.count+' topics to clipboard');}
-    async function syncToAppleNotes(){const btn=document.getElementById('sync-notes-btn');btn.disabled=true;btn.textContent='Syncing...';try{const res=await fetch('/api/topics/sync-notes',{method:'POST'});const d=await res.json();btn.textContent=d.error?'Failed':'Synced!';} catch{btn.textContent='Failed';}setTimeout(()=>{btn.textContent='Sync to Apple Notes';btn.disabled=false;},3000);}
+    async function syncToAppleNotes(){const btn=document.getElementById('sync-notes-btn');btn.disabled=true;btn.textContent='Pushing...';try{const res=await fetch('/api/topics/sync-notes',{method:'POST'});const d=await res.json();btn.textContent=d.error?'Failed':'Pushed!';} catch{btn.textContent='Failed';}setTimeout(()=>{btn.textContent='Push to Notes';btn.disabled=false;},3000);}
+    async function pullFromAppleNotes(){const btn=document.getElementById('pull-notes-btn');btn.disabled=true;btn.textContent='Pulling...';try{const res=await fetch('/api/topics/pull-from-notes',{method:'POST'});const d=await res.json();if(d.error){btn.textContent='Failed';alert(d.error);}else{btn.textContent='+'+d.added+' new';fetchTopics();}} catch{btn.textContent='Failed';}setTimeout(()=>{btn.textContent='Pull from Notes';btn.disabled=false;},3000);}
 
     function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
     </script>

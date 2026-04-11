@@ -1768,6 +1768,74 @@ def sync_to_apple_notes():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/topics/pull-from-notes', methods=['POST'])
+def pull_from_apple_notes():
+    """Read the Journal Mentor — Ideation note from Apple Notes and merge new topics."""
+    import subprocess, re as regex_mod
+    note_title = "Journal Mentor — Ideation"
+    script = (
+        'tell application "Notes"\n'
+        '    set noteBody to ""\n'
+        '    repeat with eachNote in notes\n'
+        '        if name of eachNote is "' + note_title + '" then\n'
+        '            set noteBody to body of eachNote\n'
+        '            exit repeat\n'
+        '        end if\n'
+        '    end repeat\n'
+        '    return noteBody\n'
+        'end tell'
+    )
+    try:
+        result = subprocess.run(['osascript', '-e', script], capture_output=True, timeout=15, text=True)
+        body = result.stdout or ""
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    if not body:
+        return jsonify({"error": "Note not found in Apple Notes. Click 'Sync to Notes' first to create it."}), 404
+
+    # Strip HTML tags, decode entities
+    text = regex_mod.sub(r'<br[^>]*>', '\n', body)
+    text = regex_mod.sub(r'</div>', '\n', text)
+    text = regex_mod.sub(r'<[^>]+>', '', text)
+    text = text.replace('&nbsp;', ' ').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&#39;', "'").replace('&quot;', '"')
+
+    # Parse lines into topics
+    lines = [l.strip() for l in text.split('\n')]
+    topics_found = []
+    for line in lines:
+        if not line:
+            continue
+        # Skip header lines
+        if line.startswith('Journal Mentor') or line.startswith('Updated:') or line.startswith('Ideation'):
+            continue
+        # Strip bullet markers
+        if line.startswith('•'):
+            line = line[1:].strip()
+        elif line.startswith('-'):
+            line = line[1:].strip()
+        elif line.startswith('*'):
+            line = line[1:].strip()
+        if line and len(line) > 1:
+            topics_found.append(line)
+
+    # Get existing topics (lowercased for matching)
+    conn = get_db()
+    existing = set(r['text'].lower().strip() for r in conn.execute("SELECT text FROM topics").fetchall())
+
+    added = 0
+    for t in topics_found:
+        if t.lower().strip() not in existing:
+            conn.execute("INSERT INTO topics (text) VALUES (?)", (t,))
+            existing.add(t.lower().strip())
+            added += 1
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"status": "ok", "added": added, "total_found": len(topics_found)})
+
+
 # ── Documents ──────────────────────────────────────────────
 
 @app.route('/api/documents', methods=['GET'])
