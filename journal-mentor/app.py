@@ -1768,6 +1768,84 @@ def sync_to_apple_notes():
         return jsonify({"error": str(e)}), 500
 
 
+def _do_pull_from_apple_notes():
+    """Pull topics from Apple Notes. Returns (added, total) or None on error."""
+    import subprocess, re as regex_mod
+    note_title = "Journal Mentor — Ideation"
+    script = (
+        'tell application "Notes"\n'
+        '    set noteBody to ""\n'
+        '    repeat with eachNote in notes\n'
+        '        if name of eachNote is "' + note_title + '" then\n'
+        '            set noteBody to body of eachNote\n'
+        '            exit repeat\n'
+        '        end if\n'
+        '    end repeat\n'
+        '    return noteBody\n'
+        'end tell'
+    )
+    try:
+        result = subprocess.run(['osascript', '-e', script], capture_output=True, timeout=15, text=True)
+        body = result.stdout or ""
+    except Exception:
+        return None
+
+    if not body:
+        return None
+
+    text = regex_mod.sub(r'<br[^>]*>', '\n', body)
+    text = regex_mod.sub(r'</div>', '\n', text)
+    text = regex_mod.sub(r'<[^>]+>', '', text)
+    text = text.replace('&nbsp;', ' ').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&#39;', "'").replace('&quot;', '"')
+
+    lines = [l.strip() for l in text.split('\n')]
+    topics_found = []
+    for line in lines:
+        if not line:
+            continue
+        if line.startswith('Journal Mentor') or line.startswith('Updated:') or line.startswith('Ideation'):
+            continue
+        if line.startswith('•') or line.startswith('-') or line.startswith('*'):
+            line = line[1:].strip()
+        if line and len(line) > 1:
+            topics_found.append(line)
+
+    conn = get_db()
+    existing = set(r['text'].lower().strip() for r in conn.execute("SELECT text FROM topics").fetchall())
+    added = 0
+    for t in topics_found:
+        if t.lower().strip() not in existing:
+            conn.execute("INSERT INTO topics (text) VALUES (?)", (t,))
+            existing.add(t.lower().strip())
+            added += 1
+    conn.commit()
+    conn.close()
+    return (added, len(topics_found))
+
+
+@app.route('/api/topics/pull-from-notes', methods=['POST'])
+def pull_from_apple_notes():
+    """Read the Journal Mentor — Ideation note from Apple Notes and merge new topics."""
+    result = _do_pull_from_apple_notes()
+    if result is None:
+        return jsonify({"error": "Note not found in Apple Notes. Click 'Push to Notes' first to create it."}), 404
+    added, total = result
+    return jsonify({"status": "ok", "added": added, "total_found": total})
+
+
+def background_notes_sync():
+    """Pulls from Apple Notes every 60 seconds in a background thread."""
+    import time
+    while True:
+        time.sleep(60)
+        try:
+            r = _do_pull_from_apple_notes()
+            if r and r[0] > 0:
+                print(f"  [auto-sync] Pulled {r[0]} new topic(s) from Apple Notes")
+        except Exception:
+            pass
+
+
 # ── Documents ──────────────────────────────────────────────
 
 @app.route('/api/documents', methods=['GET'])
@@ -2200,8 +2278,13 @@ if __name__ == '__main__':
     migrate_db()
     for d in [ANALYSES_DIR, BACKUPS_DIR, BASELINES_DIR, DOCUMENTS_DIR]:
         os.makedirs(d, exist_ok=True)
+    # Start background Apple Notes sync (pulls every 60s)
+    import threading
+    sync_thread = threading.Thread(target=background_notes_sync, daemon=True)
+    sync_thread.start()
     print("\n  JOURNAL MENTOR — Dialectic System v3")
     print("  Running at http://localhost:5001")
+    print("  [auto-sync] Apple Notes pull every 60s")
     if not API_KEY:
         print("  ⚠ WARNING: ANTHROPIC_JOURNAL_KEY not set!")
     print()
