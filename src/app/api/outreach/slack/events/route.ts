@@ -1,13 +1,29 @@
 import { NextResponse } from 'next/server';
 import { acknowledgeMessage, postThreadReply } from '@/lib/outreach/slack';
 import { getSlackDraft, updateSlackDraft, updateDraftStatus } from '@/lib/outreach/draft-store';
+import { getServiceSupabase } from '@/lib/outreach/supabase';
 import Anthropic from '@anthropic-ai/sdk';
 
+// Log every incoming event to Supabase for debugging
+async function logEvent(eventType: string, data: Record<string, unknown>) {
+  try {
+    const supabase = getServiceSupabase();
+    await supabase.from('slack_event_log').insert({
+      event_type: eventType,
+      event_data: data,
+    });
+  } catch {
+    // Silently ignore logging errors
+  }
+}
+
 // Slack Events API endpoint
-// Handles URL verification, reaction_added, and message.channels events
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+
+    // Log EVERY incoming request
+    await logEvent('incoming', body);
 
     // URL verification challenge (required when first setting up Events API)
     if (body.type === 'url_verification') {
@@ -18,22 +34,55 @@ export async function POST(request: Request) {
     if (body.type === 'event_callback') {
       const event = body.event;
 
+      await logEvent(`event_${event?.type || 'unknown'}`, {
+        type: event?.type,
+        subtype: event?.subtype,
+        thread_ts: event?.thread_ts,
+        ts: event?.ts,
+        channel: event?.channel || event?.item?.channel,
+        user: event?.user,
+        text: event?.text?.substring(0, 200),
+        reaction: event?.reaction,
+        bot_id: event?.bot_id,
+      });
+
       // Reaction added to a message
       if (event?.type === 'reaction_added') {
-        // Fire and forget — don't block the response
-        handleReaction(event).catch((err) => console.error('Reaction handler error:', err));
+        handleReaction(event).catch(async (err) => {
+          console.error('Reaction handler error:', err);
+          await logEvent('reaction_error', { error: String(err) });
+        });
       }
 
       // Message in a channel (might be a thread reply with revision instructions)
       if (event?.type === 'message' && event.thread_ts && !event.bot_id && !event.subtype) {
-        handleThreadReply(event).catch((err) => console.error('Thread reply handler error:', err));
+        handleThreadReply(event).catch(async (err) => {
+          console.error('Thread reply handler error:', err);
+          await logEvent('thread_reply_error', { error: String(err) });
+        });
       }
     }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error('Slack events error:', err);
-    return NextResponse.json({ ok: true }); // Always return 200 to Slack
+    await logEvent('outer_error', { error: String(err) });
+    return NextResponse.json({ ok: true });
+  }
+}
+
+// GET: view recent events for debugging
+export async function GET() {
+  try {
+    const supabase = getServiceSupabase();
+    const { data } = await supabase
+      .from('slack_event_log')
+      .select('*')
+      .order('received_at', { ascending: false })
+      .limit(30);
+
+    return NextResponse.json({ events: data || [] });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
 
