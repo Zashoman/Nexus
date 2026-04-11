@@ -22,27 +22,40 @@ export async function autoRefreshData(): Promise<{
       {
         type: 'web_search_20250305',
         name: 'web_search',
-        max_uses: 10,
+        max_uses: 15,
       },
     ],
     messages: [
       {
         role: 'user',
-        content: `Search for the latest Dubai real estate market data from the past 7 days. You MUST attempt all 6 searches below — do not stop early. Each search should target primary sources where possible.
+        content: `Search for the latest Dubai real estate weekly market data. You must complete ALL searches below before responding. Do not stop early even if some searches return nothing.
 
-SEARCH TARGETS:
-1. "Dubai DLD weekly transactions" or "Dubai Land Department weekly report" — find total transaction count, off-plan vs secondary split
-2. "Dubai mortgage registrations weekly" — mortgage vs cash transaction counts
-3. "DLD weekly transaction value AED billions"
-4. "Emaar Properties share price DFM" — current EMAAR.AE price
-5. "DFM Real Estate Index" or "DFMREI" — current level
-6. "Bayut Dubai listings count" or "Property Finder Dubai inventory" — approximate listing count
+REQUIRED SEARCHES (run each as a separate search):
 
-RULES:
-- Return ONLY data you can verify from search results
-- If a specific metric cannot be found after searching, return null for that field (do NOT guess)
-- Prioritize gulfbusiness.com, arabianbusiness.com, khaleejtimes.com, dubailand.gov.ae, finance.yahoo.com, investing.com
-- The data_date should reflect the reporting period, not today
+1. Search: "Dubai real estate market week" reliantsurveyors — this blog publishes the full weekly DLD breakdown with off-plan vs secondary sales AND mortgage vs cash split in a table
+2. Search: "DLD weekly transactions gulfbusiness" — gulfbusiness.com publishes DLD weekly updates with sales breakdown
+3. Search: "Dubai property transactions week off-plan secondary" — backup for the sales split
+4. Search: "Dubai mortgage registrations weekly DLD" — mortgage count (separate from sales)
+5. Search: "Dubai cash transactions property weekly" — cash transaction count
+6. Search: "EMAAR.AE share price" finance.yahoo.com — Emaar Properties current price
+7. Search: "DFMREI DFM Real Estate Index current" — current index level
+8. Search: "Bayut Dubai listings count" — approximate total Dubai listings
+
+CRITICAL RULES FOR BREAKDOWNS:
+- Off-plan + secondary should sum to total_sales (which is often reported separately from total_transactions)
+- If you find total sales + off-plan count in the same source, derive secondary = total_sales - off-plan
+- If you find total sales + secondary count, derive off-plan = total_sales - secondary
+- Same logic applies for mortgage/cash: if you find total + one, derive the other
+- If a blog or news article shows a table with weekly DLD data, extract EVERY column from it — do not skip any field that's visible
+
+SOURCE PRIORITY:
+- reliantsurveyors.com weekly blog posts typically have the FULL breakdown in one table
+- gulfbusiness.com and arabianbusiness.com DLD updates
+- dubailand.gov.ae if accessible
+- khaleejtimes.com, zawya.com, pro-partner.com
+
+- Only return null if you have searched AT LEAST 3 sources for that specific field and none have it
+- data_date should reflect the week the data covers, not today
 
 Return as JSON only, no other text, wrapped in a single \`\`\`json code block:
 {

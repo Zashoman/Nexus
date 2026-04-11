@@ -25,9 +25,14 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const supabase = getServiceSupabase();
 
+  // Upsert by week_label — if a row for this week exists, merge the new values
+  // over it instead of throwing a unique constraint error
   const { data, error } = await supabase
     .from('re_weekly_data')
-    .insert({ ...body, created_by: user.id })
+    .upsert(
+      { ...body, created_by: user.id, updated_at: new Date().toISOString() },
+      { onConflict: 'week_label' }
+    )
     .select()
     .single();
 
@@ -36,7 +41,7 @@ export async function POST(request: NextRequest) {
   // Log the update
   await supabase.from('re_update_log').insert({
     update_type: 'manual_weekly',
-    description: `Added weekly data for ${body.week_label}`,
+    description: `Saved weekly data for ${body.week_label}`,
     data_snapshot: body,
     updated_by: user.id,
   });
