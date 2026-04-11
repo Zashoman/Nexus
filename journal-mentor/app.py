@@ -1704,6 +1704,12 @@ def update_topic(tid):
         conn.execute("UPDATE topics SET priority=? WHERE id=?", (data['priority'], tid))
     conn.commit()
     conn.close()
+    # Status change affects what gets pushed to Notes — sync
+    if 'status' in data:
+        try:
+            _sync_topics_pull_then_push()
+        except Exception:
+            pass
     return jsonify({"status": "ok"})
 
 @app.route('/api/topics/<int:tid>', methods=['DELETE'])
@@ -1712,6 +1718,11 @@ def delete_topic(tid):
     conn.execute("DELETE FROM topics WHERE id=?", (tid,))
     conn.commit()
     conn.close()
+    # Sync the deletion to Apple Notes (pull first to not lose phone adds)
+    try:
+        _sync_topics_pull_then_push()
+    except Exception:
+        pass
     return jsonify({"status": "ok"})
 
 @app.route('/api/topics/export', methods=['GET'])
@@ -1728,9 +1739,8 @@ def export_topics():
         lines.append("")
     return jsonify({"text": "\n".join(lines), "count": len(topics)})
 
-@app.route('/api/topics/sync-notes', methods=['POST'])
-def sync_to_apple_notes():
-    """Sync topics to Apple Notes via osascript (macOS only)."""
+def _do_push_to_apple_notes():
+    """Push current topics to Apple Notes. Returns True on success, False on error."""
     conn = get_db()
     topics = conn.execute("SELECT * FROM topics WHERE status='open' ORDER BY priority DESC, created_at DESC").fetchall()
     conn.close()
@@ -1745,7 +1755,6 @@ def sync_to_apple_notes():
     note_content = "\n".join(lines)
     note_title = "Journal Mentor — Ideation"
 
-    # Use AppleScript to create/update a note in Apple Notes
     import subprocess
     escaped_content = note_content.replace(chr(10), '<br>').replace('"', '\\"')
     script = ('tell application "Notes"\n'
@@ -1763,9 +1772,24 @@ def sync_to_apple_notes():
               'end tell')
     try:
         subprocess.run(['osascript', '-e', script], capture_output=True, timeout=10)
+        return True
+    except Exception:
+        return False
+
+
+def _sync_topics_pull_then_push():
+    """Pull from Notes (captures phone additions), then push (reflects current app state)."""
+    _do_pull_from_apple_notes()
+    _do_push_to_apple_notes()
+
+
+@app.route('/api/topics/sync-notes', methods=['POST'])
+def sync_to_apple_notes():
+    """Sync topics to Apple Notes via osascript (macOS only)."""
+    ok = _do_push_to_apple_notes()
+    if ok:
         return jsonify({"status": "ok", "message": "Synced to Apple Notes"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"error": "Failed to sync"}), 500
 
 
 def _do_pull_from_apple_notes():
