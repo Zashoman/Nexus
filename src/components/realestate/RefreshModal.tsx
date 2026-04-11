@@ -69,10 +69,19 @@ export default function RefreshModal({ isOpen, onClose, token }: Props) {
         notes: `Sources: ${result.sources?.join(', ') || 'AI search'}`,
       };
 
+      let metricCount = 0;
       for (const [key, val] of Object.entries(editValues)) {
         if (val !== '' && val !== 'null') {
-          payload[key] = parseFloat(val);
+          const n = parseFloat(val);
+          if (!isNaN(n)) {
+            payload[key] = n;
+            metricCount++;
+          }
         }
+      }
+
+      if (metricCount === 0) {
+        throw new Error('Cannot save — no metric values were filled in. Edit the fields or cancel.');
       }
 
       const res = await fetch('/api/re/weekly', {

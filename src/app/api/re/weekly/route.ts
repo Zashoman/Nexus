@@ -49,6 +49,49 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ data });
 }
 
+export async function DELETE(request: NextRequest) {
+  const user = await getAuthUser(request);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!(await isOwner(user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get('id');
+  const weekLabel = searchParams.get('week_label');
+  const emptyOnly = searchParams.get('empty_only') === 'true';
+
+  const supabase = getServiceSupabase();
+
+  // Cleanup mode: delete all rows where every metric field is null
+  if (emptyOnly) {
+    const { data, error } = await supabase
+      .from('re_weekly_data')
+      .delete()
+      .is('total_transactions', null)
+      .is('offplan_transactions', null)
+      .is('secondary_transactions', null)
+      .is('mortgage_registrations', null)
+      .is('cash_transactions', null)
+      .is('total_value_aed_billions', null)
+      .is('dfm_re_index', null)
+      .is('emaar_share_price', null)
+      .is('listing_inventory', null)
+      .select();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ deleted: data?.length ?? 0, rows: data });
+  }
+
+  if (!id && !weekLabel) {
+    return NextResponse.json({ error: 'id or week_label required' }, { status: 400 });
+  }
+
+  const query = supabase.from('re_weekly_data').delete();
+  const { error } = id ? await query.eq('id', id) : await query.eq('week_label', weekLabel);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true });
+}
+
 export async function PUT(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
