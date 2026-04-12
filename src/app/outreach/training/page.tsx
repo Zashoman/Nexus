@@ -6,9 +6,7 @@ import {
   Play,
   Loader2,
   CheckCircle2,
-  XCircle,
   Mail,
-  TrendingUp,
   RefreshCw,
   Lightbulb,
   Clock,
@@ -85,7 +83,8 @@ export default function TrainingPage() {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startIngestion = async () => {
     setRunning(true);

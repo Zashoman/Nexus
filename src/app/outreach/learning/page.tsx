@@ -7,11 +7,10 @@ import {
   MessageSquareHeart,
   Loader2,
   RefreshCw,
-  ArrowRight,
   Brain,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
-import Card, { CardHeader } from '@/components/outreach/ui/Card';
+import Card from '@/components/outreach/ui/Card';
 import Badge from '@/components/outreach/ui/Badge';
 import Button from '@/components/outreach/ui/Button';
 import EmptyState from '@/components/outreach/ui/EmptyState';

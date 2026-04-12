@@ -10,12 +10,9 @@ import {
   ChevronUp,
   Undo2,
   Upload,
-  Loader2,
   Send,
   User,
-  Building2,
   BookOpen,
-  Zap,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card from '@/components/outreach/ui/Card';
@@ -161,11 +158,11 @@ export default function PitchStudioPage() {
     }
   };
 
-  const useCaseStudy = (cs: CaseStudy) => {
+  const applyCaseStudy = (cs: CaseStudy) => {
     setRevisionPrompt(`Incorporate the ${cs.client_name} case study. Reference: "${cs.result_headline}." Weave naturally as social proof, not a hard sell.`);
   };
 
-  const useArticle = (article: Article) => {
+  const applyArticle = (article: Article) => {
     setRevisionPrompt(`Reference the article "${article.title}" as relevant thought leadership. Mention it naturally as something valuable to share.`);
   };
 
@@ -334,7 +331,7 @@ export default function PitchStudioPage() {
                               return (
                                 <button
                                   key={item.id}
-                                  onClick={() => isCs ? useCaseStudy(item as CaseStudy) : useArticle(item as Article)}
+                                  onClick={() => isCs ? applyCaseStudy(item as CaseStudy) : applyArticle(item as Article)}
                                   className={`
                                     text-xs px-2.5 py-1.5 rounded-lg border transition-colors text-left
                                     ${matchesIndustry
