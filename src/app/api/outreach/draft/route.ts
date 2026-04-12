@@ -45,7 +45,7 @@ Write a reply to ${sender_name?.split(' ')[0] || 'them'}. Just the email body, n
       }],
     });
 
-    const draft = message.content[0].type === 'text' ? message.content[0].text : '';
+    const draft = message.content?.[0]?.type === 'text' ? message.content[0].text : '';
     return NextResponse.json({ draft });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to generate draft';

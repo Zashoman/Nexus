@@ -90,7 +90,7 @@ Write the reply. Just the email body.`,
     }],
   });
 
-  return message.content[0].type === 'text' ? message.content[0].text : '';
+  return message.content?.[0]?.type === 'text' ? message.content[0].text : '';
 }
 
 // GET: fetch all replies, classify, and generate drafts in one pass

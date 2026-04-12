@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Search,
   Sparkles,
@@ -185,6 +186,14 @@ export default function SalesPage() {
 
   const activeCount = people.filter((p) => !excluded.has(p.id)).length;
   const withOpenersCount = people.filter((p) => !excluded.has(p.id) && p.opener).length;
+  const router = useRouter();
+
+  const goToPitchStudio = () => {
+    const active = people.filter((p) => !excluded.has(p.id) && p.opener);
+    if (active.length === 0) return;
+    sessionStorage.setItem('pitch_studio_prospects', JSON.stringify(active));
+    router.push('/outreach/pitch-studio');
+  };
 
   return (
     <div className="space-y-6">
@@ -387,14 +396,23 @@ export default function SalesPage() {
                 Generate Openers
               </Button>
               <Button
-                variant="success"
+                variant="primary"
+                size="sm"
+                onClick={goToPitchStudio}
+                disabled={withOpenersCount === 0}
+                icon={<Sparkles className="w-3.5 h-3.5" />}
+              >
+                Review in Pitch Studio ({withOpenersCount})
+              </Button>
+              <Button
+                variant="secondary"
                 size="sm"
                 onClick={downloadCsv}
                 loading={downloading}
                 disabled={withOpenersCount === 0}
                 icon={<Download className="w-3.5 h-3.5" />}
               >
-                Download CSV ({withOpenersCount})
+                Download CSV
               </Button>
             </div>
           </div>

@@ -80,9 +80,12 @@ Output only JSON, no markdown.`,
               }],
             });
 
-            const text = message.content[0].type === 'text' ? message.content[0].text : '';
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
-            const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { subject: '', opener: '' };
+            const text = message.content?.[0]?.type === 'text' ? message.content[0].text : '';
+            const jsonMatch = text.match(/\{[\s\S]*?\}/);
+            let parsed = { subject: '', opener: '' };
+            try {
+              if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
+            } catch { /* fallback to empty */ }
 
             return {
               person_id: p.id,

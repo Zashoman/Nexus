@@ -59,7 +59,7 @@ Write the revised draft. Just the email body.`,
       }],
     });
 
-    const draft = message.content[0].type === 'text' ? message.content[0].text : '';
+    const draft = message.content?.[0]?.type === 'text' ? message.content[0].text : '';
 
     return NextResponse.json({ draft });
   } catch (err: unknown) {

@@ -17,12 +17,12 @@ export async function GET() {
       .lt('due_date', today)
       .in('status', ['upcoming', 'due_soon']);
 
-    // Mark due soon (within 7 days)
+    // Mark due soon (within 7 days — exclusive upper bound)
     await supabase
       .from('reminders')
       .update({ status: 'due_soon' })
       .gte('due_date', today)
-      .lte('due_date', weekFromNow)
+      .lt('due_date', weekFromNow)
       .eq('status', 'upcoming');
 
     // Fetch all active reminders

@@ -157,7 +157,7 @@ ${body.substring(0, 2000)}`,
     ],
   });
 
-  const text = message.content[0].type === 'text' ? message.content[0].text : '';
+  const text = message.content?.[0]?.type === 'text' ? message.content[0].text : '';
 
   try {
     const result = JSON.parse(text);

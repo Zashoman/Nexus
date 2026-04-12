@@ -206,7 +206,7 @@ Write the revised draft. Just the email body.`,
       }],
     });
 
-    const newDraft = message.content[0].type === 'text' ? message.content[0].text : '';
+    const newDraft = message.content?.[0]?.type === 'text' ? message.content[0].text : '';
 
     if (!newDraft) {
       await postThreadReply(channel, thread_ts, `⚠️ Couldn't generate a revised draft. Try again with different instructions.`);

@@ -276,9 +276,9 @@ Be concrete and actionable. Format as a numbered list.`,
     }
 
     if (patternsToInsert.length > 0) {
-      // Clear old patterns first
-      await supabase.from('email_patterns').delete().eq('is_active', true);
-      // Insert new ones
+      // Deactivate old patterns instead of deleting (preserves history)
+      await supabase.from('email_patterns').update({ is_active: false }).eq('is_active', true);
+      // Insert new ones as active
       await supabase.from('email_patterns').insert(patternsToInsert);
       patternsExtracted = patternsToInsert.length;
     }
