@@ -1787,6 +1787,11 @@ def delete_brain_dump(did):
     conn.execute("DELETE FROM brain_dumps WHERE id=?", (did,))
     conn.commit()
     conn.close()
+    try:
+        _do_pull_brain_dump_from_notes()
+        _do_push_brain_dump_to_notes()
+    except Exception:
+        pass
     return jsonify({"status": "ok"})
 
 @app.route('/api/brain-dump/categorize', methods=['POST'])
@@ -1849,7 +1854,108 @@ def promote_brain_dump(did):
     return jsonify({"status": "ok"})
 
 
-@app.route('/api/topics/export', methods=['GET'])
+def _do_push_brain_dump_to_notes():
+    """Push brain dump inbox to Apple Notes."""
+    conn = get_db()
+    items = conn.execute("SELECT * FROM brain_dumps WHERE status='inbox' ORDER BY created_at DESC").fetchall()
+    conn.close()
+
+    lines = ["Brain Dump — Inbox", f"Updated: {datetime.now().strftime('%d %b %Y %H:%M')}", ""]
+    for i in items:
+        lines.append(f"• {i['text']}")
+        lines.append("")
+
+    note_content = "\n".join(lines)
+    note_title = "Journal Mentor — Brain Dump"
+
+    import subprocess
+    escaped_content = note_content.replace(chr(10), '<br>').replace('"', '\\"')
+    script = ('tell application "Notes"\n'
+              '    set noteFound to false\n'
+              '    repeat with eachNote in notes of default account\n'
+              '        if name of eachNote is "' + note_title + '" then\n'
+              '            set body of eachNote to "' + escaped_content + '"\n'
+              '            set noteFound to true\n'
+              '            exit repeat\n'
+              '        end if\n'
+              '    end repeat\n'
+              '    if not noteFound then\n'
+              '        make new note at default account with properties {name:"' + note_title + '", body:"' + escaped_content + '"}\n'
+              '    end if\n'
+              'end tell')
+    try:
+        subprocess.run(['osascript', '-e', script], capture_output=True, timeout=10)
+        return True
+    except Exception:
+        return False
+
+
+def _do_pull_brain_dump_from_notes():
+    """Pull new items from the Brain Dump note in Apple Notes."""
+    import subprocess, re as regex_mod
+    note_title = "Journal Mentor — Brain Dump"
+    script = (
+        'tell application "Notes"\n'
+        '    set noteBody to ""\n'
+        '    repeat with eachNote in notes\n'
+        '        if name of eachNote is "' + note_title + '" then\n'
+        '            set noteBody to body of eachNote\n'
+        '            exit repeat\n'
+        '        end if\n'
+        '    end repeat\n'
+        '    return noteBody\n'
+        'end tell'
+    )
+    try:
+        result = subprocess.run(['osascript', '-e', script], capture_output=True, timeout=15, text=True)
+        body = result.stdout or ""
+    except Exception:
+        return None
+
+    if not body:
+        return None
+
+    text = regex_mod.sub(r'<br[^>]*>', '\n', body)
+    text = regex_mod.sub(r'</div>', '\n', text)
+    text = regex_mod.sub(r'<[^>]+>', '', text)
+    text = text.replace('&nbsp;', ' ').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&#39;', "'").replace('&quot;', '"')
+
+    lines = [l.strip() for l in text.split('\n')]
+    items_found = []
+    for line in lines:
+        if not line:
+            continue
+        if line.startswith('Brain Dump') or line.startswith('Updated:') or line.startswith('Journal Mentor'):
+            continue
+        if line.startswith(('•', '-', '*', '·')):
+            line = line[1:].strip()
+        if line and len(line) > 1:
+            items_found.append(line)
+
+    conn = get_db()
+    existing = set(r['text'].lower().strip() for r in conn.execute("SELECT text FROM brain_dumps").fetchall())
+    added = 0
+    for t in items_found:
+        if t.lower().strip() not in existing:
+            conn.execute("INSERT INTO brain_dumps (text) VALUES (?)", (t,))
+            existing.add(t.lower().strip())
+            added += 1
+    conn.commit()
+    conn.close()
+    return (added, len(items_found))
+
+
+@app.route('/api/brain-dump/push-notes', methods=['POST'])
+def push_brain_dump_notes():
+    ok = _do_push_brain_dump_to_notes()
+    return jsonify({"status": "ok"}) if ok else jsonify({"error": "Failed"}), 500
+
+@app.route('/api/brain-dump/pull-notes', methods=['POST'])
+def pull_brain_dump_notes():
+    result = _do_pull_brain_dump_from_notes()
+    if result is None:
+        return jsonify({"error": "Note not found. Click 'Push to Notes' first."}), 404
+    return jsonify({"status": "ok", "added": result[0], "total_found": result[1]})
 def export_topics():
     """Export topics as plain text for Apple Notes."""
     conn = get_db()
@@ -1990,6 +2096,12 @@ def background_notes_sync():
             r = _do_pull_from_apple_notes()
             if r and r[0] > 0:
                 print(f"  [auto-sync] Pulled {r[0]} new topic(s) from Apple Notes")
+        except Exception:
+            pass
+        try:
+            r2 = _do_pull_brain_dump_from_notes()
+            if r2 and r2[0] > 0:
+                print(f"  [auto-sync] Pulled {r2[0]} new brain dump item(s) from Apple Notes")
         except Exception:
             pass
 

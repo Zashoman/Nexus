@@ -332,6 +332,8 @@
                     <p class="ideation-subtitle">Dump everything. Sort later.</p>
                 </div>
                 <div style="display:flex; gap:8px">
+                    <button class="btn btn-sm" onclick="pullDumpFromNotes()" id="pull-dump-btn">Pull from Notes</button>
+                    <button class="btn btn-sm" onclick="pushDumpToNotes()" id="push-dump-btn">Push to Notes</button>
                     <button class="btn btn-accent btn-sm" onclick="categorizeDump()" id="categorize-btn">AI Sort</button>
                 </div>
             </div>
@@ -952,6 +954,8 @@
         await fetch('/api/brain-dump', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({text}) });
         ta.value = '';
         fetchDumpItems();
+        // Auto-push to Apple Notes
+        fetch('/api/brain-dump/push-notes', {method:'POST'}).catch(()=>{});
     }
     document.addEventListener('keydown', e => { if ((e.metaKey||e.ctrlKey) && e.key === 'Enter' && document.getElementById('tab-braindump').classList.contains('active')) submitDump(); });
     async function deleteDump(id) { await fetch('/api/brain-dump/' + id, {method:'DELETE'}); fetchDumpItems(); }
@@ -967,6 +971,8 @@
         } catch { btn.textContent = 'Failed'; }
         setTimeout(() => { btn.textContent = 'AI Sort'; btn.disabled = false; }, 3000);
     }
+    async function pushDumpToNotes(){const btn=document.getElementById('push-dump-btn');btn.disabled=true;btn.textContent='Pushing...';try{await fetch('/api/brain-dump/push-notes',{method:'POST'});btn.textContent='Pushed!';}catch{btn.textContent='Failed';}setTimeout(()=>{btn.textContent='Push to Notes';btn.disabled=false;},3000);}
+    async function pullDumpFromNotes(){const btn=document.getElementById('pull-dump-btn');btn.disabled=true;btn.textContent='Pulling...';try{const res=await fetch('/api/brain-dump/pull-notes',{method:'POST'});const d=await res.json();if(d.error){btn.textContent='Failed';alert(d.error);}else{btn.textContent='+'+d.added+' new';fetchDumpItems();}}catch{btn.textContent='Failed';}setTimeout(()=>{btn.textContent='Pull from Notes';btn.disabled=false;},3000);}
 
     function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
     </script>
