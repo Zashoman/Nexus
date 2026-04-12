@@ -34,7 +34,6 @@ export async function POST(request: Request) {
       const batchResults = await Promise.all(
         batch.map(async (p) => {
           try {
-            const name = p.first_name || p.name?.split(' ')[0] || 'there';
             const company = p.organization?.name || 'their company';
             const title = p.title || 'their role';
             const industry = p.organization?.industry || '';

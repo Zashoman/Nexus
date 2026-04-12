@@ -52,7 +52,6 @@ export default function CampaignCard({
   days_remaining,
 }: CampaignCardProps) {
   const Icon = typeIcons[type];
-  const percentage = target > 0 ? Math.round((achieved / target) * 100) : 0;
 
   return (
     <Link href={`/outreach/campaigns/${id}`}>

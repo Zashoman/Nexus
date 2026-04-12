@@ -16,8 +16,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  User,
-  Building2,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card, { CardHeader } from '@/components/outreach/ui/Card';

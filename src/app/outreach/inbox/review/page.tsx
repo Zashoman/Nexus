@@ -5,7 +5,6 @@ import {
   Loader2,
   Send,
   RefreshCw,
-  CheckCircle2,
   Mail,
   Sparkles,
   Clock,
