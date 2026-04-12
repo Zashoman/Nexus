@@ -2,7 +2,8 @@ import { NextResponse, after } from 'next/server';
 import { acknowledgeMessage, postThreadReply } from '@/lib/outreach/slack';
 import { getSlackDraft, updateSlackDraft, updateDraftStatus } from '@/lib/outreach/draft-store';
 import { getServiceSupabase } from '@/lib/outreach/supabase';
-import { logRevision, getRelevantRevisions, formatLearnings } from '@/lib/outreach/learning';
+import { logRevision } from '@/lib/outreach/learning';
+import { buildDraftSystemPrompt, buildDraftContext } from '@/lib/outreach/prompt';
 import Anthropic from '@anthropic-ai/sdk';
 
 // Log every incoming event to Supabase for debugging
@@ -165,15 +166,9 @@ async function handleThreadReply(event: {
   );
 
   try {
-    // Pull past learnings for this persona/campaign
-    const pastRevisions = await getRelevantRevisions({
-      campaign_name: draft.campaign_name,
-      account_email: draft.account_email,
-      limit: 10,
-    });
-    const learningsBlock = formatLearnings(pastRevisions);
+    const systemPrompt = await buildDraftSystemPrompt();
+    const extraContext = await buildDraftContext({ campaignName: draft.campaign_name, accountEmail: draft.account_email });
 
-    // Generate revised draft
     const client = new Anthropic();
 
     const cleanHtml = (draft.thread_html || '')
@@ -185,20 +180,7 @@ async function handleThreadReply(event: {
     const message = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,
-      system: `You are a professional email reply writer for Blue Tree Digital PR.
-
-Blue Tree helps SaaS/tech companies grow through editorial placements, backlinks, and digital PR campaigns.
-
-Context: You're revising a draft based on team feedback.
-
-CRITICAL:
-- Read the team feedback carefully and apply it exactly
-- Understand the type of email this is — recruitment outreach declines, digital PR pitches, sales inquiries all need different responses
-- If the prospect declined an employment opportunity, write a polite graceful decline response, not a sales pitch
-- NEVER say the message "got cut off"
-- Keep it concise (3-6 sentences), warm, professional
-- Sign off as the person in "REPLYING AS"
-- Just the email body, no preamble, no subject line`,
+      system: systemPrompt + '\n\nContext: You are REVISING an existing draft based on team feedback. Apply the feedback exactly.',
       messages: [{
         role: 'user',
         content: `Revise this draft based on team feedback.
@@ -214,12 +196,12 @@ PROSPECT'S REPLY:
 FULL THREAD:
 ${cleanHtml}
 
-PREVIOUS DRAFT (this may be wrong — listen to the feedback):
+PREVIOUS DRAFT (this may be wrong, listen to the feedback):
 ${draft.current_draft}
 
 TEAM FEEDBACK:
 ${cleanText}
-${learningsBlock ? '\n' + learningsBlock + '\n' : ''}
+${extraContext ? '\n' + extraContext + '\n' : ''}
 Write the revised draft. Just the email body.`,
       }],
     });
