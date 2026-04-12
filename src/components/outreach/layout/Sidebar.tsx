@@ -4,25 +4,34 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
-  Megaphone,
   Inbox,
-  Users,
-  BarChart3,
-  MessageSquareHeart,
   Settings,
   LogOut,
   TreePine,
   Brain,
   Database,
   Target,
+  PenTool,
+  Bell,
+  BarChart3,
+  Users,
+  MessageSquareHeart,
+  Megaphone,
 } from 'lucide-react';
 import { useAuth } from '@/components/outreach/AuthProvider';
 
+// v2 primary navigation
 const navigation = [
-  { name: 'Overview', href: '/outreach', icon: LayoutDashboard },
-  { name: 'Campaigns', href: '/outreach/campaigns', icon: Megaphone },
+  { name: 'Dashboard', href: '/outreach', icon: LayoutDashboard },
+  { name: 'Prospects', href: '/outreach/sales', icon: Target },
+  { name: 'Pitch Studio', href: '/outreach/pitch-studio', icon: PenTool },
   { name: 'Inbox', href: '/outreach/inbox', icon: Inbox },
-  { name: 'Sales Prospects', href: '/outreach/sales', icon: Target },
+  { name: 'Reminders', href: '/outreach/reminders', icon: Bell },
+];
+
+// Secondary navigation (existing features kept accessible)
+const secondaryNav = [
+  { name: 'Campaigns', href: '/outreach/campaigns', icon: Megaphone },
   { name: 'Personas', href: '/outreach/personas', icon: Users },
   { name: 'Learning', href: '/outreach/learning', icon: Brain },
   { name: 'Training', href: '/outreach/training', icon: Database },
@@ -71,7 +80,8 @@ export default function Sidebar() {
       </div>
 
       {/* Main navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-3 overflow-y-auto">
+        <div className="space-y-1">
         {navigation.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;
@@ -94,6 +104,36 @@ export default function Sidebar() {
             </Link>
           );
         })}
+        </div>
+
+        {/* Secondary nav */}
+        <div className="mt-4 pt-4 border-t border-white/10">
+          <p className="px-3 text-[10px] font-semibold text-white/30 uppercase tracking-wider mb-2">More</p>
+          <div className="space-y-0.5">
+          {secondaryNav.map((item) => {
+            const active = isActive(item.href);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`
+                  flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium
+                  transition-all duration-150
+                  ${
+                    active
+                      ? 'bg-white/10 text-white'
+                      : 'text-white/40 hover:bg-white/5 hover:text-white/70'
+                  }
+                `}
+              >
+                <Icon className={`w-[16px] h-[16px] ${active ? 'text-bt-primary-light' : ''}`} />
+                {item.name}
+              </Link>
+            );
+          })}
+          </div>
+        </div>
       </nav>
 
       {/* Bottom navigation */}
