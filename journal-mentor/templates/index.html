@@ -12,6 +12,7 @@
         <div style="display:flex">
             <button class="tab-btn active" onclick="switchTab('journal')">Journal</button>
             <button class="tab-btn" onclick="switchTab('ideation')">Ideation</button>
+            <button class="tab-btn" onclick="switchTab('braindump')">Brain Dump</button>
             <button class="tab-btn" onclick="switchTab('history')">History</button>
             <button class="tab-btn" onclick="switchTab('debugging')">Debugging Matrix</button>
             <button class="tab-btn" onclick="switchTab('mentorlog')">Mentor Log <span id="pending-badge" class="pending-badge" style="display:none">0</span></button>
@@ -322,6 +323,35 @@
         </div>
     </div>
 
+    <!-- ═══ BRAIN DUMP TAB ═══ -->
+    <div id="tab-braindump" class="tab-content">
+        <div class="braindump-content">
+            <div class="ideation-header">
+                <div>
+                    <h2 class="ideation-title">Brain Dump</h2>
+                    <p class="ideation-subtitle">Dump everything. Sort later.</p>
+                </div>
+                <div style="display:flex; gap:8px">
+                    <button class="btn btn-accent btn-sm" onclick="categorizeDump()" id="categorize-btn">AI Sort</button>
+                </div>
+            </div>
+            <div class="dump-input-area">
+                <textarea id="dump-textarea" class="dump-textarea" placeholder="Just dump it all here — one idea per line. To-dos, random thoughts, questions, anything. Press Cmd+Enter to submit."></textarea>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px">
+                    <span class="word-count" id="dump-count">one item per line</span>
+                    <button class="btn btn-accent" onclick="submitDump()">Dump It</button>
+                </div>
+            </div>
+            <div class="dump-filters" style="margin-bottom:16px">
+                <button class="log-filter active" onclick="filterDump('all',this)">All</button>
+                <button class="log-filter" onclick="filterDump('inbox',this)">Inbox</button>
+                <button class="log-filter" onclick="filterDump('sorted',this)">Sorted</button>
+                <button class="log-filter" onclick="filterDump('promoted',this)">Promoted</button>
+            </div>
+            <div id="dump-list"></div>
+        </div>
+    </div>
+
     <!-- ═══ MANUAL TAB ═══ -->
     <div id="tab-manual" class="tab-content">
         <div class="manual-page">
@@ -450,6 +480,7 @@
         if (tab === 'system') { fetchGoals(); fetchPriors(); fetchPhases(); fetchReports(); fetchDocuments(); fetchBaseline(); fetchMicro(); }
         if (tab === 'history') fetchHistoryEntries();
         if (tab === 'ideation') { fetchTopics(); startTopicAutoRefresh(); } else { stopTopicAutoRefresh(); }
+        if (tab === 'braindump') fetchDumpItems();
     }
 
     // ── Right Panel Toggle ────────────────────────────────
@@ -891,6 +922,51 @@
     let topicAutoRefreshTimer=null;
     function startTopicAutoRefresh(){stopTopicAutoRefresh();topicAutoRefreshTimer=setInterval(fetchTopics,30000);}
     function stopTopicAutoRefresh(){if(topicAutoRefreshTimer){clearInterval(topicAutoRefreshTimer);topicAutoRefreshTimer=null;}}
+
+    // ── Brain Dump ────────────────────────────────────────
+    let dumpFilter = 'all';
+    async function fetchDumpItems() {
+        const res = await fetch('/api/brain-dump');
+        let items = await res.json();
+        if (dumpFilter !== 'all') items = items.filter(i => i.status === dumpFilter);
+        const el = document.getElementById('dump-list');
+        const TYPE_COLORS = {idea:'#D4A85C',todo:'#FF8C00',question:'#4488FF',project:'#00CC66',explore:'#C8A2FF',random_thought:'#5A6A7A'};
+        el.innerHTML = items.map(i => {
+            const catBadge = i.category ? '<span class="dump-cat-badge">' + esc(i.category) + '</span>' : '';
+            const typeBadge = i.item_type && i.item_type !== 'unsorted' ? '<span class="dump-type-badge" style="color:' + (TYPE_COLORS[i.item_type]||'#5A6A7A') + '">' + esc(i.item_type) + '</span>' : '';
+            const statusBadge = '<span class="dump-status-badge ' + i.status + '">' + i.status + '</span>';
+            return '<div class="dump-item">' +
+                '<div class="dump-item-text">' + esc(i.text) + '</div>' +
+                '<div class="dump-item-meta">' + catBadge + typeBadge + statusBadge +
+                    (i.status === 'inbox' || i.status === 'sorted' ? '<button class="btn btn-sm btn-accent" onclick="promoteDump(' + i.id + ')" style="padding:2px 8px">→ Ideation</button>' : '') +
+                    '<button class="entry-delete" onclick="deleteDump(' + i.id + ')">×</button>' +
+                '</div>' +
+            '</div>';
+        }).join('') || '<div class="ideation-empty">Nothing dumped yet. Open the textarea above and let it flow.</div>';
+    }
+    function filterDump(f, btn) { dumpFilter = f; document.querySelectorAll('.dump-filters .log-filter').forEach(b => b.classList.remove('active')); if(btn) btn.classList.add('active'); fetchDumpItems(); }
+    async function submitDump() {
+        const ta = document.getElementById('dump-textarea');
+        const text = ta.value.trim();
+        if (!text) return;
+        await fetch('/api/brain-dump', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({text}) });
+        ta.value = '';
+        fetchDumpItems();
+    }
+    document.addEventListener('keydown', e => { if ((e.metaKey||e.ctrlKey) && e.key === 'Enter' && document.getElementById('tab-braindump').classList.contains('active')) submitDump(); });
+    async function deleteDump(id) { await fetch('/api/brain-dump/' + id, {method:'DELETE'}); fetchDumpItems(); }
+    async function promoteDump(id) { await fetch('/api/brain-dump/' + id + '/promote', {method:'POST'}); fetchDumpItems(); }
+    async function categorizeDump() {
+        const btn = document.getElementById('categorize-btn');
+        btn.disabled = true; btn.textContent = 'Sorting...';
+        try {
+            const res = await fetch('/api/brain-dump/categorize', {method:'POST'});
+            const d = await res.json();
+            btn.textContent = d.error ? 'Failed' : d.updated + ' sorted';
+            fetchDumpItems();
+        } catch { btn.textContent = 'Failed'; }
+        setTimeout(() => { btn.textContent = 'AI Sort'; btn.disabled = false; }, 3000);
+    }
 
     function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
     </script>

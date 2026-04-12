@@ -103,8 +103,36 @@ def migrate_db():
     # Entries backup tracking
     add_column('entries', 'backed_up', 'INTEGER', '0')
 
+    # Topics table migrations
+    add_column('topics', 'category', 'TEXT')
+    add_column('topics', 'topic_type', 'TEXT', "'idea'")
+
     conn.commit()
     conn.close()
+
+
+DEFAULT_GOALS = [
+    ("objective", "financial", "toward", "Protect existing financial assets and grow them — 20% is a win"),
+    ("objective", "cognitive", "toward", "Think from first principles always — biggest cognitive gap and biggest consistent problem throughout entire adult life"),
+    ("objective", "cognitive", "toward", "Move from consuming to thinking — defined by writing, reflecting, planning, and researching"),
+    ("objective", "cognitive", "toward", "Let intelligence augment and commoditize upwards — focus on building agency and decision-making"),
+    ("objective", "social", "toward", "2 new high-quality friends in Dubai — takes sacrifice and consistent effort to build community"),
+    ("objective", "social", "toward", "Massively improve friends and community"),
+    ("objective", "purpose", "toward", "Find meaning beyond blind speculation — prime years of exploration intellectually, focusing solely on money is a lack of purpose"),
+    ("objective", "purpose", "toward", "Work on something with focused intent, exponential payoff, and high level of personal challenge"),
+    ("objective", "behavioral", "away", "Infinite comparison and FOMO — either start winning through discipline and calculated risk, or fully decide not to care"),
+    ("objective", "behavioral", "away", "Massively reduce Twitter usage — one of the biggest failures of the last two years"),
+    ("behavioral", "behavioral", "toward", "Get out of the house min 2, max 3 times a week to work elsewhere for better focus"),
+    ("behavioral", "social", "toward", "Phone calls sometimes with friends"),
+    ("behavioral", "behavioral", "away", "When mindlessly scrolling — STOP"),
+    ("behavioral", "identity", "toward", "Move toward pain — got too comfortable in the last 12 months"),
+    ("principle", "identity", None, "Maximize time with Kian. One day it will all be gone."),
+    ("principle", "identity", None, "Love yourself. First time making this a priority. Love yourself unconditionally."),
+    ("principle", "identity", None, "Only compare yourself to yourself."),
+    ("principle", "identity", None, "The universe always provides what you need. Openness and acceptance. Everything that comes to you is data to move forward."),
+    ("principle", "cognitive", None, "My ability to trade and make decisions is based strongly off my ability to NOT torture myself. This applies to nearly everything."),
+    ("principle", "identity", None, "I always create some big problem thing that I think is haunting me — heart problems, money problems, girl problems. The problem changes, the pattern doesn't."),
+]
 
 
 def init_db():
@@ -281,6 +309,15 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE TABLE IF NOT EXISTS brain_dumps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            text TEXT NOT NULL,
+            category TEXT,
+            item_type TEXT DEFAULT 'unsorted',
+            status TEXT DEFAULT 'inbox',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
         CREATE TABLE IF NOT EXISTS mentor_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             event_type TEXT NOT NULL,
@@ -304,30 +341,6 @@ def init_db():
             conn.execute("INSERT INTO goals (layer, domain, direction, description) VALUES (?,?,?,?)", g)
         conn.commit()
     conn.close()
-
-
-DEFAULT_GOALS = [
-    ("objective", "financial", "toward", "Protect existing financial assets and grow them — 20% is a win"),
-    ("objective", "cognitive", "toward", "Think from first principles always — biggest cognitive gap and biggest consistent problem throughout entire adult life"),
-    ("objective", "cognitive", "toward", "Move from consuming to thinking — defined by writing, reflecting, planning, and researching"),
-    ("objective", "cognitive", "toward", "Let intelligence augment and commoditize upwards — focus on building agency and decision-making"),
-    ("objective", "social", "toward", "2 new high-quality friends in Dubai — takes sacrifice and consistent effort to build community"),
-    ("objective", "social", "toward", "Massively improve friends and community"),
-    ("objective", "purpose", "toward", "Find meaning beyond blind speculation — prime years of exploration intellectually, focusing solely on money is a lack of purpose"),
-    ("objective", "purpose", "toward", "Work on something with focused intent, exponential payoff, and high level of personal challenge"),
-    ("objective", "behavioral", "away", "Infinite comparison and FOMO — either start winning through discipline and calculated risk, or fully decide not to care"),
-    ("objective", "behavioral", "away", "Massively reduce Twitter usage — one of the biggest failures of the last two years"),
-    ("behavioral", "behavioral", "toward", "Get out of the house min 2, max 3 times a week to work elsewhere for better focus"),
-    ("behavioral", "social", "toward", "Phone calls sometimes with friends"),
-    ("behavioral", "behavioral", "away", "When mindlessly scrolling — STOP"),
-    ("behavioral", "identity", "toward", "Move toward pain — got too comfortable in the last 12 months"),
-    ("principle", "identity", None, "Maximize time with Kian. One day it will all be gone."),
-    ("principle", "identity", None, "Love yourself. First time making this a priority. Love yourself unconditionally."),
-    ("principle", "identity", None, "Only compare yourself to yourself."),
-    ("principle", "identity", None, "The universe always provides what you need. Openness and acceptance. Everything that comes to you is data to move forward."),
-    ("principle", "cognitive", None, "My ability to trade and make decisions is based strongly off my ability to NOT torture myself. This applies to nearly everything."),
-    ("principle", "identity", None, "I always create some big problem thing that I think is haunting me — heart problems, money problems, girl problems. The problem changes, the pattern doesn't."),
-]
 
 
 # ── Memory Management ──────────────────────────────────────
@@ -1724,6 +1737,117 @@ def delete_topic(tid):
     except Exception:
         pass
     return jsonify({"status": "ok"})
+
+@app.route('/api/brain-dump', methods=['GET'])
+def list_brain_dumps():
+    conn = get_db()
+    items = conn.execute("SELECT * FROM brain_dumps ORDER BY CASE status WHEN 'inbox' THEN 0 ELSE 1 END, created_at DESC").fetchall()
+    conn.close()
+    return jsonify([dict(i) for i in items])
+
+@app.route('/api/brain-dump', methods=['POST'])
+def add_brain_dump():
+    """Add a single item or bulk dump (newline-separated)."""
+    data = request.json
+    text = data.get("text", "").strip()
+    if not text:
+        return jsonify({"error": "No text"}), 400
+
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    cleaned = []
+    for line in lines:
+        if line.startswith(('•', '-', '*', '·')):
+            line = line[1:].strip()
+        if line and len(line) > 1:
+            cleaned.append(line)
+
+    conn = get_db()
+    added = 0
+    for t in cleaned:
+        conn.execute("INSERT INTO brain_dumps (text) VALUES (?)", (t,))
+        added += 1
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok", "added": added})
+
+@app.route('/api/brain-dump/<int:did>', methods=['PUT'])
+def update_brain_dump(did):
+    data = request.json
+    conn = get_db()
+    for field in ['text', 'category', 'item_type', 'status']:
+        if field in data:
+            conn.execute(f"UPDATE brain_dumps SET {field}=? WHERE id=?", (data[field], did))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+@app.route('/api/brain-dump/<int:did>', methods=['DELETE'])
+def delete_brain_dump(did):
+    conn = get_db()
+    conn.execute("DELETE FROM brain_dumps WHERE id=?", (did,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+@app.route('/api/brain-dump/categorize', methods=['POST'])
+def categorize_brain_dump():
+    """Use AI to sort and categorize all inbox items."""
+    if not client:
+        return jsonify({"error": "No API key"}), 500
+
+    conn = get_db()
+    items = conn.execute("SELECT id, text FROM brain_dumps WHERE status='inbox'").fetchall()
+    conn.close()
+
+    if not items:
+        return jsonify({"status": "ok", "message": "Inbox empty", "updated": 0})
+
+    item_list = "\n".join([f"{i['id']}. {i['text']}" for i in items])
+
+    prompt = f"""Sort and categorize each of these brain dump items. For each one, assign:
+1. CATEGORY: business, trading, learning, relationships, health, creativity, technology, personal_growth, other
+2. TYPE: idea, todo, question, project, explore, random_thought
+
+Output as a JSON array:
+[{{"id": 1, "category": "...", "type": "..."}}, ...]
+
+Output ONLY the JSON array.
+
+ITEMS:
+{item_list}"""
+
+    try:
+        result = call_anthropic(prompt, max_tokens=1500)
+        match = re.search(r'\[.*\]', result, re.DOTALL)
+        parsed = json.loads(match.group()) if match else json.loads(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+    conn = get_db()
+    updated = 0
+    for item in parsed:
+        if item.get('id'):
+            conn.execute("UPDATE brain_dumps SET category=?, item_type=?, status='sorted' WHERE id=?",
+                         (item.get('category', ''), item.get('type', 'idea'), item['id']))
+            updated += 1
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok", "updated": updated})
+
+@app.route('/api/brain-dump/<int:did>/promote', methods=['POST'])
+def promote_brain_dump(did):
+    """Move a brain dump item to the Ideation topics list."""
+    conn = get_db()
+    item = conn.execute("SELECT * FROM brain_dumps WHERE id=?", (did,)).fetchone()
+    if not item:
+        conn.close()
+        return jsonify({"error": "Not found"}), 404
+    conn.execute("INSERT INTO topics (text, notes) VALUES (?, ?)", (item['text'], f"From brain dump. Category: {item['category'] or 'unsorted'}"))
+    conn.execute("UPDATE brain_dumps SET status='promoted' WHERE id=?", (did,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
 
 @app.route('/api/topics/export', methods=['GET'])
 def export_topics():
