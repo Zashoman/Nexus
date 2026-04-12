@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { listUniboxEmails, listCampaigns } from '@/lib/outreach/instantly';
 import { classifyReply } from '@/lib/outreach/classifier';
-import { getRelevantRevisions, formatLearnings } from '@/lib/outreach/learning';
+import { buildDraftSystemPrompt, buildDraftContext } from '@/lib/outreach/prompt';
 import Anthropic from '@anthropic-ai/sdk';
 
 const BLUE_TREE_DOMAINS = [
@@ -57,6 +57,8 @@ async function generateDraft(
   aiSummary: string,
 ): Promise<string> {
   const client = new Anthropic();
+  const systemPrompt = await buildDraftSystemPrompt();
+  const extraContext = await buildDraftContext({ campaignName, accountEmail });
 
   const cleanHtml = threadHtml
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -64,28 +66,10 @@ async function generateDraft(
     .replace(/<img[^>]*>/gi, '[image]')
     .substring(0, 8000);
 
-  // Pull past team feedback for learning
-  const pastRevisions = await getRelevantRevisions({
-    campaign_name: campaignName,
-    account_email: accountEmail,
-    limit: 10,
-  });
-  const learningsBlock = formatLearnings(pastRevisions);
-
   const message = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
-    system: `You are a professional email reply writer for Blue Tree Digital PR.
-
-Blue Tree helps SaaS/tech companies grow through editorial placements in major publications, high-quality backlinks, and digital PR campaigns. They helped Hostinger achieve 211%+ organic growth.
-
-RULES:
-- NEVER say the message "got cut off" — short replies are complete messages
-- Directly address what the prospect said
-- Be concise (3-6 sentences), warm, professional
-- Reference their company and what was discussed
-- Sign off as the person specified in "Replying as"
-- Just the email body, no subject line`,
+    system: systemPrompt,
     messages: [{
       role: 'user',
       content: `Draft a reply.
@@ -101,7 +85,7 @@ PROSPECT'S REPLY (complete message — NOT cut off):
 
 FULL THREAD:
 ${cleanHtml}
-${learningsBlock ? '\n' + learningsBlock + '\n' : ''}
+${extraContext ? '\n' + extraContext + '\n' : ''}
 Write the reply. Just the email body.`,
     }],
   });
