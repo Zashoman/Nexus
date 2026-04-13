@@ -200,23 +200,57 @@ ${sorted.map((cs, i) => `${i + 1}. ${cs.client_name} [${(cs.industry_tags as str
   }
 }
 
-/** Load writer info for editorial campaigns */
-async function getWriterContext(accountEmail?: string): Promise<string | null> {
+/** Load writer info with publication matching for editorial campaigns */
+async function getWriterContext(accountEmail?: string, targetPublication?: string): Promise<string | null> {
   try {
-    if (!accountEmail) return null;
     const supabase = getServiceSupabase();
 
-    // Try to find writer by pen name or email pattern
+    // Get all active writers with their publication relationships
     const { data: writers } = await supabase
       .from('writers')
-      .select('name, primary_verticals, bio, writing_style')
-      .eq('active', true)
-      .limit(5);
+      .select('id, name, primary_verticals, bio, writing_style')
+      .eq('active', true);
 
     if (!writers || writers.length === 0) return null;
 
-    return `AVAILABLE WRITERS (for editorial campaigns, match writer to publication):
-${writers.map((w) => `- ${w.name}: ${(w.primary_verticals as string[]).join(', ')}${w.writing_style ? ` | Style: ${w.writing_style}` : ''}`).join('\n')}`;
+    // Get publication counts and names per writer
+    const { data: pubs } = await supabase
+      .from('writer_publications')
+      .select('writer_id, publication_name');
+
+    const writerPubs: Record<string, string[]> = {};
+    for (const pub of pubs || []) {
+      if (!writerPubs[pub.writer_id]) writerPubs[pub.writer_id] = [];
+      if (!writerPubs[pub.writer_id].includes(pub.publication_name)) {
+        writerPubs[pub.writer_id].push(pub.publication_name);
+      }
+    }
+
+    // If targeting a specific publication, find matching writers
+    let matchedWriter: string | null = null;
+    if (targetPublication) {
+      const target = targetPublication.toLowerCase();
+      for (const w of writers) {
+        const pList = writerPubs[w.id] || [];
+        if (pList.some((p) => p.toLowerCase().includes(target) || target.includes(p.toLowerCase()))) {
+          matchedWriter = w.name;
+          break;
+        }
+      }
+    }
+
+    const sections: string[] = [];
+
+    if (matchedWriter) {
+      sections.push(`WRITER MATCH: ${matchedWriter} has an existing relationship with ${targetPublication}. Draft under this writer's persona.`);
+    }
+
+    sections.push(`WRITER NETWORK:\n${writers.map((w) => {
+      const pList = writerPubs[w.id] || [];
+      return `- ${w.name}: ${(w.primary_verticals as string[]).join(', ')} | Publications: ${pList.slice(0, 4).join(', ')}${pList.length > 4 ? ` +${pList.length - 4}` : ''}`;
+    }).join('\n')}`);
+
+    return sections.join('\n\n');
   } catch {
     return null;
   }
@@ -308,7 +342,7 @@ export async function buildDraftContext(params: {
 
   // Load case studies (for sales) or writer context (for editorial)
   if (params.campaignType === 'editorial') {
-    const writerCtx = await getWriterContext(params.accountEmail);
+    const writerCtx = await getWriterContext(params.accountEmail, params.prospectIndustry);
     if (writerCtx) sections.push(writerCtx);
   } else {
     const caseStudies = await getRelevantCaseStudies(params.prospectIndustry);

@@ -592,6 +592,19 @@ export default function SalesPage() {
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant="default" size="sm">{p.organization?.name}</Badge>
                             {p.organization?.industry && <Badge variant="info" size="sm">{p.organization.industry}</Badge>}
+                            {/* Qualification score badge */}
+                            {(() => {
+                              const q = (p as unknown as { qualification?: { score: number; action: string } }).qualification;
+                              if (!q) return null;
+                              return (
+                                <Badge
+                                  variant={q.score >= 6 ? 'success' : q.score >= 2 ? 'warning' : q.action === 'exclude' ? 'danger' : 'default'}
+                                  size="sm"
+                                >
+                                  Score: {q.score} {q.action === 'exclude' ? '(excluded)' : q.action === 'warn' ? '(review)' : ''}
+                                </Badge>
+                              );
+                            })()}
                             {p.organization?.estimated_num_employees && (
                               <Badge variant="default" size="sm">{p.organization.estimated_num_employees} emp.</Badge>
                             )}

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { searchPeople, type ApolloSearchFilters } from '@/lib/outreach/apollo';
+import { scoreAndSortProspects } from '@/lib/outreach/qualification';
 import { getServiceSupabase } from '@/lib/outreach/supabase';
 
-// POST: search Apollo for prospects, save the search
+// POST: search Apollo for prospects, score + sort, save search
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -19,6 +20,9 @@ export async function POST(request: Request) {
 
     const result = await searchPeople(filters);
 
+    // Apply qualification scoring and sort by score
+    const scored = scoreAndSortProspects(result.people);
+
     // Save search to Supabase
     const supabase = getServiceSupabase();
     const { data: search } = await supabase
@@ -27,7 +31,7 @@ export async function POST(request: Request) {
         search_name: body.search_name || `Search ${new Date().toLocaleString()}`,
         filters,
         total_results: result.pagination.total_entries,
-        prospects: result.people,
+        prospects: scored,
         status: 'ready',
       })
       .select('id')
@@ -36,7 +40,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       search_id: search?.id,
-      people: result.people,
+      people: scored,
       total: result.pagination.total_entries,
       pages: result.pagination.total_pages,
     });

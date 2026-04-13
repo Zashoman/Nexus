@@ -67,6 +67,11 @@ export default function PitchStudioPage() {
   const [revisionPrompt, setRevisionPrompt] = useState('');
   const [revising, setRevising] = useState(false);
   const [campaignType] = useState<'sales' | 'editorial'>('sales');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [instantlyCampaigns, setInstantlyCampaigns] = useState<Array<{ id: string; name: string; status: string }>>([]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
 
   useEffect(() => {
     // Load prospects from sessionStorage (set by the Prospects/Sales page)
@@ -86,7 +91,40 @@ export default function PitchStudioPage() {
         setArticles(data.articles || []);
       })
       .catch(() => {});
+
+    // Load Instantly campaigns for import modal
+    fetch('/api/outreach/instantly/campaigns')
+      .then((r) => r.json())
+      .then((data) => setInstantlyCampaigns(data.campaigns || []))
+      .catch(() => {});
   }, []);
+
+  const handleImport = async () => {
+    if (!selectedCampaignId) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      // For now, download CSV (Instantly write access not yet enabled)
+      const active = prospects.filter((p) => p.status === 'approved' || p.status === 'edited');
+      const res = await fetch('/api/outreach/apollo/csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prospects: active }),
+      });
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `instantly-import-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      setImportResult(`Downloaded CSV with ${active.length} prospects. Upload this to Instantly campaign "${instantlyCampaigns.find((c) => c.id === selectedCampaignId)?.name || selectedCampaignId}".`);
+    } catch {
+      setImportResult('Failed to generate CSV. Try again.');
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const stats = {
     total: prospects.length,
@@ -444,8 +482,63 @@ export default function PitchStudioPage() {
               <Button variant="secondary" size="sm" onClick={downloadCsv} icon={<Send className="w-3.5 h-3.5" />}>
                 Download CSV
               </Button>
-              <Button variant="success" size="lg" icon={<Upload className="w-4 h-4" />}>
+              <Button variant="success" size="lg" onClick={() => setShowImportModal(true)} icon={<Upload className="w-4 h-4" />}>
                 Import to Instantly
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import to Instantly Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-bt-surface border border-bt-border rounded-xl w-full max-w-lg mx-4 shadow-lg">
+            <div className="p-5 border-b border-bt-border">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-semibold text-bt-text">Import to Instantly</h2>
+                <button onClick={() => setShowImportModal(false)} className="text-bt-text-tertiary hover:text-bt-text">✕</button>
+              </div>
+              <p className="text-xs text-bt-text-secondary mt-1">{approvedProspects.length} approved pitches ready to import</p>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-bt-text mb-1.5">Select Instantly Campaign</label>
+                <select
+                  value={selectedCampaignId}
+                  onChange={(e) => setSelectedCampaignId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-bt-border bg-bt-bg-alt text-sm text-bt-text focus:outline-none focus:ring-2 focus:ring-bt-primary"
+                >
+                  <option value="">Choose a campaign...</option>
+                  {instantlyCampaigns.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.status})</option>
+                  ))}
+                </select>
+              </div>
+
+              {importResult && (
+                <div className={`p-3 rounded-lg text-xs ${importResult.startsWith('Failed') ? 'bg-bt-red-bg/50 text-bt-red' : 'bg-bt-green-bg/50 text-bt-green'}`}>
+                  {importResult}
+                </div>
+              )}
+
+              <p className="text-[11px] text-bt-text-tertiary">
+                This downloads a CSV formatted for Instantly import. Upload it to the selected campaign in Instantly. Direct API push will be available once write access is enabled.
+              </p>
+            </div>
+
+            <div className="p-5 pt-0 flex items-center justify-end gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setShowImportModal(false)}>Cancel</Button>
+              <Button
+                variant="success"
+                size="sm"
+                onClick={handleImport}
+                loading={importing}
+                disabled={!selectedCampaignId}
+                icon={<Upload className="w-3.5 h-3.5" />}
+              >
+                Download for Import
               </Button>
             </div>
           </div>
