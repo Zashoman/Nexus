@@ -237,6 +237,16 @@ export default function SalesPage() {
   const activeCount = people.filter((p) => !excluded.has(p.id)).length;
   const withOpenersCount = people.filter((p) => !excluded.has(p.id) && p.opener).length;
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'search' | 'history'>('search');
+  const [searchHistory, setSearchHistory] = useState<Array<{ id: string; search_name: string; filters: Record<string, unknown>; total_results: number; emails_generated: number; status: string; created_at: string }>>([]);
+
+  const loadHistory = async () => {
+    try {
+      const res = await fetch('/api/outreach/apollo/history');
+      const data = await res.json();
+      setSearchHistory(data.searches || []);
+    } catch { /* silent */ }
+  };
 
   const goToPitchStudio = () => {
     const active = people.filter((p) => !excluded.has(p.id) && p.opener);
@@ -248,9 +258,57 @@ export default function SalesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Sales Prospects"
+        title="Prospects"
         subtitle="Find prospects on Apollo, generate personalized openers, export for Instantly"
       />
+
+      {/* Tabs: Search / History */}
+      <div className="flex items-center gap-1 p-1 bg-bt-bg-alt rounded-lg w-fit">
+        <button
+          onClick={() => setActiveTab('search')}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'search' ? 'bg-bt-surface text-bt-text shadow-sm' : 'text-bt-text-secondary hover:text-bt-text'}`}
+        >
+          Search
+        </button>
+        <button
+          onClick={() => { setActiveTab('history'); loadHistory(); }}
+          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'history' ? 'bg-bt-surface text-bt-text shadow-sm' : 'text-bt-text-secondary hover:text-bt-text'}`}
+        >
+          History
+        </button>
+      </div>
+
+      {/* History tab */}
+      {activeTab === 'history' && (
+        <Card padding="none">
+          {searchHistory.length === 0 ? (
+            <div className="text-center py-12">
+              <Search className="w-6 h-6 text-bt-text-tertiary mx-auto mb-2" />
+              <p className="text-sm text-bt-text-secondary">No past searches yet</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-bt-border">
+              {searchHistory.map((s) => (
+                <div key={s.id} className="px-5 py-3 hover:bg-bt-surface-hover transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-bt-text">{s.search_name}</p>
+                      <p className="text-xs text-bt-text-secondary mt-0.5">{s.total_results} results found</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={s.status === 'sent' ? 'success' : s.status === 'ready' ? 'info' : 'default'} size="sm">{s.status}</Badge>
+                      <span className="text-[11px] text-bt-text-tertiary">{new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Search tab content */}
+      {activeTab === 'search' && <>
 
       {/* AI Natural Language Search */}
       <Card>
@@ -653,6 +711,7 @@ export default function SalesPage() {
           </div>
         </>
       )}
+      </>}
     </div>
   );
 }

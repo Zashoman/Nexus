@@ -1,156 +1,33 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   Inbox,
   Send,
   Mail,
   TrendingUp,
+  Bell,
+  Megaphone,
+  Loader2,
+  RefreshCw,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
-import MetricCard from '@/components/outreach/ui/MetricCard';
-import CampaignCard from '@/components/outreach/dashboard/CampaignCard';
-import ActivityFeed from '@/components/outreach/dashboard/ActivityFeed';
-import PendingQueue from '@/components/outreach/dashboard/PendingQueue';
-import type { ActivityItem } from '@/types/outreach';
+import Card from '@/components/outreach/ui/Card';
+import Badge from '@/components/outreach/ui/Badge';
+import Button from '@/components/outreach/ui/Button';
 
-// Demo data — replaced with Supabase queries in Phase 2+
-const mockMetrics = {
-  pending_approvals: 7,
-  emails_sent_today: 34,
-  replies_received: 12,
-  positive_reply_rate: 18.4,
-};
-
-const mockCampaigns = [
-  {
-    id: '1',
-    name: 'Atera Guest Posts — Q2',
-    type: 'editorial' as const,
-    health: 'on_track' as const,
-    pending: 3,
-    achieved: 8,
-    target: 15,
-    metric_label: 'placements',
-    reply_rate: 14.2,
-    days_remaining: 52,
-  },
-  {
-    id: '2',
-    name: 'Blue Tree Sales — Series B Fintech',
-    type: 'sales' as const,
-    health: 'needs_attention' as const,
-    pending: 2,
-    achieved: 3,
-    target: 10,
-    metric_label: 'meetings',
-    reply_rate: 22.5,
-    days_remaining: 18,
-  },
-  {
-    id: '3',
-    name: 'Sponsored Links — Cybersecurity',
-    type: 'sponsored_link' as const,
-    health: 'on_track' as const,
-    pending: 2,
-    achieved: 22,
-    target: 30,
-    metric_label: 'placements',
-    reply_rate: 8.7,
-    days_remaining: 37,
-  },
-];
-
-const mockPendingDrafts = [
-  {
-    id: '1',
-    contact_name: 'Sarah Chen',
-    contact_email: 'sarah@techcrunch.com',
-    campaign_name: 'Atera Guest Posts — Q2',
-    persona_name: 'Sarah',
-    classification: 'Interested in topic',
-    confidence: 94,
-    snippet: '"Thanks for reaching out. We\'re interested in the cybersecurity angle. Can you send me a draft by Friday?"',
-    time_ago: '12m ago',
-  },
-  {
-    id: '2',
-    contact_name: 'Marcus Rodriguez',
-    contact_email: 'marcus@fintech-weekly.com',
-    campaign_name: 'Blue Tree Sales — Series B Fintech',
-    classification: 'Meeting request',
-    confidence: 88,
-    snippet: '"This sounds interesting. Could we set up a 30-minute call next week to discuss further?"',
-    time_ago: '45m ago',
-  },
-  {
-    id: '3',
-    contact_name: 'Emma Johnson',
-    contact_email: 'emma@wired.com',
-    campaign_name: 'Atera Guest Posts — Q2',
-    persona_name: 'James',
-    classification: 'Wants different angle',
-    confidence: 76,
-    snippet: '"We covered something similar last month. Do you have a different take on this? Maybe focused on SMB rather than enterprise?"',
-    time_ago: '2h ago',
-  },
-];
-
-const mockActivity: ActivityItem[] = [
-  {
-    id: '1',
-    type: 'reply_received',
-    title: 'New reply from Sarah Chen',
-    description: 'Interested in the cybersecurity angle — wants a draft by Friday',
-    campaign_name: 'Atera Guest Posts',
-    campaign_type: 'editorial',
-    persona_name: 'Sarah',
-    timestamp: new Date(Date.now() - 12 * 60000).toISOString(),
-  },
-  {
-    id: '2',
-    type: 'draft_approved',
-    title: 'Draft approved for David Kim',
-    description: 'Follow-up email sent with updated pricing for DR 60+ sites',
-    campaign_name: 'Sponsored Links',
-    campaign_type: 'sponsored_link',
-    timestamp: new Date(Date.now() - 35 * 60000).toISOString(),
-  },
-  {
-    id: '3',
-    type: 'email_sent',
-    title: 'Email sent to Marcus Rodriguez',
-    description: 'Meeting scheduling email — proposed 3 time slots for next week',
-    campaign_name: 'BT Sales',
-    campaign_type: 'sales',
-    timestamp: new Date(Date.now() - 90 * 60000).toISOString(),
-  },
-  {
-    id: '4',
-    type: 'escalation',
-    title: 'Escalation — angry reply from Tom Baker',
-    description: '"Stop emailing me" — flagged for senior review. Contact added to cool-off list.',
-    campaign_name: 'Sponsored Links',
-    campaign_type: 'sponsored_link',
-    timestamp: new Date(Date.now() - 3 * 3600000).toISOString(),
-  },
-  {
-    id: '5',
-    type: 'feedback',
-    title: 'Draft revised by Zack',
-    description: 'Changed tone from formal to casual for VentureBeat pitch — persona: James',
-    campaign_name: 'Atera Guest Posts',
-    campaign_type: 'editorial',
-    persona_name: 'James',
-    timestamp: new Date(Date.now() - 5 * 3600000).toISOString(),
-  },
-  {
-    id: '6',
-    type: 'campaign_created',
-    title: 'New campaign created',
-    description: 'Blue Tree Sales — Series B Fintech CTOs targeting 50 prospects',
-    campaign_name: 'BT Sales',
-    campaign_type: 'sales',
-    timestamp: new Date(Date.now() - 24 * 3600000).toISOString(),
-  },
-];
+interface DashboardData {
+  campaigns: Array<{ id: string; name: string; type: string; status: string; created_at: string }>;
+  metrics: { pending_approvals: number; emails_sent_today: number; replies_received_today: number };
+  reminders: { overdue: number; due_soon: number; upcoming: number };
+  instantly: { connected: boolean; campaign_count: number };
+  learning: { total_revisions: number; last_week: number };
+  slack_drafts: { pending: number; approved: number; sent: number };
+}
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -159,69 +36,227 @@ function getGreeting(): string {
   return 'Good evening';
 }
 
-export default function OutreachOverview() {
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
+export default function DashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDashboard = async () => {
+    setLoading(true);
+    try {
+      const [dashRes, remRes, learnRes] = await Promise.all([
+        fetch('/api/outreach/dashboard').then((r) => r.json()),
+        fetch('/api/outreach/reminders').then((r) => r.json()).catch(() => ({ counts: { overdue: 0, due_soon: 0, upcoming: 0 } })),
+        fetch('/api/outreach/learning').then((r) => r.json()).catch(() => ({ total_revisions: 0, last_week: 0 })),
+      ]);
+
+      // Check Instantly
+      let instantlyData = { connected: false, campaign_count: 0 };
+      try {
+        const instRes = await fetch('/api/outreach/instantly/test');
+        const inst = await instRes.json();
+        instantlyData = { connected: inst.ok, campaign_count: inst.campaign_count || 0 };
+      } catch { /* silent */ }
+
+      // Check slack drafts
+      let slackData = { pending: 0, approved: 0, sent: 0 };
+      try {
+        const slackRes = await fetch('/api/outreach/dashboard');
+        const slack = await slackRes.json();
+        slackData = {
+          pending: slack.metrics?.pending_approvals || 0,
+          approved: 0,
+          sent: slack.metrics?.emails_sent_today || 0,
+        };
+      } catch { /* silent */ }
+
+      setData({
+        campaigns: dashRes.campaigns || [],
+        metrics: dashRes.metrics || { pending_approvals: 0, emails_sent_today: 0, replies_received_today: 0 },
+        reminders: remRes.counts || { overdue: 0, due_soon: 0, upcoming: 0 },
+        instantly: instantlyData,
+        learning: { total_revisions: learnRes.total_revisions || 0, last_week: learnRes.last_week || 0 },
+        slack_drafts: slackData,
+      });
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchDashboard(); }, []);
+
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <Loader2 className="w-6 h-6 text-bt-primary animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <PageHeader
-        title={`${getGreeting()}`}
+        title={getGreeting()}
         subtitle={today}
+        action={<Button variant="secondary" size="sm" onClick={fetchDashboard} icon={<RefreshCw className="w-3.5 h-3.5" />}>Refresh</Button>}
       />
 
       {/* Key metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label="Pending Approvals"
-          value={mockMetrics.pending_approvals}
-          icon={<Inbox className="w-5 h-5 text-bt-primary" />}
-          iconBg="bg-bt-primary-bg"
-        />
-        <MetricCard
-          label="Sent Today"
-          value={mockMetrics.emails_sent_today}
-          change={12}
-          changeLabel="vs yesterday"
-          icon={<Send className="w-5 h-5 text-bt-teal" />}
-          iconBg="bg-bt-teal-bg"
-        />
-        <MetricCard
-          label="Replies Today"
-          value={mockMetrics.replies_received}
-          change={-5}
-          changeLabel="vs yesterday"
-          icon={<Mail className="w-5 h-5 text-bt-blue" />}
-          iconBg="bg-bt-blue-bg"
-        />
-        <MetricCard
-          label="Positive Reply Rate"
-          value={`${mockMetrics.positive_reply_rate}%`}
-          change={2.3}
-          changeLabel="7d trend"
-          icon={<TrendingUp className="w-5 h-5 text-bt-green" />}
-          iconBg="bg-bt-green-bg"
-        />
+        <Card>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-bt-text-secondary uppercase tracking-wider">Pending Approvals</p>
+              <p className="text-2xl font-bold text-bt-text mt-2 tabular-nums">{data?.metrics.pending_approvals || 0}</p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-bt-primary-bg"><Inbox className="w-5 h-5 text-bt-primary" /></div>
+          </div>
+        </Card>
+        <Card>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-bt-text-secondary uppercase tracking-wider">Sent Today</p>
+              <p className="text-2xl font-bold text-bt-text mt-2 tabular-nums">{data?.metrics.emails_sent_today || 0}</p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-bt-teal-bg"><Send className="w-5 h-5 text-bt-teal" /></div>
+          </div>
+        </Card>
+        <Card>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-bt-text-secondary uppercase tracking-wider">Replies Today</p>
+              <p className="text-2xl font-bold text-bt-text mt-2 tabular-nums">{data?.metrics.replies_received_today || 0}</p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-bt-blue-bg"><Mail className="w-5 h-5 text-bt-blue" /></div>
+          </div>
+        </Card>
+        <Card>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-bt-text-secondary uppercase tracking-wider">Agent Lessons</p>
+              <p className="text-2xl font-bold text-bt-text mt-2 tabular-nums">{data?.learning.total_revisions || 0}</p>
+              <p className="text-xs text-bt-text-tertiary mt-0.5">{data?.learning.last_week || 0} this week</p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-bt-green-bg"><TrendingUp className="w-5 h-5 text-bt-green" /></div>
+          </div>
+        </Card>
       </div>
 
-      {/* Active Campaigns */}
+      {/* Status cards row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Instantly connection */}
+        <Card>
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${data?.instantly.connected ? 'bg-bt-green' : 'bg-bt-red'}`} />
+            <div>
+              <p className="text-sm font-medium text-bt-text">Instantly</p>
+              <p className="text-xs text-bt-text-secondary">
+                {data?.instantly.connected ? `Connected (${data.instantly.campaign_count} campaigns)` : 'Not connected'}
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Reminders */}
+        <Link href="/outreach/reminders">
+          <Card hover>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Bell className="w-5 h-5 text-bt-amber" />
+                <div>
+                  <p className="text-sm font-medium text-bt-text">Reminders</p>
+                  <p className="text-xs text-bt-text-secondary">
+                    {(data?.reminders.overdue || 0) > 0
+                      ? `${data?.reminders.overdue} overdue`
+                      : `${data?.reminders.due_soon || 0} due this week`}
+                  </p>
+                </div>
+              </div>
+              {(data?.reminders.overdue || 0) > 0 && (
+                <Badge variant="danger" size="sm" dot>{data?.reminders.overdue} overdue</Badge>
+              )}
+            </div>
+          </Card>
+        </Link>
+
+        {/* Daily cron status */}
+        <Card>
+          <div className="flex items-center gap-3">
+            <Clock className="w-5 h-5 text-bt-primary" />
+            <div>
+              <p className="text-sm font-medium text-bt-text">Daily Summary</p>
+              <p className="text-xs text-bt-text-secondary">10:00 AM UK time, every day</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Active campaigns */}
       <div>
-        <h2 className="text-sm font-semibold text-bt-text mb-3">Active Campaigns</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {mockCampaigns.map((campaign) => (
-            <CampaignCard key={campaign.id} {...campaign} />
-          ))}
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-bt-text">Active Campaigns</h2>
+          <Link href="/outreach/campaigns"><Button variant="ghost" size="sm">View all</Button></Link>
         </div>
+        {data?.campaigns && data.campaigns.length > 0 ? (
+          <Card padding="none">
+            <div className="divide-y divide-bt-border">
+              {data.campaigns.slice(0, 5).map((c) => (
+                <div key={c.id} className="flex items-center justify-between px-5 py-3 hover:bg-bt-surface-hover transition-colors">
+                  <div className="flex items-center gap-3">
+                    <Megaphone className="w-4 h-4 text-bt-text-tertiary" />
+                    <div>
+                      <p className="text-sm font-medium text-bt-text">{c.name}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <Badge variant={c.type === 'sales' ? 'teal' : c.type === 'editorial' ? 'info' : 'primary'} size="sm">{c.type}</Badge>
+                        <Badge variant={c.status === 'active' ? 'success' : c.status === 'draft' ? 'default' : 'warning'} size="sm">{c.status}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-bt-text-tertiary">{new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        ) : (
+          <Card>
+            <div className="text-center py-8">
+              <Megaphone className="w-8 h-8 text-bt-text-tertiary mx-auto mb-2" />
+              <p className="text-sm text-bt-text-secondary">No campaigns yet</p>
+              <Link href="/outreach/campaigns/new"><Button variant="primary" size="sm" className="mt-3">Create Campaign</Button></Link>
+            </div>
+          </Card>
+        )}
       </div>
 
-      {/* Bottom section: Pending approvals + Activity feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PendingQueue drafts={mockPendingDrafts} />
-        <ActivityFeed items={mockActivity} />
+      {/* Quick actions */}
+      <div>
+        <h2 className="text-sm font-semibold text-bt-text mb-3">Quick Actions</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Link href="/outreach/inbox/review">
+            <Card hover className="text-center py-4">
+              <CheckCircle2 className="w-6 h-6 text-bt-green mx-auto mb-2" />
+              <p className="text-xs font-medium text-bt-text">Daily Review</p>
+            </Card>
+          </Link>
+          <Link href="/outreach/sales">
+            <Card hover className="text-center py-4">
+              <Send className="w-6 h-6 text-bt-primary mx-auto mb-2" />
+              <p className="text-xs font-medium text-bt-text">Find Prospects</p>
+            </Card>
+          </Link>
+          <Link href="/outreach/inbox">
+            <Card hover className="text-center py-4">
+              <Inbox className="w-6 h-6 text-bt-blue mx-auto mb-2" />
+              <p className="text-xs font-medium text-bt-text">Check Inbox</p>
+            </Card>
+          </Link>
+          <Link href="/outreach/reminders">
+            <Card hover className="text-center py-4">
+              <AlertTriangle className="w-6 h-6 text-bt-amber mx-auto mb-2" />
+              <p className="text-xs font-medium text-bt-text">Reminders ({(data?.reminders.overdue || 0) + (data?.reminders.due_soon || 0)})</p>
+            </Card>
+          </Link>
+        </div>
       </div>
     </div>
   );

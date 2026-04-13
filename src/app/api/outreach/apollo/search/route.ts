@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { searchPeople, type ApolloSearchFilters } from '@/lib/outreach/apollo';
 import { scoreAndSortProspects } from '@/lib/outreach/qualification';
+import { getExcludedEmails } from '@/lib/outreach/exclusion';
 import { getServiceSupabase } from '@/lib/outreach/supabase';
 
 // POST: search Apollo for prospects, score + sort, save search
@@ -20,8 +21,13 @@ export async function POST(request: Request) {
 
     const result = await searchPeople(filters);
 
+    // Exclude do-not-contact emails
+    const emails = result.people.map((p) => p.email).filter(Boolean) as string[];
+    const excluded = await getExcludedEmails(emails);
+    const filtered = result.people.filter((p) => !p.email || !excluded.has(p.email.toLowerCase()));
+
     // Apply qualification scoring and sort by score
-    const scored = scoreAndSortProspects(result.people);
+    const scored = scoreAndSortProspects(filtered);
 
     // Save search to Supabase
     const supabase = getServiceSupabase();
