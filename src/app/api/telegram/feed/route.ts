@@ -98,7 +98,7 @@ export async function GET() {
     .eq("is_active", true);
 
   if (!channels || channels.length === 0) {
-    return NextResponse.json({ messages: [], channels: [] });
+    return NextResponse.json({ messages: [], channels: [], new_messages: 0 });
   }
 
   let newMessages = 0;

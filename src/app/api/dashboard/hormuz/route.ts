@@ -79,7 +79,7 @@ export async function POST() {
   else if (brentPrice < 75) brentRating = 'red';
 
   let dxyRating = 'yellow';
-  if (dxyPrice > 103 || dxyPrice > 0) dxyRating = 'green';
+  if (dxyPrice > 103) dxyRating = 'green';
   else if (dxyPrice < 95) dxyRating = 'red';
 
   let storageRating = 'green';
