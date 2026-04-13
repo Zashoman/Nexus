@@ -19,6 +19,7 @@ interface Video {
 interface VideoDetailPanelProps {
   video: Video | null;
   onClose?: () => void;
+  onVideoUpdate?: (videoId: string, updates: Partial<Video>) => void;
 }
 
 function timeAgo(dateStr: string): string {
@@ -208,7 +209,7 @@ function FeedbackInput({ videoId }: { videoId: string }) {
   );
 }
 
-export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelProps) {
+export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: VideoDetailPanelProps) {
   const [miniSummary, setMiniSummary] = useState<string | null>(null);
   const [fullSummary, setFullSummary] = useState<string | null>(null);
   const [extendedSummary, setExtendedSummary] = useState<string | null>(null);
@@ -221,12 +222,21 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
   const [readProgress, setReadProgress] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // Track current video ID to prevent stale async updates
+  const currentVideoIdRef = useRef<string | null>(null);
+  // Cache summaries across video switches
+  const cacheRef = useRef<Map<string, { mini?: string; full?: string; extended?: string; factcheck?: string }>>(new Map());
+
   useEffect(() => {
     if (!video) return;
-    setMiniSummary(video.mini_summary || null);
-    setFullSummary(video.full_summary || null);
-    setExtendedSummary(null);
-    setFactCheck(null);
+    currentVideoIdRef.current = video.video_id;
+
+    // Load from cache first, then fall back to video props
+    const cached = cacheRef.current.get(video.video_id);
+    setMiniSummary(cached?.mini || video.mini_summary || null);
+    setFullSummary(cached?.full || video.full_summary || null);
+    setExtendedSummary(cached?.extended || null);
+    setFactCheck(cached?.factcheck || null);
     setMiniLoading(false);
     setFullLoading(false);
     setExtendedLoading(false);
@@ -234,6 +244,19 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
     setIsStarred(false);
     setReadProgress(0);
   }, [video?.video_id]);
+
+  // Helper: only update state if we're still on the same video
+  function updateIfCurrent(videoId: string, setter: (v: string) => void, cacheKey: 'mini' | 'full' | 'extended' | 'factcheck', summary: string) {
+    // Always cache regardless of current view
+    const entry = cacheRef.current.get(videoId) || {};
+    entry[cacheKey] = summary;
+    cacheRef.current.set(videoId, entry);
+
+    // Only update displayed state if still viewing this video
+    if (currentVideoIdRef.current === videoId) {
+      setter(summary);
+    }
+  }
 
   // Reading progress tracker
   const handleScroll = useCallback(() => {
@@ -248,62 +271,84 @@ export default function VideoDetailPanel({ video, onClose }: VideoDetailPanelPro
 
   async function generateMini() {
     if (!video || miniLoading) return;
+    const targetId = video.video_id;
     setMiniLoading(true);
     try {
       const res = await fetch("/api/youtube/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ video_id: video.video_id, mode: "mini" }),
+        body: JSON.stringify({ video_id: targetId, mode: "mini" }),
       });
       const data = await res.json();
-      if (data.summary) setMiniSummary(data.summary);
+      if (data.summary) {
+        updateIfCurrent(targetId, setMiniSummary, 'mini', data.summary);
+        onVideoUpdate?.(targetId, { mini_summary: data.summary });
+      }
     } catch { /* silent */ }
-    finally { setMiniLoading(false); }
+    finally {
+      if (currentVideoIdRef.current === targetId) setMiniLoading(false);
+    }
   }
 
   async function generateFull() {
     if (!video || fullLoading) return;
+    const targetId = video.video_id;
     setFullLoading(true);
     try {
       const res = await fetch("/api/youtube/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ video_id: video.video_id, mode: "full" }),
+        body: JSON.stringify({ video_id: targetId, mode: "full" }),
       });
       const data = await res.json();
-      if (data.summary) setFullSummary(data.summary);
+      if (data.summary) {
+        updateIfCurrent(targetId, setFullSummary, 'full', data.summary);
+        onVideoUpdate?.(targetId, { full_summary: data.summary });
+      }
     } catch { /* silent */ }
-    finally { setFullLoading(false); }
+    finally {
+      if (currentVideoIdRef.current === targetId) setFullLoading(false);
+    }
   }
 
   async function generateExtended() {
     if (!video || extendedLoading) return;
+    const targetId = video.video_id;
     setExtendedLoading(true);
     try {
       const res = await fetch("/api/youtube/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ video_id: video.video_id, mode: "extended" }),
+        body: JSON.stringify({ video_id: targetId, mode: "extended" }),
       });
       const data = await res.json();
-      if (data.summary) setExtendedSummary(data.summary);
+      if (data.summary) {
+        updateIfCurrent(targetId, setExtendedSummary, 'extended', data.summary);
+      }
     } catch { /* silent */ }
-    finally { setExtendedLoading(false); }
+    finally {
+      if (currentVideoIdRef.current === targetId) setExtendedLoading(false);
+    }
   }
 
   async function generateFactCheck() {
     if (!video || factCheckLoading) return;
+    const targetId = video.video_id;
     setFactCheckLoading(true);
     try {
       const res = await fetch("/api/youtube/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ video_id: video.video_id, mode: "factcheck" }),
+        body: JSON.stringify({ video_id: targetId, mode: "factcheck" }),
       });
       const data = await res.json();
-      if (data.summary) setFactCheck(data.summary);
+      if (data.summary) {
+        updateIfCurrent(targetId, setFactCheck, 'factcheck', data.summary);
+      }
     } catch { /* silent */ }
-    finally { setFactCheckLoading(false); }
+    finally {
+      if (currentVideoIdRef.current === targetId) setFactCheckLoading(false);
+    }
   }
 
   if (!video) {

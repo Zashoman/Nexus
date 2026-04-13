@@ -118,6 +118,16 @@ export default function YouTubePage() {
     setMobileDetailOpen(true);
   }
 
+  function handleVideoUpdate(videoId: string, updates: Partial<Video>) {
+    setVideos((prev) =>
+      prev.map((v) => (v.video_id === videoId ? { ...v, ...updates } : v))
+    );
+    // Also update selected video if it's the one being updated
+    setSelectedVideo((prev) =>
+      prev && prev.video_id === videoId ? { ...prev, ...updates } : prev
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-[#0B0E11] text-[#E8EAED]">
       {/* Header */}
@@ -196,7 +206,7 @@ export default function YouTubePage() {
 
         {/* Detail Panel — desktop */}
         <div className="hidden lg:flex flex-1">
-          <VideoDetailPanel video={selectedVideo} />
+          <VideoDetailPanel video={selectedVideo} onVideoUpdate={handleVideoUpdate} />
         </div>
 
         {/* Detail Panel — mobile overlay */}
@@ -205,6 +215,7 @@ export default function YouTubePage() {
             <VideoDetailPanel
               video={selectedVideo}
               onClose={() => setMobileDetailOpen(false)}
+              onVideoUpdate={handleVideoUpdate}
             />
           </div>
         )}
