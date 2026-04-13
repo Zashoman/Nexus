@@ -44,16 +44,23 @@ interface ApolloPerson {
 
 const sizeRanges = ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001+'];
 const fundingStages = ['Seed', 'Series A', 'Series B', 'Series C', 'Series D', 'Public', 'Acquired'];
+const seniorityLevels = ['C-Suite', 'VP', 'Director', 'Manager', 'Senior', 'Entry'];
+const departments = ['Engineering', 'Marketing', 'Sales', 'Finance', 'Operations', 'Product', 'HR', 'IT', 'Legal'];
 
 export default function SalesPage() {
   const [titles, setTitles] = useState<string[]>(['CEO', 'Founder']);
   const [titleInput, setTitleInput] = useState('');
+  const [seniority, setSeniority] = useState<string[]>([]);
+  const [department, setDepartment] = useState<string[]>([]);
   const [industries, setIndustries] = useState<string[]>([]);
   const [industryInput, setIndustryInput] = useState('');
   const [sizes, setSizes] = useState<string[]>([]);
   const [funding, setFunding] = useState<string[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
   const [locationInput, setLocationInput] = useState('');
+  const [techInput, setTechInput] = useState('');
+  const [technologies, setTechnologies] = useState<string[]>([]);
+  const [revenueRange, setRevenueRange] = useState('');
   const [keywords, setKeywords] = useState('');
   const [perPage, setPerPage] = useState(25);
 
@@ -116,6 +123,14 @@ export default function SalesPage() {
 
   const toggleFunding = (stage: string) => {
     setFunding(funding.includes(stage) ? funding.filter((f) => f !== stage) : [...funding, stage]);
+  };
+
+  const toggleSeniority = (level: string) => {
+    setSeniority(seniority.includes(level) ? seniority.filter((s) => s !== level) : [...seniority, level]);
+  };
+
+  const toggleDepartment = (dept: string) => {
+    setDepartment(department.includes(dept) ? department.filter((d) => d !== dept) : [...department, dept]);
   };
 
   const search = async () => {
@@ -369,6 +384,46 @@ export default function SalesPage() {
             </div>
           </div>
 
+          {/* Seniority Level */}
+          <div>
+            <label className="block text-xs font-medium text-bt-text mb-1.5">Seniority Level</label>
+            <div className="flex flex-wrap gap-1.5">
+              {seniorityLevels.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => toggleSeniority(s)}
+                  className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
+                    seniority.includes(s)
+                      ? 'bg-bt-primary text-white'
+                      : 'bg-bt-bg-alt text-bt-text-secondary hover:bg-bt-border'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Department */}
+          <div>
+            <label className="block text-xs font-medium text-bt-text mb-1.5">Department</label>
+            <div className="flex flex-wrap gap-1.5">
+              {departments.map((d) => (
+                <button
+                  key={d}
+                  onClick={() => toggleDepartment(d)}
+                  className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
+                    department.includes(d)
+                      ? 'bg-bt-primary text-white'
+                      : 'bg-bt-bg-alt text-bt-text-secondary hover:bg-bt-border'
+                  }`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Locations */}
           <div>
             <label className="block text-xs font-medium text-bt-text mb-1.5">
@@ -395,9 +450,44 @@ export default function SalesPage() {
             </div>
           </div>
 
+          {/* Technologies */}
+          <div>
+            <label className="block text-xs font-medium text-bt-text mb-1.5">Technologies Used</label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {technologies.map((t) => (
+                <Badge key={t} variant="teal" size="sm">
+                  {t} <button onClick={() => removeTag(t, technologies, setTechnologies)} className="ml-1 hover:text-bt-red"><X className="w-3 h-3 inline" /></button>
+                </Badge>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={techInput}
+                onChange={(e) => setTechInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag(techInput, setTechInput, technologies, setTechnologies))}
+                placeholder="e.g., React, Kubernetes, Salesforce"
+                className="flex-1 h-9 px-3 rounded-lg border border-bt-border bg-bt-surface text-sm text-bt-text placeholder:text-bt-text-tertiary focus:outline-none focus:ring-2 focus:ring-bt-primary"
+              />
+              <Button variant="secondary" size="sm" onClick={() => addTag(techInput, setTechInput, technologies, setTechnologies)} icon={<Plus className="w-3.5 h-3.5" />}>Add</Button>
+            </div>
+          </div>
+
+          {/* Revenue Range */}
+          <div>
+            <label className="block text-xs font-medium text-bt-text mb-1.5">Revenue Range</label>
+            <input
+              type="text"
+              value={revenueRange}
+              onChange={(e) => setRevenueRange(e.target.value)}
+              placeholder="e.g., $1M-$10M, $10M+"
+              className="w-full h-9 px-3 rounded-lg border border-bt-border bg-bt-surface text-sm text-bt-text placeholder:text-bt-text-tertiary focus:outline-none focus:ring-2 focus:ring-bt-primary"
+            />
+          </div>
+
           {/* Keywords */}
           <div>
-            <label className="block text-xs font-medium text-bt-text mb-1.5">Keywords (optional)</label>
+            <label className="block text-xs font-medium text-bt-text mb-1.5">Keywords / Buying Intent (optional)</label>
             <input
               type="text"
               value={keywords}
@@ -419,6 +509,7 @@ export default function SalesPage() {
               <option value={25}>25</option>
               <option value={50}>50</option>
               <option value={100}>100</option>
+              <option value={250}>250</option>
             </select>
           </div>
 
