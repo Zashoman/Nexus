@@ -100,12 +100,19 @@ Write the reply. Just the email body.`,
 
 // GET: triggered by Vercel Cron daily
 export async function GET(request: Request) {
-  // Verify it's actually Vercel Cron (or allow manual testing with secret)
+  // Verify it's Vercel Cron or authorized caller
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    // Vercel Cron sends authorization header automatically when CRON_SECRET is set
+  // In production, CRON_SECRET must be set and must match
+  if (process.env.NODE_ENV === 'production') {
+    if (!cronSecret) {
+      return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+    }
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  } else if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

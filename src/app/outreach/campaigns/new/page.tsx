@@ -127,24 +127,29 @@ export default function NewCampaignPage() {
 
     try {
       const goals: Record<string, unknown> = {};
-      if (form.target_placements) goals.target_placements = parseInt(form.target_placements);
-      if (form.target_meetings) goals.target_meetings = parseInt(form.target_meetings);
+      const placements = parseInt(form.target_placements);
+      const meetings = parseInt(form.target_meetings);
+      if (!isNaN(placements) && placements > 0) goals.target_placements = placements;
+      if (!isNaN(meetings) && meetings > 0) goals.target_meetings = meetings;
       if (form.deadline) goals.deadline = form.deadline;
+
+      const dailySends = parseInt(form.max_daily_sends);
+      const pollingMin = parseInt(form.polling_interval);
 
       const res = await fetch('/api/outreach/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: form.name,
+          name: form.name.trim(),
           type: form.type,
           sensitivity: form.sensitivity,
           status: 'draft',
           goals,
           constraints: {
-            max_daily_sends: parseInt(form.max_daily_sends) || 50,
+            max_daily_sends: !isNaN(dailySends) && dailySends > 0 ? dailySends : 50,
           },
           tone_guidelines: form.tone_guidelines || null,
-          polling_interval_minutes: parseInt(form.polling_interval) || 15,
+          polling_interval_minutes: !isNaN(pollingMin) && pollingMin > 0 ? pollingMin : 15,
           business_hours_timezone: form.timezone,
           created_by: user?.id,
         }),

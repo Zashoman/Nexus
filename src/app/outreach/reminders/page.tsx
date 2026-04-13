@@ -49,11 +49,14 @@ interface ReminderCounts {
 }
 
 function daysUntil(dateStr: string): number {
-  const due = new Date(dateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  due.setHours(0, 0, 0, 0);
-  return Math.round((due.getTime() - today.getTime()) / 86400000);
+  try {
+    const due = new Date(dateStr);
+    if (isNaN(due.getTime())) return 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    due.setHours(0, 0, 0, 0);
+    return Math.round((due.getTime() - today.getTime()) / 86400000);
+  } catch { return 0; }
 }
 
 function formatDate(dateStr: string): string {

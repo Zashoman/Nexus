@@ -652,7 +652,7 @@ export default function InboxPage() {
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-5">
-                  <div className="email-body text-sm text-bt-text leading-relaxed" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(getEmailBodyHtml(selectedEmail), { ADD_TAGS: ['blockquote'], ADD_ATTR: ['class', 'dir', 'style'], FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'] }) }} />
+                  <div className="email-body text-sm text-bt-text leading-relaxed" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(getEmailBodyHtml(selectedEmail), { ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 'a', 'blockquote', 'ul', 'ol', 'li', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'table', 'tbody', 'tr', 'td', 'th', 'hr', 'img'], ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'width', 'height', 'class', 'dir'], FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'svg', 'link', 'meta'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'style'] }) }} />
                 </div>
                 {/* Draft Reply section */}
                 <div className="px-5 py-4 border-t border-bt-border">

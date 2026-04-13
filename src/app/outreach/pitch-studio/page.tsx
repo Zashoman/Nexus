@@ -380,8 +380,9 @@ export default function PitchStudioPage() {
                           <textarea
                             value={revisionPrompt}
                             onChange={(e) => setRevisionPrompt(e.target.value)}
-                            placeholder="e.g., The pitch is too cheesy — make the intro more direct and reference their product launch instead of the funding round."
+                            placeholder="e.g., The pitch is too cheesy, make the intro more direct and reference their product launch instead of the funding round."
                             rows={3}
+                            maxLength={2000}
                             className="w-full px-3 py-2 rounded-lg border border-bt-border bg-bt-surface text-sm text-bt-text placeholder:text-bt-text-tertiary focus:outline-none focus:ring-2 focus:ring-bt-primary resize-none"
                           />
                           <div className="flex items-center gap-2 mt-2">

@@ -2,8 +2,16 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Debug endpoint — checks ALL env vars
-// DELETE THIS ROUTE before production launch
-export async function GET() {
+// GATED: only works in development or with debug token
+export async function GET(request: Request) {
+  // Block in production unless debug token is provided
+  const debugToken = process.env.DEBUG_TOKEN;
+  const authHeader = request.headers.get('authorization');
+
+  if (process.env.NODE_ENV === 'production' && (!debugToken || authHeader !== `Bearer ${debugToken}`)) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
