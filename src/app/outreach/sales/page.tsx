@@ -14,6 +14,8 @@ import {
   Globe,
   Users,
   AlertCircle,
+  Loader2,
+  MessageSquare,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card, { CardHeader } from '@/components/outreach/ui/Card';
@@ -55,6 +57,9 @@ export default function SalesPage() {
   const [keywords, setKeywords] = useState('');
   const [perPage, setPerPage] = useState(25);
 
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiParsing, setAiParsing] = useState(false);
+
   const [searching, setSearching] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -62,6 +67,36 @@ export default function SalesPage() {
   const [people, setPeople] = useState<ApolloPerson[]>([]);
   const [totalResults, setTotalResults] = useState(0);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
+
+  const parseAiQuery = async () => {
+    if (!aiQuery.trim()) return;
+    setAiParsing(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/outreach/apollo/ai-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: aiQuery }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
+      const f = data.filters || {};
+      if (f.person_titles?.length) setTitles(f.person_titles);
+      if (f.organization_industries?.length) setIndustries(f.organization_industries);
+      if (f.organization_num_employees_ranges?.length) setSizes(f.organization_num_employees_ranges);
+      if (f.organization_funding_stage?.length) setFunding(f.organization_funding_stage);
+      if (f.person_locations?.length) setLocations(f.person_locations);
+      if (f.q_keywords) setKeywords(f.q_keywords);
+      if (f.per_page) setPerPage(f.per_page);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to parse query');
+    } finally {
+      setAiParsing(false);
+    }
+  };
 
   const addTag = (input: string, setInput: (v: string) => void, list: string[], setList: (l: string[]) => void) => {
     const trimmed = input.trim();
@@ -202,9 +237,41 @@ export default function SalesPage() {
         subtitle="Find prospects on Apollo, generate personalized openers, export for Instantly"
       />
 
+      {/* AI Natural Language Search */}
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 rounded-lg bg-bt-primary-bg shrink-0 mt-0.5">
+            <MessageSquare className="w-5 h-5 text-bt-primary" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-bt-text mb-1">AI Search</h3>
+            <p className="text-xs text-bt-text-secondary mb-3">Describe who you are looking for in plain English. The AI will parse your query and fill in the filters below.</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), parseAiQuery())}
+                placeholder="e.g., Find 100 CTOs at Series B fintech startups in the US with 20-200 employees"
+                className="flex-1 h-10 px-4 rounded-lg border border-bt-border bg-bt-surface text-sm text-bt-text placeholder:text-bt-text-tertiary focus:outline-none focus:ring-2 focus:ring-bt-primary"
+              />
+              <Button
+                variant="primary"
+                onClick={parseAiQuery}
+                loading={aiParsing}
+                disabled={!aiQuery.trim()}
+                icon={aiParsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              >
+                Parse
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       {/* Search Filters */}
       <Card>
-        <CardHeader title="Search Filters" subtitle="Build your prospect list" />
+        <CardHeader title="Search Filters" subtitle="Adjust filters manually or let AI fill them in" />
 
         <div className="space-y-4 mt-4">
           {/* Job Titles */}
