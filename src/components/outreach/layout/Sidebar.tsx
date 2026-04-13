@@ -175,6 +175,7 @@ export default function Sidebar() {
               onClick={signOut}
               className="p-1.5 rounded-md text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
               title="Sign out"
+              aria-label="Sign out"
             >
               <LogOut className="w-4 h-4" />
             </button>

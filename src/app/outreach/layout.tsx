@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import AuthProvider from '@/components/outreach/AuthProvider';
+import ErrorBoundary from '@/components/outreach/ErrorBoundary';
 import OutreachShell from '@/components/outreach/layout/OutreachShell';
 
 export const metadata = {
@@ -10,7 +11,9 @@ export const metadata = {
 export default function OutreachLayout({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
-      <OutreachShell>{children}</OutreachShell>
+      <ErrorBoundary>
+        <OutreachShell>{children}</OutreachShell>
+      </ErrorBoundary>
     </AuthProvider>
   );
 }

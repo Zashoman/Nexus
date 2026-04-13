@@ -229,6 +229,7 @@ export default function FeedbackPage() {
                 <label className="block text-xs font-medium text-bt-text mb-1.5">Email content</label>
                 <textarea
                   rows={6}
+                  maxLength={5000}
                   placeholder="Paste your example email here..."
                   className="w-full px-3 py-2 rounded-lg border border-bt-border bg-bt-surface text-sm text-bt-text placeholder:text-bt-text-tertiary focus:outline-none focus:ring-2 focus:ring-bt-primary resize-none"
                 />

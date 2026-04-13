@@ -95,11 +95,18 @@ export default function RemindersPage() {
   };
 
   const addReminder = async () => {
-    if (!newReminder.contact_name || !newReminder.due_date) return;
+    if (!newReminder.contact_name.trim() || !newReminder.due_date) return;
     await fetch('/api/outreach/reminders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...newReminder, type: 'manual' }),
+      body: JSON.stringify({
+        ...newReminder,
+        contact_name: newReminder.contact_name.trim(),
+        contact_email: newReminder.contact_email.trim(),
+        company_or_publication: newReminder.company_or_publication.trim(),
+        manual_note: newReminder.manual_note.trim(),
+        type: 'manual',
+      }),
     });
     setNewReminder({ contact_name: '', contact_email: '', company_or_publication: '', due_date: '', manual_note: '' });
     setShowAddForm(false);

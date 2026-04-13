@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import DOMPurify from 'isomorphic-dompurify';
 import Link from 'next/link';
 import {
@@ -362,13 +362,14 @@ export default function InboxPage() {
       })
     : tabFiltered;
 
-  // Tab counts
-  const tabCounts: Record<InboxTab, number> = {
+  // Tab counts — memoized to avoid O(4n) per render
+  const tabCounts = useMemo<Record<InboxTab, number>>(() => ({
     needs_reply: isClassified ? emails.filter((e) => getEmailTab(e) === 'needs_reply').length : 0,
     auto_ooo: isClassified ? emails.filter((e) => getEmailTab(e) === 'auto_ooo').length : 0,
     not_interested: isClassified ? emails.filter((e) => getEmailTab(e) === 'not_interested').length : 0,
     all: emails.length,
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [emails, classifications, isClassified]);
 
   return (
     <div className="space-y-6">
@@ -701,7 +702,7 @@ export default function InboxPage() {
                     </span>
                     <details className="text-[11px]">
                       <summary className="text-bt-text-tertiary cursor-pointer hover:text-bt-text-secondary">Raw data</summary>
-                      <pre className="mt-2 text-[10px] text-bt-text-tertiary bg-bt-bg-alt rounded-lg p-3 overflow-x-auto max-h-48 absolute right-4 bottom-12 w-[500px] z-10 border border-bt-border shadow-lg">
+                      <pre className="mt-2 text-[10px] text-bt-text-tertiary bg-bt-bg-alt rounded-lg p-3 overflow-x-auto max-h-48 absolute right-4 bottom-12 w-full max-w-[500px] z-10 border border-bt-border shadow-lg">
                         {JSON.stringify(selectedEmail, null, 2)}
                       </pre>
                     </details>
