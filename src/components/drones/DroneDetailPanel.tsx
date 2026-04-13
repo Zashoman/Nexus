@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { IntelItem, RatingValue } from '@/types/intel';
 import RatingButtons from '@/components/intel/RatingButtons';
 
@@ -95,9 +95,12 @@ export default function DroneDetailPanel({ item, onClose }: DroneDetailPanelProp
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const currentItemIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!item) return;
+    const targetId = item.id;
+    currentItemIdRef.current = targetId;
     setFeedback('');
     setAiSummary(item.ai_summary || null);
 
@@ -106,14 +109,18 @@ export default function DroneDetailPanel({ item, onClose }: DroneDetailPanelProp
       fetch('/api/intel/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item_id: item.id }),
+        body: JSON.stringify({ item_id: targetId }),
       })
         .then((r) => r.json())
         .then((data) => {
-          if (data.summary) setAiSummary(data.summary);
+          if (data.summary && currentItemIdRef.current === targetId) {
+            setAiSummary(data.summary);
+          }
         })
         .catch(() => {})
-        .finally(() => setSummaryLoading(false));
+        .finally(() => {
+          if (currentItemIdRef.current === targetId) setSummaryLoading(false);
+        });
     }
   }, [item?.id]);
 
