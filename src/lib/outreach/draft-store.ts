@@ -22,7 +22,7 @@ export interface SlackDraftContext {
 export async function saveSlackDraft(ctx: SlackDraftContext) {
   try {
     const supabase = getServiceSupabase();
-    const { error } = await supabase.from('slack_drafts').insert({
+    const { error } = await supabase.from('slack_drafts').upsert({
       slack_channel: ctx.slack_channel,
       slack_message_ts: ctx.slack_message_ts,
       email_id: ctx.email_id,

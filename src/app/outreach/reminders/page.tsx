@@ -284,7 +284,26 @@ export default function RemindersPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 pt-2">
-                      <Button variant="primary" size="sm" icon={<PenTool className="w-3.5 h-3.5" />}>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={<PenTool className="w-3.5 h-3.5" />}
+                        onClick={() => {
+                          // Store reminder context and navigate to pitch studio
+                          sessionStorage.setItem('pitch_studio_prospects', JSON.stringify([{
+                            id: reminder.id,
+                            first_name: reminder.contact_name.split(' ')[0],
+                            last_name: reminder.contact_name.split(' ').slice(1).join(' '),
+                            title: reminder.contact_title,
+                            email: reminder.contact_email,
+                            organization: { name: reminder.company_or_publication },
+                            subject: `Follow-up: ${reminder.contact_name}`,
+                            opener: reminder.suggested_action || reminder.manual_note || `Following up with ${reminder.contact_name}`,
+                            status: 'pending',
+                          }]));
+                          window.location.href = '/outreach/pitch-studio';
+                        }}
+                      >
                         Draft Follow-up
                       </Button>
                       <div className="flex items-center gap-1">

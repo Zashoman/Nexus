@@ -121,18 +121,21 @@ export default function PitchStudioPage() {
     setRevising(true);
 
     try {
-      const res = await fetch('/api/outreach/draft', {
+      const res = await fetch('/api/outreach/revise', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sender_name: `${prospect.first_name} ${prospect.last_name}`,
-          sender_email: prospect.email,
-          subject: prospect.subject || '',
-          reply_text: prospect.opener || '',
-          full_thread_html: prospect.opener || '',
-          campaign_name: '',
-          account_email: '',
-          classification_summary: `Revision request: ${revisionPrompt}`,
+          context: {
+            sender_name: `${prospect.first_name} ${prospect.last_name}`,
+            sender_email: prospect.email || '',
+            subject: prospect.subject || '',
+            reply_text: `Prospect: ${prospect.first_name} ${prospect.last_name}, ${prospect.title} at ${prospect.organization?.name}`,
+            thread_html: prospect.opener || '',
+            campaign_name: '',
+            account_email: '',
+            current_draft: prospect.opener || '',
+          },
+          feedback: revisionPrompt,
         }),
       });
       const data = await res.json();

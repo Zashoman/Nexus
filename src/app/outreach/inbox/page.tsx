@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import DOMPurify from 'isomorphic-dompurify';
 import Link from 'next/link';
 import {
   Search,
@@ -651,7 +652,7 @@ export default function InboxPage() {
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-5">
-                  <div className="email-body text-sm text-bt-text leading-relaxed" dangerouslySetInnerHTML={{ __html: getEmailBodyHtml(selectedEmail) }} />
+                  <div className="email-body text-sm text-bt-text leading-relaxed" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(getEmailBodyHtml(selectedEmail), { ADD_TAGS: ['blockquote'], ADD_ATTR: ['class', 'dir', 'style'], FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'], FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'] }) }} />
                 </div>
                 {/* Draft Reply section */}
                 <div className="px-5 py-4 border-t border-bt-border">

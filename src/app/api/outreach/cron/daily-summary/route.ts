@@ -113,6 +113,11 @@ export async function GET(request: Request) {
     const startTime = Date.now();
     const channel = (process.env.SLACK_CHANNEL || '').replace(/^#/, '');
 
+    // Validate required env vars
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set' }, { status: 500 });
+    }
+
     // 1. Fetch campaigns for name lookup
     const campaigns = await listCampaigns();
     const campaignMap: Record<string, string> = {};
@@ -130,18 +135,30 @@ export async function GET(request: Request) {
       return true;
     });
 
+    // 4. Get unique accounts and campaigns
+    const allAccounts = [...new Set(allEmails.map((e) => String((e as Record<string, unknown>).eaccount || '')).filter(Boolean))];
+
     if (inbound.length === 0) {
+      // Always post a header so the team knows the cron ran
+      await postBatchHeader(0, allAccounts, [], { high: 0, medium: 0, low: 0 });
       return NextResponse.json({ ok: true, message: 'No new replies today', count: 0 });
     }
 
-    // 4. Get unique accounts and campaigns
     const accounts = [...new Set(inbound.map((e) => String((e as Record<string, unknown>).eaccount || '')).filter(Boolean))];
     const campaignNames = [...new Set(inbound.map((e) => campaignMap[String((e as Record<string, unknown>).campaign_id || '')] || 'Unknown').filter((n) => n !== 'Unknown'))];
 
     // 5. Process each reply: classify + draft
     const processed = [];
+    const processedIds = new Set<string>();
+
     for (const email of inbound) {
       const raw = email as unknown as Record<string, unknown>;
+      const emailId = String(raw.id || '');
+
+      // Dedup: skip if we've already processed this email
+      if (processedIds.has(emailId)) continue;
+      processedIds.add(emailId);
+
       const fromJson = raw.from_address_json as Array<{ address: string; name: string }> | undefined;
       const senderName = fromJson?.[0]?.name || String(raw.from_name || raw.from_address_email || raw.lead || 'Unknown');
       const senderEmail = fromJson?.[0]?.address || String(raw.from_address_email || raw.lead || '');
@@ -149,6 +166,9 @@ export async function GET(request: Request) {
       const campaignName = campaignMap[String(raw.campaign_id || '')] || 'Unknown campaign';
       const accountEmail = String(raw.eaccount || '');
       const { plain, html } = getBody(raw);
+
+      // Skip emails with no body
+      if (!plain && !html) continue;
 
       const classification = await classifyReply(senderName, senderEmail, subject, plain, campaignName);
 

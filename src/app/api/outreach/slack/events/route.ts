@@ -153,8 +153,13 @@ async function handleThreadReply(event: {
   // Skip empty messages or system messages
   if (!text || text.trim().length === 0) return;
 
-  // Clean the feedback text (remove Slack formatting)
-  const cleanText = text.replace(/<@[A-Z0-9]+>/g, '').trim();
+  // Clean the feedback text — remove Slack formatting AND HTML tags to prevent prompt injection
+  const cleanText = text
+    .replace(/<@[A-Z0-9]+>/g, '')  // Remove Slack @mentions
+    .replace(/<[^>]*>/g, '')        // Remove HTML/script tags
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')  // Decode HTML entities
+    .replace(/<[^>]*>/g, '')        // Second pass after entity decode
+    .trim();
   if (!cleanText) return;
 
   // Acknowledge immediately with a text message — feels conversational
