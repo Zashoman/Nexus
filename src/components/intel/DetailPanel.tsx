@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import type { IntelItem, IntelBeliefEvidence, RatingValue } from '@/types/intel';
 import RatingButtons from './RatingButtons';
 
@@ -204,9 +204,12 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
   const [isStarred, setIsStarred] = useState(false);
   const [deepAnalysis, setDeepAnalysis] = useState<string | null>(null);
   const [deepLoading, setDeepLoading] = useState(false);
+  const currentItemIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!item) return;
+    const targetId = item.id;
+    currentItemIdRef.current = targetId;
     setBeliefEvidence([]);
     setFeedback('');
     setAiSummary(item.ai_summary || null);
@@ -219,14 +222,18 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
       fetch('/api/intel/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item_id: item.id }),
+        body: JSON.stringify({ item_id: targetId }),
       })
         .then((r) => r.json())
         .then((data) => {
-          if (data.summary) setAiSummary(data.summary);
+          if (data.summary && currentItemIdRef.current === targetId) {
+            setAiSummary(data.summary);
+          }
         })
         .catch(() => {})
-        .finally(() => setSummaryLoading(false));
+        .finally(() => {
+          if (currentItemIdRef.current === targetId) setSummaryLoading(false);
+        });
     }
   }, [item?.id]);
 
@@ -342,19 +349,22 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
           {!deepAnalysis && !deepLoading && (
             <button
               onClick={async () => {
+                const targetId = item.id;
                 setDeepLoading(true);
                 try {
                   const res = await fetch('/api/intel/deep-analysis', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ item_id: item.id }),
+                    body: JSON.stringify({ item_id: targetId }),
                   });
                   const data = await res.json();
-                  if (data.analysis) setDeepAnalysis(data.analysis);
+                  if (data.analysis && currentItemIdRef.current === targetId) {
+                    setDeepAnalysis(data.analysis);
+                  }
                 } catch {
                   // silent
                 } finally {
-                  setDeepLoading(false);
+                  if (currentItemIdRef.current === targetId) setDeepLoading(false);
                 }
               }}
               className="w-full py-3 px-4 text-sm font-mono font-semibold text-[#0B0E11] rounded cursor-pointer transition-all duration-200 bg-[#4488FF] hover:bg-[#5599FF] active:bg-[#3377EE]"

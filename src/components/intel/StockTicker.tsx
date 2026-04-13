@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { TRACKED_STOCKS } from '@/lib/intel/sources-config';
 
 interface StockQuote {
   symbol: string;
@@ -21,37 +20,13 @@ export default function StockTicker() {
   }, []);
 
   async function fetchQuotes() {
-    const apiKey = process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
-    if (!apiKey) {
-      // Use placeholder data if no API key
-      setQuotes(
-        TRACKED_STOCKS.map((symbol) => ({
-          symbol,
-          price: 0,
-          change: 0,
-          changePercent: 0,
-        }))
-      );
-      return;
-    }
-
     try {
-      const results: StockQuote[] = [];
-      for (const symbol of TRACKED_STOCKS) {
-        const res = await fetch(
-          `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`
-        );
-        const data = await res.json();
-        if (data.c) {
-          results.push({
-            symbol,
-            price: data.c,
-            change: data.d || 0,
-            changePercent: data.dp || 0,
-          });
-        }
+      const res = await fetch('/api/intel/stock-quotes');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.quotes && data.quotes.length > 0) {
+        setQuotes(data.quotes);
       }
-      if (results.length > 0) setQuotes(results);
     } catch {
       // Silent fail — ticker is non-critical
     }
