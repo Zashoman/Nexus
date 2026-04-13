@@ -4,6 +4,7 @@ import { classifyReply } from '@/lib/outreach/classifier';
 import { postBatchHeader, postInboxSectionHeader, postReplyToSlack } from '@/lib/outreach/slack';
 import { saveSlackDraft } from '@/lib/outreach/draft-store';
 import { buildDraftSystemPrompt, buildDraftContext } from '@/lib/outreach/prompt';
+import { getServiceSupabase } from '@/lib/outreach/supabase';
 import Anthropic from '@anthropic-ai/sdk';
 
 // Cron endpoint — runs daily to fetch, classify, draft, and push to Slack
@@ -118,6 +119,7 @@ export async function GET(request: Request) {
 
   try {
     const startTime = Date.now();
+    const supabase = getServiceSupabase();
     const channel = (process.env.SLACK_CHANNEL || '').replace(/^#/, '');
 
     // Validate required env vars
@@ -179,7 +181,36 @@ export async function GET(request: Request) {
 
       const classification = await classifyReply(senderName, senderEmail, subject, plain, campaignName);
 
-      if (!classification.needs_reply) continue; // Skip auto-replies, declines, etc.
+      // Auto-create reminder for "not now, later" replies
+      if (classification.category === 'not_now_later') {
+        try {
+          // Extract timeframe hint from summary, default to 90 days
+          const daysOut = classification.summary?.match(/(\d+)\s*month/i)
+            ? parseInt(classification.summary.match(/(\d+)\s*month/i)![1]) * 30
+            : classification.summary?.match(/(\d+)\s*week/i)
+              ? parseInt(classification.summary.match(/(\d+)\s*week/i)![1]) * 7
+              : 90;
+
+          const dueDate = new Date(Date.now() + daysOut * 86400000).toISOString().split('T')[0];
+
+          await supabase.from('reminders').insert({
+            type: 'auto',
+            contact_name: senderName,
+            contact_email: senderEmail,
+            company_or_publication: campaignName,
+            campaign_id: raw.campaign_id ? String(raw.campaign_id) : null,
+            due_date: dueDate,
+            original_due_date: dueDate,
+            original_reply: plain.substring(0, 500),
+            ai_summary: classification.summary,
+            suggested_action: `Follow up referencing their original interest. They said: "${plain.substring(0, 100)}"`,
+          });
+        } catch (err) {
+          console.error('Failed to create auto-reminder:', err);
+        }
+      }
+
+      if (!classification.needs_reply) continue;
 
       let draft = '';
       try {

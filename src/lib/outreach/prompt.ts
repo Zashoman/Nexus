@@ -8,6 +8,7 @@
 
 import { getRelevantRevisions, formatLearnings } from './learning';
 import { getServiceSupabase } from './supabase';
+import { getRelationshipContext } from './relationship';
 
 // -------------------------------------------------------
 // HARDCODED RULES — apply to ALL campaign types
@@ -282,8 +283,15 @@ export async function buildDraftContext(params: {
   campaignType?: string;
   accountEmail?: string;
   prospectIndustry?: string;
+  contactEmail?: string;
 }): Promise<string> {
   const sections: string[] = [];
+
+  // Load relationship memory for this contact
+  if (params.contactEmail) {
+    const relCtx = await getRelationshipContext(params.contactEmail);
+    if (relCtx) sections.push(relCtx);
+  }
 
   // Load past team feedback
   const pastRevisions = await getRelevantRevisions({

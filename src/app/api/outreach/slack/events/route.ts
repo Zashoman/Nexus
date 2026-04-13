@@ -3,6 +3,7 @@ import { acknowledgeMessage, postThreadReply } from '@/lib/outreach/slack';
 import { getSlackDraft, updateSlackDraft, updateDraftStatus } from '@/lib/outreach/draft-store';
 import { getServiceSupabase } from '@/lib/outreach/supabase';
 import { logRevision } from '@/lib/outreach/learning';
+import { recordInteraction } from '@/lib/outreach/relationship';
 import { buildDraftSystemPrompt, buildDraftContext } from '@/lib/outreach/prompt';
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -134,6 +135,23 @@ async function handleReaction(event: {
 
   if (action.status) {
     await updateDraftStatus(channel, ts, action.status);
+
+    // Record in relationship memory on approval
+    if (action.status === 'approved') {
+      const draft = await getSlackDraft(channel, ts);
+      if (draft?.sender_email) {
+        await recordInteraction({
+          contact_email: draft.sender_email,
+          contact_name: draft.sender_name,
+          interaction: {
+            type: 'draft_approved',
+            campaign_name: draft.campaign_name,
+            summary: `Reply approved for: ${draft.subject}`,
+            date: new Date().toISOString(),
+          },
+        });
+      }
+    }
   }
 }
 

@@ -100,7 +100,21 @@ export default function PitchStudioPage() {
     setProspects((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
   };
 
+  const [vocabWarning, setVocabWarning] = useState<string | null>(null);
+
   const approve = (id: string) => {
+    // Vocabulary enforcement pre-check
+    const prospect = prospects.find((p) => p.id === id);
+    if (prospect?.opener) {
+      const lower = prospect.opener.toLowerCase();
+      const forbidden = ['buying links', 'paid links', 'guest post farms', 'pbn', 'seo juice', 'cheap', 'link farm', 'paid placement'];
+      const found = forbidden.filter((f) => lower.includes(f));
+      if (found.length > 0) {
+        setVocabWarning(`Draft contains forbidden phrases: ${found.join(', ')}. Please revise before approving.`);
+        return;
+      }
+    }
+    setVocabWarning(null);
     updateProspect(id, { status: 'approved' });
     advanceToNext(id);
   };
@@ -291,6 +305,13 @@ export default function PitchStudioPage() {
                         <p className="text-sm text-bt-text leading-relaxed whitespace-pre-wrap">{prospect.opener || '(no draft generated)'}</p>
                       </div>
                     </div>
+
+                    {/* Vocabulary warning */}
+                    {vocabWarning && expandedId === prospect.id && (
+                      <div className="p-3 rounded-lg bg-bt-red-bg/50 border border-bt-red/20 mb-3">
+                        <p className="text-xs text-bt-red">{vocabWarning}</p>
+                      </div>
+                    )}
 
                     {/* Action buttons */}
                     <div className="flex items-center gap-2 mt-4">
