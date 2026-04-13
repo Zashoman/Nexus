@@ -66,6 +66,9 @@ export default function SalesPage() {
 
   const [aiQuery, setAiQuery] = useState('');
   const [aiParsing, setAiParsing] = useState(false);
+  const [lookalikeQuery, setLookalikeQuery] = useState('');
+  const [lookalikeLoading, setLookalikeLoading] = useState(false);
+  const [lookalikeReasoning, setLookalikeReasoning] = useState('');
 
   const [searching, setSearching] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -102,6 +105,33 @@ export default function SalesPage() {
       setError(err instanceof Error ? err.message : 'Failed to parse query');
     } finally {
       setAiParsing(false);
+    }
+  };
+
+  const parseLookalike = async () => {
+    if (!lookalikeQuery.trim()) return;
+    setLookalikeLoading(true);
+    setLookalikeReasoning('');
+    setError(null);
+    try {
+      const res = await fetch('/api/outreach/apollo/lookalike', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: lookalikeQuery }),
+      });
+      const data = await res.json();
+      if (data.error) { setError(data.error); return; }
+      const f = data.filters || {};
+      if (f.person_titles?.length) setTitles(f.person_titles);
+      if (f.organization_industries?.length) setIndustries(f.organization_industries);
+      if (f.organization_num_employees_ranges?.length) setSizes(f.organization_num_employees_ranges);
+      if (f.organization_funding_stage?.length) setFunding(f.organization_funding_stage);
+      if (f.person_locations?.length) setLocations(f.person_locations);
+      setLookalikeReasoning(data.reasoning || f.reasoning || 'Filters updated based on lookalike analysis.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lookalike search failed');
+    } finally {
+      setLookalikeLoading(false);
     }
   };
 
@@ -338,6 +368,41 @@ export default function SalesPage() {
                 Parse
               </Button>
             </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Lookalike Search */}
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 rounded-lg bg-bt-teal-bg shrink-0 mt-0.5">
+            <User className="w-5 h-5 text-bt-teal" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-bt-text mb-1">Lookalike Search</h3>
+            <p className="text-xs text-bt-text-secondary mb-3">Paste a LinkedIn URL, email, or name + company. The AI will find similar people.</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={lookalikeQuery}
+                onChange={(e) => setLookalikeQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), parseLookalike())}
+                placeholder="e.g., Sarah Chen, CTO at Finova Capital OR linkedin.com/in/sarahchen"
+                className="flex-1 h-10 px-4 rounded-lg border border-bt-border bg-bt-surface text-sm text-bt-text placeholder:text-bt-text-tertiary focus:outline-none focus:ring-2 focus:ring-bt-teal"
+              />
+              <Button
+                variant="secondary"
+                onClick={parseLookalike}
+                loading={lookalikeLoading}
+                disabled={!lookalikeQuery.trim()}
+                icon={<User className="w-4 h-4" />}
+              >
+                Find Similar
+              </Button>
+            </div>
+            {lookalikeReasoning && (
+              <p className="text-xs text-bt-teal mt-2">{lookalikeReasoning}</p>
+            )}
           </div>
         </div>
       </Card>
