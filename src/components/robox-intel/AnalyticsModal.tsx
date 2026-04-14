@@ -32,13 +32,19 @@ export function AnalyticsModal({ open, onClose }: AnalyticsModalProps) {
 
   useEffect(() => {
     if (!open) return;
-    setLoading(true);
-    fetch('/api/robox-intel/analytics')
-      .then((r) => r.json())
-      .then((d) => {
+    let cancelled = false;
+    const load = async () => {
+      const res = await fetch('/api/robox-intel/analytics');
+      const d = await res.json();
+      if (!cancelled) {
         setData(d);
         setLoading(false);
-      });
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   if (!open) return null;

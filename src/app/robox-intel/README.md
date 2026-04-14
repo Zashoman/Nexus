@@ -155,6 +155,37 @@ Click any company row in the Companies tab to jump to the Signals tab
 filtered by that company. A pill at the top of the Signals list shows
 the active filter and exposes a × to clear it.
 
+## Trending companies
+
+The Companies tab shows a "Trending" strip at the top with the 8
+companies that accumulated the most signals in the last 14 days,
+sorted by high-relevance count. Clicking a card filters the full
+Companies table view to that company's signals.
+
+`GET /api/robox-intel/trending` returns the raw data (top 20).
+
+## CSV export
+
+The Signals tab has an "Export CSV" link that downloads the currently
+filtered set. Directly:
+
+```
+GET /api/robox-intel/export?format=csv&status=acted,queued&type=funding
+```
+
+Supports filters: `status`, `type`, `relevance`, `dateFrom`, and
+`format=json` when you need machine-readable output.
+
+## Bulk signal updates
+
+```
+PATCH /api/robox-intel/signals/bulk
+{ "ids": [12, 34, 56], "status": "dismissed" }
+```
+
+Applies the same status/relevance/tags update to many signals in one
+call. Automatically sets `acted_at` when status becomes `acted`.
+
 ## Relevance scoring
 
 Signals are scored `high` / `medium` / `low` based on rules in

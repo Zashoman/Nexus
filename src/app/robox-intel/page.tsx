@@ -91,6 +91,9 @@ export default function RoboXIntelPage() {
   }, [loadSignals, loadBriefing, loadCompanies, loadSources, loadMedia, loadStats]);
 
   useEffect(() => {
+    // Initial data load — each setState happens inside fetch callbacks
+    // inside refreshAll, not synchronously in the effect body.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshAll();
   }, [refreshAll]);
 

@@ -38,6 +38,16 @@ const STATUS_COLORS: Record<SignalStatus, string> = {
   dismissed: '#64748b',
 };
 
+function buildExportUrl(
+  typeFilter: SignalType | 'all',
+  highOnly: boolean
+): string {
+  const params = new URLSearchParams({ format: 'csv' });
+  if (typeFilter !== 'all') params.set('type', typeFilter);
+  if (highOnly) params.set('relevance', 'high');
+  return `/api/robox-intel/export?${params.toString()}`;
+}
+
 export function SignalsTab({
   signals,
   onUpdate,
@@ -50,9 +60,10 @@ export function SignalsTab({
   const [showClosed, setShowClosed] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
 
-  // Auto-expand highlighted signal
+  // Auto-expand highlighted signal — syncing external prop to internal state
   useEffect(() => {
     if (highlightSignalId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setExpandedIds((prev) => new Set(prev).add(highlightSignalId));
       const el = document.getElementById(`signal-${highlightSignalId}`);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -141,7 +152,7 @@ export function SignalsTab({
           ))}
         </div>
 
-        <div className="flex gap-4 text-[12px]">
+        <div className="flex gap-4 text-[12px] items-center">
           <label className="flex items-center gap-2 cursor-pointer text-[#A1A1AA] hover:text-[#FAFAFA]">
             <input
               type="checkbox"
@@ -160,6 +171,13 @@ export function SignalsTab({
             />
             Show closed
           </label>
+          <a
+            href={buildExportUrl(typeFilter, highOnly)}
+            className="ml-auto text-[11px] text-[#60A5FA] hover:text-[#93C5FD] px-2 py-1 rounded hover:bg-[#60A5FA]/10 transition-colors"
+            title="Download filtered signals as CSV"
+          >
+            Export CSV
+          </a>
         </div>
       </div>
 

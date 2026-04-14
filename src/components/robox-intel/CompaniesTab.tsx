@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { Company, CompanyTier } from '@/types/robox-intel';
 import { TIER_COLORS } from '@/types/robox-intel';
+import { TrendingPanel } from './TrendingPanel';
 
 interface CompaniesTabProps {
   companies: Company[];
@@ -26,8 +27,37 @@ export function CompaniesTab({ companies, onCompanyClick }: CompaniesTabProps) {
     return true;
   });
 
+  const handleTrendingClick = (companyName: string) => {
+    if (onCompanyClick) {
+      // Find matching tracked company, else synthesize one
+      const tracked = companies.find(
+        (c) => c.name.toLowerCase() === companyName.toLowerCase()
+      );
+      if (tracked) {
+        onCompanyClick(tracked);
+      } else {
+        // Fallback: pass a stub Company-shaped object
+        onCompanyClick({
+          id: -1,
+          name: companyName,
+          tier: 'prospect',
+          status: null,
+          raised: null,
+          valuation: null,
+          notes: null,
+          created_at: '',
+          updated_at: '',
+          signal_count: 0,
+        });
+      }
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {onCompanyClick && (
+        <TrendingPanel onCompanyClick={handleTrendingClick} />
+      )}
       <div className="flex flex-wrap gap-2 items-center justify-between">
         <div className="flex flex-wrap gap-1.5">
           <TierFilterButton
