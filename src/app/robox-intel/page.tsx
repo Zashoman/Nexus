@@ -32,6 +32,7 @@ export default function RoboXIntelPage() {
   const [pitches, setPitches] = useState<PitchAngle[]>([]);
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
+  const [companyFilter, setCompanyFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadSignals = useCallback(async () => {
@@ -93,9 +94,20 @@ export default function RoboXIntelPage() {
 
   const handleBriefingClick = (signal: Signal) => {
     setActiveTab('signals');
+    setCompanyFilter(null);
     setHighlightId(signal.id);
     // Clear highlight after scroll
     setTimeout(() => setHighlightId(null), 1500);
+  };
+
+  const handleCompanyClick = (company: Company) => {
+    setCompanyFilter(company.name);
+    setActiveTab('signals');
+  };
+
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    if (tab !== 'signals') setCompanyFilter(null);
   };
 
   const handleSignalsUpdate = () => {
@@ -115,7 +127,7 @@ export default function RoboXIntelPage() {
     <>
       <Header
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         stats={stats}
         lastScan={lastScan}
       />
@@ -138,9 +150,16 @@ export default function RoboXIntelPage() {
                 signals={signals}
                 onUpdate={handleSignalsUpdate}
                 highlightSignalId={highlightId}
+                companyFilter={companyFilter}
+                onClearCompanyFilter={() => setCompanyFilter(null)}
               />
             )}
-            {activeTab === 'companies' && <CompaniesTab companies={companies} />}
+            {activeTab === 'companies' && (
+              <CompaniesTab
+                companies={companies}
+                onCompanyClick={handleCompanyClick}
+              />
+            )}
             {activeTab === 'sources' && (
               <SourcesTab sources={sources} onUpdate={loadSources} />
             )}

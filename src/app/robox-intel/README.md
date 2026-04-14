@@ -68,25 +68,80 @@ supabase/
   robox-intel-schema.sql      — Database schema for all 5 tables
 ```
 
-## Automated sources (Phase 1)
+## Automated sources
 
-The following six fetchers are wired up and run every 4 hours:
+Fourteen fetchers run every 4 hours via `/api/robox-intel/ingest`:
 
-- **PR Newswire** — technology press releases, keyword-filtered
-- **Business Wire** — business press releases, keyword-filtered
-- **Google News** — RSS search results for 6 robotics-data queries
-- **arXiv cs.RO** — academic papers mentioning manipulation/VLA/egocentric
-- **Crunchbase News** — startup funding coverage, keyword-filtered
-- **The Robot Report** — industry news, no keyword filter (low volume)
+PR wires (keyword-filtered for robotics keywords):
+- **PR Newswire**, **Business Wire**, **GlobeNewsWire**, **Accesswire**
 
-Remaining sources from the spec (GlobeNewsWire, Accesswire, IEEE Spectrum,
-Import AI, Hugging Face, GitHub, Reddit, NSF, SAM.gov, conferences) are
-defined in the sources table with `status = 'not_connected'` and can be
-wired up in Phase 2 by adding fetchers to `lib/robox-intel/fetchers.ts`.
+News:
+- **Google News** — RSS for 6 robotics-training-data search queries
+- **The Robot Report** — industry news, no filter
+- **IEEE Spectrum Robotics** — filtered for training/data/learning
+- **Import AI Newsletter** — filtered for robotics/embodied terms
+
+Research:
+- **arXiv cs.RO** — papers mentioning manipulation/VLA/egocentric
+
+Funding:
+- **Crunchbase News** — startup funding, keyword-filtered
+
+Datasets:
+- **Hugging Face** — robotics datasets + download volume
+- **GitHub Trending** — repos across 5 topic filters (stars >50, recent)
+
+Social:
+- **Reddit** — r/robotics, r/MachineLearning, r/reinforcementlearning
+
+Grants:
+- **NSF Award Search** — federal grants > $500K, last 30 days
+
+Still to wire (Phase 2 remainder):
+- SAM.gov (DARPA), Google Scholar alerts, conference trackers
 
 Manual sources (Twitter/X list, LinkedIn feed, podcasts, LinkedIn jobs,
 conferences) are captured via the floating **Quick Add** button on the
 Signals tab.
+
+## LLM enhancement (Phase 3)
+
+When `ANTHROPIC_API_KEY` is set, high-relevance signals get a richer
+LLM-generated summary and suggested action via Claude Haiku. Falls back
+to templates silently if the API call fails or the key isn't set.
+
+## Zero-coverage detection
+
+`/api/robox-intel/zero-coverage` runs hourly via cron. For press release
+signals aged 4-72 hours, it searches Google News for any media pickup.
+If none found, the signal is tagged `zero-coverage`, boosted to high
+relevance, and gets a prefixed action line:
+*"ZERO MEDIA COVERAGE — your outreach lands in an empty inbox."*
+
+## Daily digest
+
+`/api/robox-intel/digest` runs daily at 8 AM UTC. Builds HTML + plain
+text of all high-priority new signals from the last 24h.
+
+Configure sending by setting:
+- `DIGEST_WEBHOOK_URL` — POST endpoint receiving `{to, subject, html, text}`
+- `DIGEST_WEBHOOK_TOKEN` — optional Bearer token
+- `DIGEST_RECIPIENT` — email address
+
+Without these, `GET /api/robox-intel/digest` just returns the payload.
+To preview without sending: `POST /api/robox-intel/digest?preview=true`.
+
+## Analytics
+
+`GET /api/robox-intel/analytics` returns 30-day stats: signals per day,
+breakdowns by type/relevance/source/status, funnel (ingested → reviewed
+→ actionable → acted), and time-to-action histogram.
+
+## Cross-signal company view
+
+Click any company row in the Companies tab to jump to the Signals tab
+filtered by that company. A pill at the top of the Signals list shows
+the active filter and exposes a × to clear it.
 
 ## Relevance scoring
 
@@ -104,11 +159,10 @@ Signals are scored `high` / `medium` / `low` based on rules in
 
 Tune the rules based on 2 weeks of real data.
 
-## Phase 3 (not yet implemented)
+## Still to do
 
-- LLM-powered summaries and suggested actions (Anthropic SDK is already a
-  dependency)
-- Zero-coverage detection for PR wire signals
-- Cross-signal company linking (click company → all signals)
-- Daily email digest
-- Slack notifications for Tier 1 signals
+- SAM.gov / DARPA grant fetcher (the NSF fetcher is a good template)
+- Google Scholar citation alerts for key papers (DROID, Open X-Embodiment, etc.)
+- Semi-automated conference tracker (speaker/exhibitor lists)
+- Slack notifications for Tier 1 signals (wiring to existing Slack lib)
+- Relevance scoring tuning after 2 weeks of real data

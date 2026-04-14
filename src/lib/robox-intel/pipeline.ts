@@ -3,12 +3,14 @@ import { generateDedupHash } from './dedup';
 import { scoreRelevance } from './scoring';
 import { generateSummary, generateAction } from './templates';
 import { runAllFetchers, SOURCE_TYPE_MAP, FETCHERS } from './fetchers';
-import type { FetcherResult, SignalType, Company } from '@/types/robox-intel';
+import { enhanceSignal, isLLMEnabled } from './llm';
+import type { SignalType, Company } from '@/types/robox-intel';
 
 interface PipelineResult {
   totalFetched: number;
   newSignals: number;
   duplicatesSkipped: number;
+  llmEnhanced: number;
   errors: string[];
 }
 
@@ -32,6 +34,8 @@ export async function runPipeline(sourceKeys?: string[]): Promise<PipelineResult
   let totalFetched = 0;
   let newSignals = 0;
   let duplicatesSkipped = 0;
+  let llmEnhanced = 0;
+  const llmEnabled = isLLMEnabled();
 
   // Load tracked companies for relevance scoring
   const { data: companies } = await supabase
@@ -99,7 +103,7 @@ export async function runPipeline(sourceKeys?: string[]): Promise<PipelineResult
         trackedCompanies
       );
 
-      // Generate summary and action using templates
+      // Generate summary and action using templates (baseline)
       const templateInput = {
         type: signalType,
         title: result.title,
@@ -108,8 +112,19 @@ export async function runPipeline(sourceKeys?: string[]): Promise<PipelineResult
         date: result.date,
         rawContent: result.rawContent,
       };
-      const summary = generateSummary(templateInput);
-      const suggestedAction = generateAction(templateInput);
+      let summary = generateSummary(templateInput);
+      let suggestedAction = generateAction(templateInput);
+
+      // Enhance with LLM for high-relevance signals only (cost control).
+      // Falls back to templates on any failure.
+      if (llmEnabled && relevance === 'high') {
+        const enhanced = await enhanceSignal(templateInput);
+        if (enhanced) {
+          summary = enhanced.summary;
+          suggestedAction = enhanced.suggestedAction;
+          llmEnhanced++;
+        }
+      }
 
       // Insert signal
       const { error: insertError } = await supabase.from('robox_signals').insert({
@@ -164,5 +179,5 @@ export async function runPipeline(sourceKeys?: string[]): Promise<PipelineResult
       .eq('source_key', key);
   }
 
-  return { totalFetched, newSignals, duplicatesSkipped, errors };
+  return { totalFetched, newSignals, duplicatesSkipped, llmEnhanced, errors };
 }

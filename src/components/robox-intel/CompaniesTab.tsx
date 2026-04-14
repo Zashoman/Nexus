@@ -6,6 +6,7 @@ import { TIER_COLORS } from '@/types/robox-intel';
 
 interface CompaniesTabProps {
   companies: Company[];
+  onCompanyClick?: (company: Company) => void;
 }
 
 const TIER_LABELS: Record<CompanyTier, string> = {
@@ -15,7 +16,7 @@ const TIER_LABELS: Record<CompanyTier, string> = {
   competitor: 'Competitor',
 };
 
-export function CompaniesTab({ companies }: CompaniesTabProps) {
+export function CompaniesTab({ companies, onCompanyClick }: CompaniesTabProps) {
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState<CompanyTier | 'all'>('all');
 
@@ -78,12 +79,15 @@ export function CompaniesTab({ companies }: CompaniesTabProps) {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((c, idx) => (
+            {filtered.map((c, idx) => {
+              const clickable = onCompanyClick && (c.signal_count ?? 0) > 0;
+              return (
               <tr
                 key={c.id}
+                onClick={clickable ? () => onCompanyClick!(c) : undefined}
                 className={`border-b border-[#1C1C1F] last:border-b-0 ${
                   idx % 2 === 0 ? 'bg-[#0F0F11]' : 'bg-[#131316]'
-                }`}
+                } ${clickable ? 'cursor-pointer hover:bg-[#1A1A1D]' : ''}`}
               >
                 <td className="px-3 py-2.5 text-[#FAFAFA] font-medium">
                   {c.name}
@@ -110,9 +114,13 @@ export function CompaniesTab({ companies }: CompaniesTabProps) {
                 </td>
                 <td className="px-3 py-2.5 text-right text-[#A1A1AA] font-mono">
                   {c.signal_count ?? 0}
+                  {clickable && (
+                    <span className="ml-1 text-[#60A5FA]">→</span>
+                  )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-3 py-8 text-center text-[#71717A]">

@@ -14,6 +14,8 @@ interface SignalsTabProps {
   signals: Signal[];
   onUpdate: () => void;
   highlightSignalId?: number | null;
+  companyFilter?: string | null;
+  onClearCompanyFilter?: () => void;
 }
 
 const TYPES: SignalType[] = [
@@ -36,7 +38,13 @@ const STATUS_COLORS: Record<SignalStatus, string> = {
   dismissed: '#64748b',
 };
 
-export function SignalsTab({ signals, onUpdate, highlightSignalId }: SignalsTabProps) {
+export function SignalsTab({
+  signals,
+  onUpdate,
+  highlightSignalId,
+  companyFilter,
+  onClearCompanyFilter,
+}: SignalsTabProps) {
   const [typeFilter, setTypeFilter] = useState<SignalType | 'all'>('all');
   const [highOnly, setHighOnly] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
@@ -53,6 +61,10 @@ export function SignalsTab({ signals, onUpdate, highlightSignalId }: SignalsTabP
 
   const filtered = useMemo(() => {
     let result = signals;
+    if (companyFilter) {
+      const needle = companyFilter.toLowerCase();
+      result = result.filter((s) => s.company.toLowerCase().includes(needle));
+    }
     if (typeFilter !== 'all') result = result.filter((s) => s.type === typeFilter);
     if (highOnly) result = result.filter((s) => s.relevance === 'high');
     if (!showClosed) result = result.filter((s) => s.status !== 'dismissed');
@@ -64,7 +76,7 @@ export function SignalsTab({ signals, onUpdate, highlightSignalId }: SignalsTabP
       if (statusDiff !== 0) return statusDiff;
       return RELEVANCE_ORDER.indexOf(a.relevance) - RELEVANCE_ORDER.indexOf(b.relevance);
     });
-  }, [signals, typeFilter, highOnly, showClosed]);
+  }, [signals, typeFilter, highOnly, showClosed, companyFilter]);
 
   const toggleExpand = (id: number) => {
     setExpandedIds((prev) => {
@@ -94,6 +106,21 @@ export function SignalsTab({ signals, onUpdate, highlightSignalId }: SignalsTabP
 
   return (
     <div className="space-y-4">
+      {companyFilter && (
+        <div className="flex items-center gap-2 text-[12px] bg-[#3B82F6]/10 border border-[#3B82F6]/30 rounded-md px-3 py-2">
+          <span className="text-[#A1A1AA]">Filtering by company:</span>
+          <span className="text-[#FAFAFA] font-medium">{companyFilter}</span>
+          {onClearCompanyFilter && (
+            <button
+              onClick={onClearCompanyFilter}
+              className="ml-auto text-[#71717A] hover:text-[#FAFAFA] text-[14px] px-1.5"
+              title="Clear filter"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
       {/* Filter bar */}
       <div className="space-y-3">
         <div className="flex flex-wrap gap-1.5">
