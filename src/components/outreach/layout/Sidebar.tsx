@@ -17,6 +17,8 @@ import {
   Users,
   MessageSquareHeart,
   Megaphone,
+  ListPlus,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/components/outreach/AuthProvider';
 
@@ -36,7 +38,9 @@ const secondaryNav = [
   { name: 'Learning', href: '/outreach/learning', icon: Brain },
   { name: 'Training', href: '/outreach/training', icon: Database },
   { name: 'Analytics', href: '/outreach/analytics', icon: BarChart3 },
+  { name: 'Instantly Queue', href: '/outreach/instantly-queue', icon: ListPlus },
   { name: 'Feedback', href: '/outreach/feedback', icon: MessageSquareHeart },
+  { name: 'Demo Hub', href: '/outreach/demo', icon: Sparkles },
 ];
 
 const bottomNav = [

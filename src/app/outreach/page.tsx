@@ -16,6 +16,8 @@ import {
   CheckCircle2,
   MessageSquare,
   Hash,
+  Zap,
+  MessageSquareHeart,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card from '@/components/outreach/ui/Card';
@@ -58,6 +60,8 @@ function getGreeting(): string {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [slackTesting, setSlackTesting] = useState(false);
+  const [slackTestResult, setSlackTestResult] = useState<string | null>(null);
 
   const fetchDashboard = async () => {
     setLoading(true);
@@ -106,6 +110,27 @@ export default function DashboardPage() {
   };
 
   useEffect(() => { fetchDashboard(); }, []);
+
+  const sendSlackTest = async () => {
+    setSlackTesting(true);
+    setSlackTestResult(null);
+    try {
+      const res = await fetch('/api/outreach/slack/test');
+      const json = await res.json();
+      if (json.ok) {
+        setSlackTestResult(`Test message sent to #${json.channel || 'slack'} — check the channel.`);
+        // Refresh activity to reflect any new state
+        setTimeout(fetchDashboard, 800);
+      } else {
+        setSlackTestResult(`Failed: ${json.error || 'unknown error'}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed';
+      setSlackTestResult(`Failed: ${msg}`);
+    } finally {
+      setSlackTesting(false);
+    }
+  };
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
@@ -232,8 +257,24 @@ export default function DashboardPage() {
               </span>
             )}
           </div>
-          <Link href="/outreach/inbox"><Button variant="ghost" size="sm">Push more</Button></Link>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={sendSlackTest}
+              loading={slackTesting}
+              icon={<Zap className="w-3.5 h-3.5" />}
+            >
+              Send test message
+            </Button>
+            <Link href="/outreach/inbox"><Button variant="ghost" size="sm">Push more</Button></Link>
+          </div>
         </div>
+        {slackTestResult && (
+          <div className={`mb-3 text-[11px] px-3 py-2 rounded-md ${slackTestResult.startsWith('Failed') ? 'bg-bt-red-bg/50 text-bt-red' : 'bg-bt-green-bg/50 text-bt-green'}`}>
+            {slackTestResult}
+          </div>
+        )}
 
         <Card padding="none">
           {/* Stats strip */}
@@ -347,7 +388,7 @@ export default function DashboardPage() {
       {/* Quick actions */}
       <div>
         <h2 className="text-sm font-semibold text-bt-text mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Link href="/outreach/inbox/review">
             <Card hover className="text-center py-4">
               <CheckCircle2 className="w-6 h-6 text-bt-green mx-auto mb-2" />
@@ -370,6 +411,12 @@ export default function DashboardPage() {
             <Card hover className="text-center py-4">
               <AlertTriangle className="w-6 h-6 text-bt-amber mx-auto mb-2" />
               <p className="text-xs font-medium text-bt-text">Reminders ({(data?.reminders.overdue || 0) + (data?.reminders.due_soon || 0)})</p>
+            </Card>
+          </Link>
+          <Link href="/outreach/demo">
+            <Card hover className="text-center py-4">
+              <MessageSquareHeart className="w-6 h-6 text-bt-teal mx-auto mb-2" />
+              <p className="text-xs font-medium text-bt-text">Demo Hub</p>
             </Card>
           </Link>
         </div>
