@@ -104,16 +104,36 @@ export function scoreRelevance(
     return 'high';
   }
 
+  // Dataset by a tracked academic/prospect
+  if (type === 'dataset' && isTrackedCompany(company, trackedCompanies, [
+    'hot_lead', 'prospect', 'academic',
+  ])) {
+    return 'high';
+  }
+
+  // Research or news referencing our core datasets — likely the citing
+  // group is evaluating or extending robot training data
+  const coreDatasets = [
+    'open x-embodiment', 'openx-embodiment', 'droid dataset',
+    'egoscale', 'rt-x', 'pi-zero', 'bridge dataset',
+  ];
+  if (coreDatasets.some((k) => text.includes(k))) {
+    return 'high';
+  }
+
   // --- MEDIUM ---
 
   // HuggingFace dataset with > 100 downloads
   if (type === 'dataset') {
-    const dlMatch = text.match(/(\d+)\s*downloads?/i);
-    if (dlMatch && parseInt(dlMatch[1]) > 100) return 'medium';
+    const dlMatch = text.match(/downloads?:\s*(\d+)/i);
+    if (dlMatch && parseInt(dlMatch[1], 10) > 100) return 'medium';
   }
 
-  // Social post mentioning data
-  if ((type === 'social' || type === 'quote') && text.includes('data')) {
+  // Social post mentioning data or training
+  if (
+    (type === 'social' || type === 'quote') &&
+    (text.includes('data') || text.includes('training'))
+  ) {
     return 'medium';
   }
 
@@ -122,6 +142,27 @@ export function scoreRelevance(
 
   // Research paper (baseline)
   if (type === 'research') return 'medium';
+
+  // News mentioning a tracked company
+  if (
+    type === 'news' &&
+    isTrackedCompany(company, trackedCompanies, [
+      'hot_lead', 'prospect', 'academic', 'competitor',
+    ])
+  ) {
+    return 'medium';
+  }
+
+  // News discussing robotics training data generically
+  if (type === 'news') {
+    const hasData = ['training data', 'data collection', 'dataset'].some(
+      (k) => text.includes(k)
+    );
+    const hasRobot = ['robot', 'humanoid', 'manipulation', 'embodied'].some(
+      (k) => text.includes(k)
+    );
+    if (hasData && hasRobot) return 'medium';
+  }
 
   // --- LOW ---
   return 'low';

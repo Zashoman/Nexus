@@ -137,6 +137,18 @@ To preview without sending: `POST /api/robox-intel/digest?preview=true`.
 breakdowns by type/relevance/source/status, funnel (ingested → reviewed
 → actionable → acted), and time-to-action histogram.
 
+The dashboard exposes this via the bar-chart icon in the header — opens
+an Analytics modal with funnel, daily trend, type/relevance breakdowns,
+time-to-action histogram, and top 10 sources.
+
+## Slack notifications (Tier 1)
+
+When `ROBOX_SLACK_WEBHOOK_URL` is set, every newly-ingested signal with
+`relevance = 'high'` is posted to Slack. Zero-coverage boosts that change
+a signal's relevance from non-high to high also fire a notification.
+
+Use a standard Slack incoming webhook URL. No OAuth needed.
+
 ## Cross-signal company view
 
 Click any company row in the Companies tab to jump to the Signals tab

@@ -4,13 +4,15 @@ import { scoreRelevance } from './scoring';
 import { generateSummary, generateAction } from './templates';
 import { runAllFetchers, SOURCE_TYPE_MAP, FETCHERS } from './fetchers';
 import { enhanceSignal, isLLMEnabled } from './llm';
-import type { SignalType, Company } from '@/types/robox-intel';
+import { postSignalToSlack, isSlackEnabled } from './slack';
+import type { SignalType, Company, Signal } from '@/types/robox-intel';
 
 interface PipelineResult {
   totalFetched: number;
   newSignals: number;
   duplicatesSkipped: number;
   llmEnhanced: number;
+  slackPosted: number;
   errors: string[];
 }
 
@@ -35,7 +37,9 @@ export async function runPipeline(sourceKeys?: string[]): Promise<PipelineResult
   let newSignals = 0;
   let duplicatesSkipped = 0;
   let llmEnhanced = 0;
+  let slackPosted = 0;
   const llmEnabled = isLLMEnabled();
+  const slackEnabled = isSlackEnabled();
 
   // Load tracked companies for relevance scoring
   const { data: companies } = await supabase
@@ -127,22 +131,26 @@ export async function runPipeline(sourceKeys?: string[]): Promise<PipelineResult
       }
 
       // Insert signal
-      const { error: insertError } = await supabase.from('robox_signals').insert({
-        type: signalType,
-        title: result.title,
-        company: result.company,
-        source: sourceName,
-        source_key: result.sourceKey,
-        url: result.url,
-        date: result.date,
-        summary,
-        suggested_action: suggestedAction,
-        relevance,
-        status: 'new',
-        tags: [],
-        raw_content: result.rawContent,
-        dedup_hash: dedupHash,
-      });
+      const { data: inserted, error: insertError } = await supabase
+        .from('robox_signals')
+        .insert({
+          type: signalType,
+          title: result.title,
+          company: result.company,
+          source: sourceName,
+          source_key: result.sourceKey,
+          url: result.url,
+          date: result.date,
+          summary,
+          suggested_action: suggestedAction,
+          relevance,
+          status: 'new',
+          tags: [],
+          raw_content: result.rawContent,
+          dedup_hash: dedupHash,
+        })
+        .select()
+        .single();
 
       if (insertError) {
         // Could be a race condition duplicate
@@ -155,6 +163,12 @@ export async function runPipeline(sourceKeys?: string[]): Promise<PipelineResult
       }
 
       newSignals++;
+
+      // Post Tier 1 (high-relevance) signals to Slack
+      if (slackEnabled && inserted && relevance === 'high') {
+        const posted = await postSignalToSlack(inserted as Signal);
+        if (posted) slackPosted++;
+      }
 
       // Update source signal count
       await supabase
@@ -179,5 +193,12 @@ export async function runPipeline(sourceKeys?: string[]): Promise<PipelineResult
       .eq('source_key', key);
   }
 
-  return { totalFetched, newSignals, duplicatesSkipped, llmEnhanced, errors };
+  return {
+    totalFetched,
+    newSignals,
+    duplicatesSkipped,
+    llmEnhanced,
+    slackPosted,
+    errors,
+  };
 }

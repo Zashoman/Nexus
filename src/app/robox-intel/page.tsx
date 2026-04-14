@@ -17,12 +17,14 @@ import { CompaniesTab } from '@/components/robox-intel/CompaniesTab';
 import { SourcesTab } from '@/components/robox-intel/SourcesTab';
 import { MediaTab } from '@/components/robox-intel/MediaTab';
 import { QuickAddModal } from '@/components/robox-intel/QuickAddModal';
+import { AnalyticsModal } from '@/components/robox-intel/AnalyticsModal';
 
 type Tab = 'signals' | 'companies' | 'sources' | 'media';
 
 export default function RoboXIntelPage() {
   const [activeTab, setActiveTab] = useState<Tab>('signals');
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   const [signals, setSignals] = useState<Signal[]>([]);
   const [briefing, setBriefing] = useState<Signal[]>([]);
@@ -130,6 +132,7 @@ export default function RoboXIntelPage() {
         onTabChange={handleTabChange}
         stats={stats}
         lastScan={lastScan}
+        onOpenAnalytics={() => setAnalyticsOpen(true)}
       />
 
       <ActionBar stats={stats} />
@@ -185,6 +188,11 @@ export default function RoboXIntelPage() {
         onClose={() => setQuickAddOpen(false)}
         onAdded={handleSignalsUpdate}
         companies={companies}
+      />
+
+      <AnalyticsModal
+        open={analyticsOpen}
+        onClose={() => setAnalyticsOpen(false)}
       />
     </>
   );
