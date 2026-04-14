@@ -1892,24 +1892,35 @@ def _do_push_brain_dump_to_notes():
 
 def _do_pull_brain_dump_from_notes():
     """Pull new items from the Brain Dump note in Apple Notes."""
-    import subprocess, re as regex_mod
+    import subprocess, re as regex_mod, sys
     note_title = "Journal Mentor — Brain Dump"
     script = (
         'tell application "Notes"\n'
         '    set noteBody to ""\n'
-        '    repeat with eachNote in notes\n'
-        '        if name of eachNote is "' + note_title + '" then\n'
-        '            set noteBody to body of eachNote\n'
-        '            exit repeat\n'
-        '        end if\n'
-        '    end repeat\n'
+        '    try\n'
+        '        set noteBody to body of note "' + note_title + '" of folder "Journal Mentor"\n'
+        '    on error\n'
+        '        try\n'
+        '            set noteBody to body of note "' + note_title + '"\n'
+        '        on error\n'
+        '            repeat with eachNote in notes\n'
+        '                if name of eachNote is "' + note_title + '" then\n'
+        '                    set noteBody to body of eachNote\n'
+        '                    exit repeat\n'
+        '                end if\n'
+        '            end repeat\n'
+        '        end try\n'
+        '    end try\n'
         '    return noteBody\n'
         'end tell'
     )
     try:
         result = subprocess.run(['osascript', '-e', script], capture_output=True, timeout=15, text=True)
         body = result.stdout or ""
-    except Exception:
+        if result.stderr:
+            print(f"  [sync-error] {result.stderr.strip()}", file=sys.stderr)
+    except Exception as e:
+        print(f"  [sync-exception] {e}", file=sys.stderr)
         return None
 
     if not body:
@@ -2024,24 +2035,36 @@ def sync_to_apple_notes():
 
 def _do_pull_from_apple_notes():
     """Pull topics from Apple Notes. Returns (added, total) or None on error."""
-    import subprocess, re as regex_mod
+    import subprocess, re as regex_mod, sys
     note_title = "Journal Mentor — Ideation"
+    # Try folder-scoped first, fall back to all notes
     script = (
         'tell application "Notes"\n'
         '    set noteBody to ""\n'
-        '    repeat with eachNote in notes\n'
-        '        if name of eachNote is "' + note_title + '" then\n'
-        '            set noteBody to body of eachNote\n'
-        '            exit repeat\n'
-        '        end if\n'
-        '    end repeat\n'
+        '    try\n'
+        '        set noteBody to body of note "' + note_title + '" of folder "Journal Mentor"\n'
+        '    on error\n'
+        '        try\n'
+        '            set noteBody to body of note "' + note_title + '"\n'
+        '        on error\n'
+        '            repeat with eachNote in notes\n'
+        '                if name of eachNote is "' + note_title + '" then\n'
+        '                    set noteBody to body of eachNote\n'
+        '                    exit repeat\n'
+        '                end if\n'
+        '            end repeat\n'
+        '        end try\n'
+        '    end try\n'
         '    return noteBody\n'
         'end tell'
     )
     try:
         result = subprocess.run(['osascript', '-e', script], capture_output=True, timeout=15, text=True)
         body = result.stdout or ""
-    except Exception:
+        if result.stderr:
+            print(f"  [sync-error] {result.stderr.strip()}", file=sys.stderr)
+    except Exception as e:
+        print(f"  [sync-exception] {e}", file=sys.stderr)
         return None
 
     if not body:
