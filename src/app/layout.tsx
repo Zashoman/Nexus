@@ -166,6 +166,32 @@ export default function RootLayout({
           </a>
 
           <a
+            href="/robox-intel"
+            title="RoboX Intel"
+            className="w-8 h-8 flex items-center justify-center text-[#EF4444] hover:text-[#F87171] transition-colors rounded-sm hover:bg-[#EF4444]/10"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {/* Robot head */}
+              <rect x="5" y="7" width="14" height="12" rx="2" />
+              <line x1="12" y1="3" x2="12" y2="7" />
+              <circle cx="12" cy="3" r="1" />
+              <circle cx="9" cy="12" r="1" fill="currentColor" />
+              <circle cx="15" cy="12" r="1" fill="currentColor" />
+              <path d="M9 16h6" />
+            </svg>
+          </a>
+
+          <a
             href="/journal"
             title="Journal Mentor"
             className="w-8 h-8 flex items-center justify-center text-[#D4A85C] hover:text-[#E0BC78] transition-colors rounded-sm hover:bg-[#D4A85C]/10"

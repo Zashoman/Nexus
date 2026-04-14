@@ -1,0 +1,168 @@
+import { getServiceSupabase } from '@/lib/supabase';
+import { generateDedupHash } from './dedup';
+import { scoreRelevance } from './scoring';
+import { generateSummary, generateAction } from './templates';
+import { runAllFetchers, SOURCE_TYPE_MAP, FETCHERS } from './fetchers';
+import type { FetcherResult, SignalType, Company } from '@/types/robox-intel';
+
+interface PipelineResult {
+  totalFetched: number;
+  newSignals: number;
+  duplicatesSkipped: number;
+  errors: string[];
+}
+
+/**
+ * Check if a company name matches a known competitor.
+ */
+function checkCompetitor(company: string, companies: Company[]): boolean {
+  const lower = company.toLowerCase();
+  return companies.some(
+    (c) => c.tier === 'competitor' && c.name.toLowerCase() === lower
+  );
+}
+
+/**
+ * Run the full ingestion pipeline.
+ * Optionally filter to specific source keys.
+ */
+export async function runPipeline(sourceKeys?: string[]): Promise<PipelineResult> {
+  const supabase = getServiceSupabase();
+  const errors: string[] = [];
+  let totalFetched = 0;
+  let newSignals = 0;
+  let duplicatesSkipped = 0;
+
+  // Load tracked companies for relevance scoring
+  const { data: companies } = await supabase
+    .from('robox_companies')
+    .select('*');
+  const trackedCompanies: Company[] = companies || [];
+
+  // Fetch from all sources
+  const results = await runAllFetchers(sourceKeys);
+  totalFetched = results.length;
+
+  // Process each result
+  for (const result of results) {
+    try {
+      // Generate dedup hash
+      const dedupHash = await generateDedupHash(result.url, result.title);
+
+      // Check for duplicate
+      const { data: existing } = await supabase
+        .from('robox_signals')
+        .select('id')
+        .eq('dedup_hash', dedupHash)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        duplicatesSkipped++;
+        continue;
+      }
+
+      // Determine signal type
+      let signalType = (SOURCE_TYPE_MAP[result.sourceKey] || 'news') as SignalType;
+
+      // Check if company is a known competitor
+      if (checkCompetitor(result.company, trackedCompanies)) {
+        signalType = 'competitor';
+      }
+
+      // Detect funding signals from PR wires
+      if (
+        signalType === 'press_release' &&
+        /\b(raises?|raised|funding|series [a-c]|seed round|investment)\b/i.test(
+          result.title + ' ' + result.rawContent
+        )
+      ) {
+        signalType = 'funding';
+      }
+
+      // Get source display name and current signal count
+      const { data: sourceRow } = await supabase
+        .from('robox_sources')
+        .select('name, signal_count')
+        .eq('source_key', result.sourceKey)
+        .maybeSingle();
+      const sourceName = sourceRow?.name || result.sourceKey;
+      const currentCount = sourceRow?.signal_count || 0;
+
+      // Score relevance
+      const relevance = scoreRelevance(
+        signalType,
+        result.title,
+        '',
+        null,
+        result.company,
+        result.rawContent,
+        trackedCompanies
+      );
+
+      // Generate summary and action using templates
+      const templateInput = {
+        type: signalType,
+        title: result.title,
+        company: result.company,
+        source: sourceName,
+        date: result.date,
+        rawContent: result.rawContent,
+      };
+      const summary = generateSummary(templateInput);
+      const suggestedAction = generateAction(templateInput);
+
+      // Insert signal
+      const { error: insertError } = await supabase.from('robox_signals').insert({
+        type: signalType,
+        title: result.title,
+        company: result.company,
+        source: sourceName,
+        source_key: result.sourceKey,
+        url: result.url,
+        date: result.date,
+        summary,
+        suggested_action: suggestedAction,
+        relevance,
+        status: 'new',
+        tags: [],
+        raw_content: result.rawContent,
+        dedup_hash: dedupHash,
+      });
+
+      if (insertError) {
+        // Could be a race condition duplicate
+        if (insertError.code === '23505') {
+          duplicatesSkipped++;
+        } else {
+          errors.push(`Insert error for "${result.title}": ${insertError.message}`);
+        }
+        continue;
+      }
+
+      newSignals++;
+
+      // Update source signal count
+      await supabase
+        .from('robox_sources')
+        .update({
+          signal_count: currentCount + 1,
+          last_fetched: new Date().toISOString(),
+        })
+        .eq('source_key', result.sourceKey);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`Processing error for "${result.title}": ${msg}`);
+    }
+  }
+
+  // Update last_fetched for all fetched sources
+  const fetchedKeys = sourceKeys || Object.keys(FETCHERS);
+  for (const key of fetchedKeys) {
+    await supabase
+      .from('robox_sources')
+      .update({ last_fetched: new Date().toISOString() })
+      .eq('source_key', key);
+  }
+
+  return { totalFetched, newSignals, duplicatesSkipped, errors };
+}
