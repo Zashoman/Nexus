@@ -101,8 +101,8 @@ export function CompaniesTab({
         </div>
       </div>
 
-      <div className="rounded-lg border border-[#27272A] overflow-hidden">
-        <table className="w-full text-[12px]">
+      <div className="rounded-lg border border-[#27272A] overflow-x-auto">
+        <table className="w-full text-[12px] min-w-[640px]">
           <thead>
             <tr className="bg-[#18181B] border-b border-[#27272A]">
               <th className="text-left px-3 py-2.5 font-semibold text-[#A1A1AA] tracking-wide">

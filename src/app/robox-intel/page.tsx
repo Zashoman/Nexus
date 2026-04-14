@@ -144,7 +144,7 @@ export default function RoboXIntelPage() {
         <Briefing signals={briefing} onSignalClick={handleBriefingClick} />
       )}
 
-      <main className="max-w-[1000px] mx-auto px-6 py-6 relative min-h-[400px]">
+      <main className="max-w-[1000px] mx-auto px-4 sm:px-6 py-6 relative min-h-[400px]">
         {loading ? (
           <div className="text-center py-16 text-[#71717A] text-[13px]">
             Loading...

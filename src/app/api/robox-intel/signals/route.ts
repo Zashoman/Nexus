@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { generateDedupHash } from '@/lib/robox-intel/dedup';
+import { appendHistory } from '@/lib/robox-intel/history';
 
 export async function GET(req: NextRequest) {
   const supabase = getServiceSupabase();
@@ -106,6 +107,10 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  await appendHistory(data.id, 'created', null, 'new', {
+    source: 'manual',
+  });
 
   return NextResponse.json(data, { status: 201 });
 }

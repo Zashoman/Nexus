@@ -12,7 +12,7 @@ export function Briefing({ signals, onSignalClick }: BriefingProps) {
   if (signals.length === 0) return null;
 
   return (
-    <section className="max-w-[1000px] mx-auto px-6 mt-6">
+    <section className="max-w-[1000px] mx-auto px-4 sm:px-6 mt-6">
       <div className="relative rounded-lg border border-[#27272A] bg-[#0F0F11] overflow-hidden">
         {/* Gradient accent line */}
         <div

@@ -202,10 +202,83 @@ Signals are scored `high` / `medium` / `low` based on rules in
 
 Tune the rules based on 2 weeks of real data.
 
+## Signal notes & history
+
+Each signal can hold free-form notes (the triage person's own notes:
+"outreach sent 2025-04-14", "waiting on intro"). Notes save on blur or
+via a "Save" button. Changes append to `robox_signal_history`, shown
+in a collapsible "+ HISTORY" panel on the expanded signal.
+
+## Snooze
+
+Snooze a signal for 1h / 4h / 1d / 3d / 1w. The `snoozed_until` column
+is cleared automatically by the hourly `/api/robox-intel/maintenance`
+job once the time has passed.
+
+## Auto-archive
+
+New signals untouched for `auto_archive_days` (default 30) get
+auto-dismissed, so the "new" queue stays a live triage list. Threshold
+configurable in Settings.
+
+## Velocity alerts
+
+When a tracked company gets ≥ `velocity_threshold` signals (default 3)
+within `velocity_window_hours` (default 24), Slack gets a velocity
+ping. De-duped: one alert per company per day.
+
+## Keyboard shortcuts
+
+On an expanded signal card:
+- `n` / `r` / `q` / `a` — set status to new / reviewing / queued / acted
+- `d` — dismiss (or reopen if already dismissed)
+- `o` — open source link
+- `Escape` — collapse
+
+Global on the Signals tab:
+- `/` — focus search
+
+## Settings page (`/robox-intel/settings`)
+
+Configures: auto-archive threshold, LLM toggle, velocity thresholds,
+digest recipients. Also shows status of expected env vars (Resend,
+Slack, Anthropic, SAM.gov).
+
+## Digest preview (`/robox-intel/digest`)
+
+See exactly what tomorrow's 8 AM digest looks like. HTML iframe +
+plain-text toggle. One-click send to an override recipient list
+for testing.
+
+## Source config
+
+The Sources tab shows a "Config" button on sources that accept
+config JSON. Click to paste:
+- **Google Scholar**: a list of Scholar alert RSS URLs (one per
+  paper-of-interest you created an alert for).
+- **Conferences**: a list of `{ name, url, selector? }` entries
+  pointing at conference speaker pages.
+
+The fetchers read `robox_sources.config` JSONB on every run.
+
 ## Still to do
 
-- SAM.gov / DARPA grant fetcher (the NSF fetcher is a good template)
-- Google Scholar citation alerts for key papers (DROID, Open X-Embodiment, etc.)
-- Semi-automated conference tracker (speaker/exhibitor lists)
-- Slack notifications for Tier 1 signals (wiring to existing Slack lib)
 - Relevance scoring tuning after 2 weeks of real data
+- Per-source-type custom scoring rules (UI)
+
+## Env vars reference
+
+| Var | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
+| `ANTHROPIC_API_KEY` | LLM summaries for high-relevance signals |
+| `RESEND_API_KEY` | Daily digest sender (preferred) |
+| `RESEND_FROM` | From address, default `digest@resend.dev` |
+| `ROBOX_SLACK_WEBHOOK_URL` | Tier 1 + velocity alerts |
+| `SAM_API_KEY` | SAM.gov grant fetcher |
+| `DIGEST_WEBHOOK_URL` | Legacy digest sender |
+| `DIGEST_RECIPIENT` | Legacy digest recipient |
+
+Prefer Settings-page config when available; env vars only.

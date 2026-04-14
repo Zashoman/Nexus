@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Source, SourceCategory } from '@/types/robox-intel';
+import { SourceConfigModal } from './SourceConfigModal';
 
 interface SourcesTabProps {
   sources: Source[];
@@ -34,9 +35,12 @@ const TYPE_BADGE_COLORS = {
   paid: { bg: '#6B728020', color: '#A1A1AA', label: 'Paid' },
 };
 
+const CONFIGURABLE_SOURCE_KEYS = new Set(['google_scholar', 'conferences']);
+
 export function SourcesTab({ sources, onUpdate }: SourcesTabProps) {
   const [category, setCategory] = useState<SourceCategory | 'all'>('all');
   const [fetchingId, setFetchingId] = useState<number | null>(null);
+  const [configSource, setConfigSource] = useState<Source | null>(null);
 
   const filtered = sources.filter(
     (s) => category === 'all' || s.category === category
@@ -135,6 +139,14 @@ export function SourcesTab({ sources, onUpdate }: SourcesTabProps) {
                 )}
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
+                {CONFIGURABLE_SOURCE_KEYS.has(source.source_key) && (
+                  <button
+                    onClick={() => setConfigSource(source)}
+                    className="text-[10px] px-2 py-1 rounded border border-[#27272A] text-[#A1A1AA] hover:text-[#FAFAFA] hover:border-[#3F3F46]"
+                  >
+                    Config
+                  </button>
+                )}
                 {source.type === 'free' && source.status === 'active' && (
                   <button
                     onClick={() => fetchSource(source)}
@@ -157,6 +169,12 @@ export function SourcesTab({ sources, onUpdate }: SourcesTabProps) {
           );
         })}
       </div>
+
+      <SourceConfigModal
+        source={configSource}
+        onClose={() => setConfigSource(null)}
+        onSaved={onUpdate}
+      />
 
       {/* Upgrade path callout */}
       <div className="mt-6 rounded-lg border border-[#3B82F6]/30 bg-[#3B82F6]/5 p-4">

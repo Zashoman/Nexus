@@ -551,6 +551,259 @@ async function fetchNSF(): Promise<FetcherResult[]> {
 }
 
 // ============================================
+// Config loading helper — for config-driven fetchers
+// ============================================
+async function loadSourceConfig<T>(
+  sourceKey: string,
+  defaultValue: T
+): Promise<T> {
+  try {
+    // Lazy import to avoid top-level dependency ordering issues
+    const { getServiceSupabase } = await import('@/lib/supabase');
+    const supabase = getServiceSupabase();
+    const { data } = await supabase
+      .from('robox_sources')
+      .select('config')
+      .eq('source_key', sourceKey)
+      .maybeSingle();
+    if (!data?.config) return defaultValue;
+    return data.config as T;
+  } catch (err) {
+    console.error(`[${sourceKey}] config load failed:`, err);
+    return defaultValue;
+  }
+}
+
+// ============================================
+// Google Scholar Alerts Fetcher
+// Reads a list of Scholar alert RSS URLs from sources.config.feeds
+// User creates alerts in scholar.google.com and pastes the resulting
+// feed URLs into the Source config modal.
+// ============================================
+async function fetchGoogleScholar(): Promise<FetcherResult[]> {
+  const results: FetcherResult[] = [];
+  const config = await loadSourceConfig<{ feeds?: string[] }>(
+    'google_scholar',
+    {}
+  );
+  const feeds = config.feeds || [];
+  if (feeds.length === 0) return results;
+
+  for (const url of feeds) {
+    try {
+      const feed = await parser.parseURL(url);
+      for (const item of (feed.items || []).slice(0, 10)) {
+        results.push({
+          title: (item.title || '').slice(0, 300),
+          company: extractScholarAuthor(item) || 'Unknown Lab',
+          url: item.link || '',
+          date: item.isoDate || new Date().toISOString().split('T')[0],
+          rawContent: item.contentSnippet || item.content || '',
+          sourceKey: 'google_scholar',
+        });
+      }
+    } catch (err) {
+      console.error(`[google_scholar] Fetch error for ${url}:`, err);
+    }
+  }
+  return results;
+}
+
+function extractScholarAuthor(item: { title?: string; contentSnippet?: string }): string | null {
+  // Scholar titles often include "Paper Title - Author, Year"
+  const match = (item.title || '').match(/-\s*([^,-]+)(?:,|$)/);
+  if (match) return match[1].trim();
+  return null;
+}
+
+// ============================================
+// Conference Tracker Fetcher
+// Reads a list of conference pages from sources.config.conferences:
+//   [{ name: "ICRA 2026", url: "https://...", selector?: ".speaker" }]
+// Scrapes the page, extracts speaker names. If the page is the
+// raw HTML and no selector is given, we look for common patterns.
+// ============================================
+interface ConferenceConfig {
+  conferences?: Array<{
+    name: string;
+    url: string;
+    selector?: string;
+  }>;
+}
+
+async function fetchConferences(): Promise<FetcherResult[]> {
+  const results: FetcherResult[] = [];
+  const config = await loadSourceConfig<ConferenceConfig>('conferences', {});
+  const confs = config.conferences || [];
+  if (confs.length === 0) return results;
+
+  for (const conf of confs) {
+    try {
+      const res = await fetch(conf.url, {
+        headers: { 'User-Agent': 'RoboX-Intel/1.0' },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+
+      // Extract plausible speaker/presenter names
+      const speakers = extractSpeakersFromHtml(html, conf.selector);
+      if (speakers.length === 0) continue;
+
+      results.push({
+        title: `${conf.name}: ${speakers.length} speakers/presenters identified`,
+        company: conf.name,
+        url: conf.url,
+        date: new Date().toISOString().split('T')[0],
+        rawContent:
+          `Conference: ${conf.name}\nURL: ${conf.url}\n\n` +
+          `Speakers/presenters (excerpt):\n${speakers.slice(0, 30).join('\n')}`,
+        sourceKey: 'conferences',
+      });
+    } catch (err) {
+      console.error(`[conferences] Fetch error for ${conf.name}:`, err);
+    }
+  }
+  return results;
+}
+
+function extractSpeakersFromHtml(html: string, selector?: string): string[] {
+  // Strip scripts and styles
+  const cleaned = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '');
+
+  // If a selector-like class is given, try to extract class="..." blocks
+  if (selector && selector.startsWith('.')) {
+    const cls = selector.slice(1);
+    const regex = new RegExp(
+      `<[^>]+class="[^"]*${cls}[^"]*"[^>]*>([\\s\\S]*?)<`,
+      'gi'
+    );
+    const out: string[] = [];
+    let m;
+    while ((m = regex.exec(cleaned)) !== null) {
+      const text = m[1].replace(/<[^>]+>/g, '').trim();
+      if (text && text.length < 120) out.push(text);
+    }
+    if (out.length > 0) return dedupe(out);
+  }
+
+  // Fallback: find capitalized name-like patterns near "Speaker"/"Keynote"
+  const namePattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})/g;
+  const nameContexts = /(speaker|keynote|invited talk|presenter|panelist)/i;
+  const lines = cleaned.split(/[\n\r]/).slice(0, 500);
+  const out: string[] = [];
+  for (const line of lines) {
+    if (!nameContexts.test(line)) continue;
+    const stripped = line.replace(/<[^>]+>/g, ' ');
+    let m;
+    while ((m = namePattern.exec(stripped)) !== null) {
+      if (m[1].length < 80) out.push(m[1]);
+    }
+  }
+  return dedupe(out).slice(0, 100);
+}
+
+function dedupe(arr: string[]): string[] {
+  return Array.from(new Set(arr));
+}
+
+// ============================================
+// SAM.gov Opportunities Fetcher
+// Requires SAM_API_KEY from api.data.gov (free signup).
+// Searches for robotics/autonomy-related BAAs and awards in last 30 days.
+// ============================================
+interface SamOpportunity {
+  title: string;
+  department?: string;
+  subTier?: string;
+  office?: string;
+  postedDate?: string;
+  type?: string;
+  uiLink?: string;
+  description?: string;
+  award?: { amount?: number };
+}
+
+async function fetchSamGov(): Promise<FetcherResult[]> {
+  const results: FetcherResult[] = [];
+  const apiKey = process.env.SAM_API_KEY;
+  if (!apiKey) return results;
+
+  const postedFrom = new Date();
+  postedFrom.setDate(postedFrom.getDate() - 30);
+  const mm = String(postedFrom.getMonth() + 1).padStart(2, '0');
+  const dd = String(postedFrom.getDate()).padStart(2, '0');
+  const yyyy = postedFrom.getFullYear();
+  const postedFromStr = `${mm}/${dd}/${yyyy}`;
+
+  const today = new Date();
+  const mm2 = String(today.getMonth() + 1).padStart(2, '0');
+  const dd2 = String(today.getDate()).padStart(2, '0');
+  const yyyy2 = today.getFullYear();
+  const postedToStr = `${mm2}/${dd2}/${yyyy2}`;
+
+  const keywords = [
+    'robot manipulation',
+    'embodied AI',
+    'autonomous manipulation',
+    'robot learning',
+  ];
+
+  for (const keyword of keywords) {
+    try {
+      const params = new URLSearchParams({
+        api_key: apiKey,
+        limit: '25',
+        postedFrom: postedFromStr,
+        postedTo: postedToStr,
+        q: keyword,
+      });
+      const res = await fetch(
+        `https://api.sam.gov/opportunities/v2/search?${params}`,
+        {
+          headers: { 'User-Agent': 'RoboX-Intel/1.0' },
+          signal: AbortSignal.timeout(15000),
+        }
+      );
+      if (!res.ok) {
+        console.error(`[sam_gov] ${res.status} for "${keyword}"`);
+        continue;
+      }
+      const data = (await res.json()) as {
+        opportunitiesData?: SamOpportunity[];
+      };
+
+      for (const opp of data.opportunitiesData || []) {
+        const amount = opp.award?.amount;
+        results.push({
+          title: (opp.title || 'SAM.gov opportunity').slice(0, 300),
+          company:
+            [opp.department, opp.subTier, opp.office]
+              .filter(Boolean)
+              .join(' / ') || 'US Government',
+          url: opp.uiLink || 'https://sam.gov',
+          date: (opp.postedDate || new Date().toISOString()).split('T')[0],
+          rawContent:
+            `Type: ${opp.type}\n` +
+            `Department: ${opp.department || ''}\n` +
+            `Sub-tier: ${opp.subTier || ''}\n` +
+            `Office: ${opp.office || ''}\n` +
+            (amount ? `Award amount: $${amount.toLocaleString()}\n` : '') +
+            `\n${(opp.description || '').slice(0, 2000)}`,
+          sourceKey: 'sam_gov',
+        });
+      }
+    } catch (err) {
+      console.error(`[sam_gov] Fetch error for "${keyword}":`, err);
+    }
+  }
+
+  return results;
+}
+
+// ============================================
 // Source-to-Type mapping
 // ============================================
 export const SOURCE_TYPE_MAP: Record<string, string> = {
@@ -573,6 +826,7 @@ export const SOURCE_TYPE_MAP: Record<string, string> = {
   podcasts: 'quote',
   nsf: 'grant',
   darpa: 'grant',
+  sam_gov: 'grant',
   conferences: 'conference',
   linkedin_jobs: 'hiring',
 };
@@ -590,11 +844,14 @@ export const FETCHERS: Record<string, () => Promise<FetcherResult[]>> = {
   ieee_spectrum: fetchIEEESpectrum,
   import_ai: fetchImportAI,
   arxiv: fetchArxiv,
+  google_scholar: fetchGoogleScholar,
   crunchbase: fetchCrunchbase,
   huggingface: fetchHuggingFace,
   github: fetchGitHub,
   reddit: fetchReddit,
   nsf: fetchNSF,
+  sam_gov: fetchSamGov,
+  conferences: fetchConferences,
 };
 
 /**

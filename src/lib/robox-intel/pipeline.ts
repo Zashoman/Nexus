@@ -5,6 +5,7 @@ import { generateSummary, generateAction } from './templates';
 import { runAllFetchers, SOURCE_TYPE_MAP, FETCHERS } from './fetchers';
 import { enhanceSignal, isLLMEnabled } from './llm';
 import { postSignalToSlack, isSlackEnabled } from './slack';
+import { appendHistory } from './history';
 import type { SignalType, Company, Signal } from '@/types/robox-intel';
 
 interface PipelineResult {
@@ -163,6 +164,15 @@ export async function runPipeline(sourceKeys?: string[]): Promise<PipelineResult
       }
 
       newSignals++;
+
+      // Record creation in history
+      if (inserted) {
+        await appendHistory(inserted.id, 'created', null, 'new', {
+          source_key: result.sourceKey,
+          source: sourceName,
+          initial_relevance: relevance,
+        });
+      }
 
       // Post Tier 1 (high-relevance) signals to Slack
       if (slackEnabled && inserted && relevance === 'high') {

@@ -357,6 +357,15 @@ function SignalCard({
   const color = SIGNAL_COLORS[signal.type];
   const isDismissed = signal.status === 'dismissed';
   const isActed = signal.status === 'acted';
+  // Date.now() is called inside useMemo so the rule treats it as a
+  // stable value for this render cycle.
+  const isSnoozed = useMemo(
+    () =>
+      !!signal.snoozed_until &&
+      // eslint-disable-next-line react-hooks/purity
+      new Date(signal.snoozed_until).getTime() > Date.now(),
+    [signal.snoozed_until]
+  );
 
   const bgClass =
     signal.status === 'new'
@@ -364,6 +373,59 @@ function SignalCard({
       : isDismissed || isActed
         ? 'bg-[#0D0D10]'
         : 'bg-[#101013]';
+
+  // Keyboard shortcuts when expanded
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (
+        active &&
+        (active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          active.isContentEditable)
+      ) {
+        return;
+      }
+      switch (e.key) {
+        case 'd':
+          e.preventDefault();
+          if (isDismissed) {
+            onReopen();
+          } else {
+            onDismiss();
+          }
+          break;
+        case 'a':
+          e.preventDefault();
+          onUpdate({ status: 'acted' });
+          break;
+        case 'q':
+          e.preventDefault();
+          onUpdate({ status: 'queued' });
+          break;
+        case 'r':
+          e.preventDefault();
+          onUpdate({ status: 'reviewing' });
+          break;
+        case 'n':
+          e.preventDefault();
+          onUpdate({ status: 'new' });
+          break;
+        case 'o':
+          e.preventDefault();
+          window.open(signal.url, '_blank', 'noopener,noreferrer');
+          break;
+        case 'Escape':
+          e.preventDefault();
+          onToggle();
+          break;
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [expanded, isDismissed, onDismiss, onReopen, onUpdate, onToggle, signal.url]);
 
   return (
     <div
@@ -396,6 +458,22 @@ function SignalCard({
             {signal.relevance === 'high' && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#EF4444]/15 text-[#F87171] tracking-wider">
                 HIGH
+              </span>
+            )}
+            {isSnoozed && (
+              <span
+                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#A855F7]/15 text-[#C084FC] tracking-wider"
+                title={`Snoozed until ${new Date(signal.snoozed_until!).toLocaleString()}`}
+              >
+                ZZZ
+              </span>
+            )}
+            {signal.notes && (
+              <span
+                className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#60A5FA]/15 text-[#60A5FA] tracking-wider"
+                title="Has notes"
+              >
+                NOTE
               </span>
             )}
             <span className="text-[10px] text-[#71717A] font-mono">
@@ -463,6 +541,10 @@ function SignalCard({
             </p>
           </div>
 
+          <NotesEditor signal={signal} onSave={(notes) => onUpdate({ notes })} />
+
+          <SnoozeControl signal={signal} onUpdate={onUpdate} />
+
           {signal.tags && signal.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {signal.tags.map((tag) => (
@@ -476,7 +558,7 @@ function SignalCard({
             </div>
           )}
 
-          <div className="flex items-center gap-1 pt-1">
+          <div className="flex items-center gap-1 pt-1 flex-wrap">
             <span className="text-[10px] text-[#71717A] mr-2">STATUS:</span>
             {STATUS_OPTIONS.map((opt) => {
               const isActive = signal.status === opt.key;
@@ -503,6 +585,191 @@ function SignalCard({
               );
             })}
           </div>
+
+          <p className="text-[10px] text-[#52525B] pt-1 font-mono">
+            shortcuts: n·r·q·a status · d dismiss · o open · esc close
+          </p>
+
+          <SignalHistoryPanel signalId={signal.id} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NotesEditor({
+  signal,
+  onSave,
+}: {
+  signal: Signal;
+  onSave: (notes: string) => void;
+}) {
+  const [text, setText] = useState(signal.notes || '');
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Sync when signal changes externally (new id, or remote update)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setText(signal.notes || '');
+    setDirty(false);
+  }, [signal.id, signal.notes]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    await Promise.resolve(onSave(text));
+    setDirty(false);
+    setSaving(false);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[9px] font-semibold tracking-[0.2em] text-[#60A5FA]">
+          YOUR NOTES
+        </span>
+        {dirty && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="text-[10px] text-[#60A5FA] hover:text-[#93C5FD] px-2 py-0.5 rounded hover:bg-[#60A5FA]/10"
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        )}
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          setDirty(e.target.value !== (signal.notes || ''));
+        }}
+        onBlur={() => {
+          if (dirty) handleSave();
+        }}
+        placeholder="Add notes — outreach sent, context, follow-up..."
+        className="w-full bg-[#0B0B0D] border border-[#27272A] rounded-md px-3 py-2 text-[12px] text-[#E4E4E7] placeholder-[#52525B] focus:outline-none focus:border-[#60A5FA]/40 min-h-[60px] resize-y"
+      />
+    </div>
+  );
+}
+
+const SNOOZE_PRESETS: { label: string; hours: number }[] = [
+  { label: '1h', hours: 1 },
+  { label: '4h', hours: 4 },
+  { label: '1d', hours: 24 },
+  { label: '3d', hours: 72 },
+  { label: '1w', hours: 168 },
+];
+
+function SnoozeControl({
+  signal,
+  onUpdate,
+}: {
+  signal: Signal;
+  onUpdate: (updates: Partial<Signal>) => void;
+}) {
+  const isSnoozed = useMemo(
+    () =>
+      !!signal.snoozed_until &&
+      // eslint-disable-next-line react-hooks/purity
+      new Date(signal.snoozed_until).getTime() > Date.now(),
+    [signal.snoozed_until]
+  );
+
+  if (isSnoozed) {
+    return (
+      <div className="rounded-md bg-[#A855F7]/10 border border-[#A855F7]/20 p-2 flex items-center justify-between">
+        <span className="text-[11px] text-[#C084FC]">
+          Snoozed until {new Date(signal.snoozed_until!).toLocaleString()}
+        </span>
+        <button
+          onClick={() => onUpdate({ snoozed_until: null })}
+          className="text-[10px] text-[#A1A1AA] hover:text-[#FAFAFA] px-2 py-0.5 rounded hover:bg-[#27272A]"
+        >
+          Unsnooze
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      <span className="text-[10px] text-[#71717A] mr-1">SNOOZE:</span>
+      {SNOOZE_PRESETS.map((p) => (
+        <button
+          key={p.label}
+          onClick={() => {
+            const until = new Date(Date.now() + p.hours * 60 * 60 * 1000);
+            onUpdate({ snoozed_until: until.toISOString() });
+          }}
+          className="text-[11px] text-[#71717A] hover:text-[#C084FC] px-2 py-0.5 rounded hover:bg-[#A855F7]/10"
+        >
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+interface HistoryItem {
+  id: number;
+  event_type: string;
+  from_value: string | null;
+  to_value: string | null;
+  created_at: string;
+}
+
+function SignalHistoryPanel({ signalId }: { signalId: number }) {
+  const [items, setItems] = useState<HistoryItem[] | null>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open || items !== null) return;
+    let cancelled = false;
+    const load = async () => {
+      const res = await fetch(`/api/robox-intel/signals/${signalId}/history`);
+      const data = await res.json();
+      if (!cancelled) setItems(data.history || []);
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, items, signalId]);
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="text-[10px] text-[#52525B] hover:text-[#A1A1AA] tracking-wider font-semibold"
+      >
+        {open ? '− HISTORY' : '+ HISTORY'}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-1">
+          {items === null ? (
+            <div className="text-[10px] text-[#52525B]">Loading...</div>
+          ) : items.length === 0 ? (
+            <div className="text-[10px] text-[#52525B]">No history yet.</div>
+          ) : (
+            items.map((h) => (
+              <div
+                key={h.id}
+                className="flex items-baseline gap-2 text-[10px] font-mono"
+              >
+                <span className="text-[#52525B] w-32 flex-shrink-0">
+                  {new Date(h.created_at).toLocaleString()}
+                </span>
+                <span className="text-[#A1A1AA]">
+                  {h.event_type}
+                  {h.from_value &&
+                    h.to_value &&
+                    `: ${h.from_value} → ${h.to_value}`}
+                </span>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>

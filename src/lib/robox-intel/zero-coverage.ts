@@ -1,6 +1,7 @@
 import Parser from 'rss-parser';
 import { getServiceSupabase } from '@/lib/supabase';
 import { postSignalToSlack, isSlackEnabled } from './slack';
+import { appendHistory } from './history';
 import type { Signal } from '@/types/robox-intel';
 
 const parser = new Parser({
@@ -89,6 +90,14 @@ export async function applyZeroCoverageBoost(signal: Signal): Promise<void> {
     .eq('id', signal.id)
     .select()
     .single();
+
+  // Record in history
+  await appendHistory(
+    signal.id,
+    'zero_coverage_boost',
+    signal.relevance,
+    'high'
+  );
 
   // Only notify if the signal was boosted from non-high to high
   if (isSlackEnabled() && data && signal.relevance !== 'high') {

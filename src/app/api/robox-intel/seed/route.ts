@@ -45,7 +45,7 @@ const SEED_SOURCES = [
   { name: 'IEEE Spectrum Robotics', source_key: 'ieee_spectrum', category: 'news', type: 'free', cost: '$0', status: 'active', description: 'Technical robotics coverage. Filtered for training/data/learning.' },
   { name: 'Import AI Newsletter', source_key: 'import_ai', category: 'news', type: 'free', cost: '$0', status: 'active', description: "Jack Clark's AI research newsletter. Keyword-filtered for robotics." },
   { name: 'arXiv cs.RO + cs.CV', source_key: 'arxiv', category: 'research', type: 'free', cost: '$0', status: 'active', description: 'Academic papers on robotics, manipulation, embodied AI.' },
-  { name: 'Google Scholar Alerts', source_key: 'google_scholar', category: 'research', type: 'free', cost: '$0', status: 'not_connected', description: 'Citation alerts for key robotics papers. Phase 2.' },
+  { name: 'Google Scholar Alerts', source_key: 'google_scholar', category: 'research', type: 'free', cost: '$0', status: 'active', description: 'Citation alerts for key robotics papers. Paste alert RSS URLs in source config.' },
   { name: 'Crunchbase News', source_key: 'crunchbase', category: 'funding', type: 'free', cost: '$0', status: 'active', description: 'Startup funding news filtered for robotics.' },
   { name: 'Hugging Face Datasets', source_key: 'huggingface', category: 'datasets', type: 'free', cost: '$0', status: 'active', description: 'New robotics datasets. Track uploading labs and download volume.' },
   { name: 'GitHub Trending', source_key: 'github', category: 'datasets', type: 'free', cost: '$0', status: 'active', description: 'Trending robotics repos across 5 topic filters.' },
@@ -54,8 +54,8 @@ const SEED_SOURCES = [
   { name: 'LinkedIn Feed', source_key: 'linkedin_feed', category: 'social', type: 'manual', cost: '$0', status: 'active', description: 'Manual entry from daily LinkedIn browsing.' },
   { name: 'Podcast Monitoring', source_key: 'podcasts', category: 'quotes', type: 'manual', cost: '$0', status: 'active', description: 'Robot Brains, Gradient Dissent, Practical AI, etc.' },
   { name: 'NSF Award Search', source_key: 'nsf', category: 'grants', type: 'free', cost: '$0', status: 'active', description: 'Federal grants for robotics research (> $500K last 30 days).' },
-  { name: 'DARPA / SAM.gov', source_key: 'darpa', category: 'grants', type: 'free', cost: '$0', status: 'not_connected', description: 'Defense solicitations and awards. Phase 2.' },
-  { name: 'Conference Trackers', source_key: 'conferences', category: 'events', type: 'manual', cost: '$0', status: 'active', description: 'ICRA, CoRL, RSS, NeurIPS workshops, Robotics Summit.' },
+  { name: 'DARPA / SAM.gov', source_key: 'sam_gov', category: 'grants', type: 'free', cost: '$0', status: 'active', description: 'Defense solicitations and awards. Requires SAM_API_KEY env var.' },
+  { name: 'Conference Trackers', source_key: 'conferences', category: 'events', type: 'free', cost: '$0', status: 'active', description: 'Scrapes conference websites for speakers. Paste conference list in source config.' },
   { name: 'LinkedIn Jobs', source_key: 'linkedin_jobs', category: 'hiring', type: 'manual', cost: '$0', status: 'active', description: 'Weekly search for robotics data roles. Manual entry.' },
 ];
 
@@ -103,6 +103,17 @@ export async function POST() {
       .upsert(source, { onConflict: 'source_key' });
     if (error) sourceResults.errors.push(`${source.name}: ${error.message}`);
     else sourceResults.inserted++;
+  }
+  // Deprecate old source_keys that were renamed
+  const DEPRECATED_KEYS = ['darpa'];
+  for (const key of DEPRECATED_KEYS) {
+    await supabase
+      .from('robox_sources')
+      .update({
+        status: 'not_connected',
+        description: `Deprecated — see replacement source`,
+      })
+      .eq('source_key', key);
   }
   results.sources = sourceResults;
 

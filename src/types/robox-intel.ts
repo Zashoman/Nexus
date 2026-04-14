@@ -58,10 +58,22 @@ export interface Signal {
   status: SignalStatus;
   tags: string[] | null;
   raw_content: string | null;
+  notes: string | null;
+  snoozed_until: string | null;
   created_at: string;
   updated_at: string;
   acted_at: string | null;
   dedup_hash: string | null;
+}
+
+export interface SignalHistoryEntry {
+  id: number;
+  signal_id: number;
+  event_type: string;
+  from_value: string | null;
+  to_value: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
 }
 
 export interface Company {

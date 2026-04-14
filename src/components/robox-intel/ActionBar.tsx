@@ -11,7 +11,7 @@ export function ActionBar({ stats }: ActionBarProps) {
   const hasAction = stats.highPriorityCount > 0;
 
   return (
-    <div className="max-w-[1000px] mx-auto px-6 pt-5">
+    <div className="max-w-[1000px] mx-auto px-4 sm:px-6 pt-5">
       <div className="flex items-center gap-3 text-[12px]">
         {hasAction && (
           <div className="flex items-center gap-2">
