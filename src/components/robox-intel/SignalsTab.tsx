@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import type { Signal, SignalType, SignalStatus } from '@/types/robox-intel';
 import {
   SIGNAL_COLORS,
@@ -60,6 +60,28 @@ export function SignalsTab({
   const [showClosed, setShowClosed] = useState(false);
   const [search, setSearch] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  // Global "/" shortcut to focus search
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (
+        active &&
+        (active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          active.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   // Auto-expand highlighted signal — syncing external prop to internal state
   useEffect(() => {
@@ -165,8 +187,9 @@ export function SignalsTab({
       <div className="space-y-3">
         <div className="relative">
           <input
+            ref={searchRef}
             type="text"
-            placeholder="Search title, company, summary, tags..."
+            placeholder="Search title, company, summary, tags... ( / to focus)"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full px-3 py-2 pl-9 bg-[#0B0B0D] border border-[#27272A] rounded-md text-[12px] text-[#FAFAFA] placeholder-[#52525B] focus:outline-none focus:border-[#3F3F46]"
