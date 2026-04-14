@@ -58,6 +58,7 @@ export function SignalsTab({
   const [typeFilter, setTypeFilter] = useState<SignalType | 'all'>('all');
   const [highOnly, setHighOnly] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
+  const [search, setSearch] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
 
   // Auto-expand highlighted signal — syncing external prop to internal state
@@ -79,6 +80,17 @@ export function SignalsTab({
     if (typeFilter !== 'all') result = result.filter((s) => s.type === typeFilter);
     if (highOnly) result = result.filter((s) => s.relevance === 'high');
     if (!showClosed) result = result.filter((s) => s.status !== 'dismissed');
+    if (search.trim()) {
+      const needle = search.trim().toLowerCase();
+      result = result.filter((s) => {
+        return (
+          s.title.toLowerCase().includes(needle) ||
+          s.company.toLowerCase().includes(needle) ||
+          s.summary.toLowerCase().includes(needle) ||
+          (s.tags || []).some((t) => t.toLowerCase().includes(needle))
+        );
+      });
+    }
 
     // Sort by status then relevance
     return [...result].sort((a, b) => {
@@ -87,7 +99,7 @@ export function SignalsTab({
       if (statusDiff !== 0) return statusDiff;
       return RELEVANCE_ORDER.indexOf(a.relevance) - RELEVANCE_ORDER.indexOf(b.relevance);
     });
-  }, [signals, typeFilter, highOnly, showClosed, companyFilter]);
+  }, [signals, typeFilter, highOnly, showClosed, companyFilter, search]);
 
   const toggleExpand = (id: number) => {
     setExpandedIds((prev) => {
@@ -115,6 +127,23 @@ export function SignalsTab({
     await updateSignal(id, { status: 'new' });
   };
 
+  const dismissFilteredNew = async (ids: number[]) => {
+    if (ids.length === 0) return;
+    if (
+      !confirm(
+        `Dismiss ${ids.length} signal${ids.length === 1 ? '' : 's'}? You can restore them from "Show closed".`
+      )
+    ) {
+      return;
+    }
+    await fetch('/api/robox-intel/signals/bulk', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, status: 'dismissed' }),
+    });
+    onUpdate();
+  };
+
   return (
     <div className="space-y-4">
       {companyFilter && (
@@ -134,6 +163,37 @@ export function SignalsTab({
       )}
       {/* Filter bar */}
       <div className="space-y-3">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search title, company, summary, tags..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full px-3 py-2 pl-9 bg-[#0B0B0D] border border-[#27272A] rounded-md text-[12px] text-[#FAFAFA] placeholder-[#52525B] focus:outline-none focus:border-[#3F3F46]"
+          />
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[#52525B]"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-[#FAFAFA] w-5 h-5 flex items-center justify-center rounded hover:bg-[#27272A]"
+            >
+              ×
+            </button>
+          )}
+        </div>
         <div className="flex flex-wrap gap-1.5">
           <FilterButton
             active={typeFilter === 'all'}
@@ -171,13 +231,28 @@ export function SignalsTab({
             />
             Show closed
           </label>
-          <a
-            href={buildExportUrl(typeFilter, highOnly)}
-            className="ml-auto text-[11px] text-[#60A5FA] hover:text-[#93C5FD] px-2 py-1 rounded hover:bg-[#60A5FA]/10 transition-colors"
-            title="Download filtered signals as CSV"
-          >
-            Export CSV
-          </a>
+          <div className="ml-auto flex items-center gap-1">
+            {filtered.length > 0 && filtered.some((s) => s.status === 'new') && (
+              <button
+                onClick={() =>
+                  dismissFilteredNew(
+                    filtered.filter((s) => s.status === 'new').map((s) => s.id)
+                  )
+                }
+                className="text-[11px] text-[#71717A] hover:text-[#F87171] px-2 py-1 rounded hover:bg-[#F87171]/10 transition-colors"
+                title="Dismiss all new signals matching current filters"
+              >
+                Dismiss filtered
+              </button>
+            )}
+            <a
+              href={buildExportUrl(typeFilter, highOnly)}
+              className="text-[11px] text-[#60A5FA] hover:text-[#93C5FD] px-2 py-1 rounded hover:bg-[#60A5FA]/10 transition-colors"
+              title="Download filtered signals as CSV"
+            >
+              Export CSV
+            </a>
+          </div>
         </div>
       </div>
 
