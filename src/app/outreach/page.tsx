@@ -14,6 +14,8 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle2,
+  MessageSquare,
+  Hash,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card from '@/components/outreach/ui/Card';
@@ -26,7 +28,24 @@ interface DashboardData {
   reminders: { overdue: number; due_soon: number; upcoming: number };
   instantly: { connected: boolean; campaign_count: number };
   learning: { total_revisions: number; last_week: number };
-  slack_drafts: { pending: number; approved: number; sent: number };
+  slack: SlackActivity;
+}
+
+interface SlackActivity {
+  connection: { ok: boolean; error?: string; channel?: string; team?: string };
+  counts: Record<string, number>;
+  revisions_total: number;
+  revisions_last_24h: number;
+  recent: Array<{
+    id: string;
+    slack_message_ts: string;
+    sender_name: string;
+    subject: string;
+    campaign_name: string;
+    status: string;
+    revision_count: number;
+    created_at: string;
+  }>;
 }
 
 function getGreeting(): string {
@@ -43,10 +62,19 @@ export default function DashboardPage() {
   const fetchDashboard = async () => {
     setLoading(true);
     try {
-      const [dashRes, remRes, learnRes] = await Promise.all([
+      const emptySlack: SlackActivity = {
+        connection: { ok: false },
+        counts: {},
+        revisions_total: 0,
+        revisions_last_24h: 0,
+        recent: [],
+      };
+
+      const [dashRes, remRes, learnRes, slackRes] = await Promise.all([
         fetch('/api/outreach/dashboard').then((r) => r.json()),
         fetch('/api/outreach/reminders').then((r) => r.json()).catch(() => ({ counts: { overdue: 0, due_soon: 0, upcoming: 0 } })),
         fetch('/api/outreach/learning').then((r) => r.json()).catch(() => ({ total_revisions: 0, last_week: 0 })),
+        fetch('/api/outreach/slack/activity').then((r) => r.json()).catch(() => emptySlack),
       ]);
 
       // Check Instantly
@@ -57,17 +85,13 @@ export default function DashboardPage() {
         instantlyData = { connected: inst.ok, campaign_count: inst.campaign_count || 0 };
       } catch { /* silent */ }
 
-      // Check slack drafts
-      let slackData = { pending: 0, approved: 0, sent: 0 };
-      try {
-        const slackRes = await fetch('/api/outreach/dashboard');
-        const slack = await slackRes.json();
-        slackData = {
-          pending: slack.metrics?.pending_approvals || 0,
-          approved: 0,
-          sent: slack.metrics?.emails_sent_today || 0,
-        };
-      } catch { /* silent */ }
+      const slackData: SlackActivity = {
+        connection: slackRes.connection || { ok: false },
+        counts: slackRes.counts || {},
+        revisions_total: slackRes.revisions_total || 0,
+        revisions_last_24h: slackRes.revisions_last_24h || 0,
+        recent: slackRes.recent || [],
+      };
 
       setData({
         campaigns: dashRes.campaigns || [],
@@ -75,7 +99,7 @@ export default function DashboardPage() {
         reminders: remRes.counts || { overdue: 0, due_soon: 0, upcoming: 0 },
         instantly: instantlyData,
         learning: { total_revisions: learnRes.total_revisions || 0, last_week: learnRes.last_week || 0 },
-        slack_drafts: slackData,
+        slack: slackData,
       });
     } catch { /* silent */ }
     finally { setLoading(false); }
@@ -188,6 +212,98 @@ export default function DashboardPage() {
               <p className="text-xs text-bt-text-secondary">10:00 AM UK time, every day</p>
             </div>
           </div>
+        </Card>
+      </div>
+
+      {/* Slack activity */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-bt-text-secondary" />
+            <h2 className="text-sm font-semibold text-bt-text">Slack Activity</h2>
+            {data?.slack.connection.ok ? (
+              <Badge variant="success" size="sm" dot>Connected</Badge>
+            ) : (
+              <Badge variant="danger" size="sm" dot>Offline</Badge>
+            )}
+            {data?.slack.connection.channel && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-bt-text-tertiary">
+                <Hash className="w-3 h-3" />{data.slack.connection.channel}
+              </span>
+            )}
+          </div>
+          <Link href="/outreach/inbox"><Button variant="ghost" size="sm">Push more</Button></Link>
+        </div>
+
+        <Card padding="none">
+          {/* Stats strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-bt-border">
+            <div className="px-5 py-4">
+              <p className="text-[10px] text-bt-text-tertiary uppercase tracking-wider">Pending Review</p>
+              <p className="text-xl font-bold text-bt-text mt-1 tabular-nums">{data?.slack.counts.pending || 0}</p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[10px] text-bt-text-tertiary uppercase tracking-wider">Approved</p>
+              <p className="text-xl font-bold text-bt-text mt-1 tabular-nums">{data?.slack.counts.approved || 0}</p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[10px] text-bt-text-tertiary uppercase tracking-wider">Sent</p>
+              <p className="text-xl font-bold text-bt-text mt-1 tabular-nums">{data?.slack.counts.sent || 0}</p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[10px] text-bt-text-tertiary uppercase tracking-wider">Thread Lessons</p>
+              <p className="text-xl font-bold text-bt-text mt-1 tabular-nums">{data?.slack.revisions_total || 0}</p>
+              <p className="text-[10px] text-bt-text-tertiary mt-0.5">{data?.slack.revisions_last_24h || 0} in last 24h</p>
+            </div>
+          </div>
+
+          {/* Recent drafts */}
+          {data?.slack.recent && data.slack.recent.length > 0 ? (
+            <div className="divide-y divide-bt-border border-t border-bt-border">
+              {data.slack.recent.map((d) => (
+                <div key={d.id} className="flex items-center justify-between px-5 py-3 hover:bg-bt-surface-hover transition-colors">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-bt-text truncate">{d.sender_name || '(unknown sender)'}</p>
+                      <span className="text-[11px] text-bt-text-tertiary">·</span>
+                      <p className="text-[11px] text-bt-text-secondary truncate">{d.campaign_name}</p>
+                    </div>
+                    <p className="text-[11px] text-bt-text-tertiary truncate mt-0.5">{d.subject || '(no subject)'}</p>
+                  </div>
+                  <div className="flex items-center gap-2 ml-3 shrink-0">
+                    {d.revision_count > 0 && (
+                      <Badge variant="info" size="sm">{d.revision_count} revision{d.revision_count === 1 ? '' : 's'}</Badge>
+                    )}
+                    <Badge
+                      variant={
+                        d.status === 'sent' ? 'success'
+                        : d.status === 'approved' ? 'teal'
+                        : d.status === 'skipped' ? 'default'
+                        : d.status === 'snoozed' ? 'warning'
+                        : 'primary'
+                      }
+                      size="sm"
+                      dot
+                    >
+                      {d.status}
+                    </Badge>
+                    <span className="text-[11px] text-bt-text-tertiary tabular-nums">
+                      {new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="border-t border-bt-border px-5 py-6 text-center">
+              <p className="text-xs text-bt-text-secondary">
+                No Slack drafts yet. Classify replies in the <Link href="/outreach/inbox" className="text-bt-primary underline">Inbox</Link> and click <strong>Send to Slack</strong>.
+              </p>
+              {!data?.slack.connection.ok && data?.slack.connection.error && (
+                <p className="text-[11px] text-bt-red mt-2">{data.slack.connection.error}</p>
+              )}
+            </div>
+          )}
         </Card>
       </div>
 

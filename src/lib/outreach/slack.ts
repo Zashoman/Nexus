@@ -251,6 +251,40 @@ export async function testSlackConnection(): Promise<{ ok: boolean; error?: stri
   }
 }
 
+/** Lightweight Slack health check — does NOT post a message.
+ *  Calls auth.test to verify the bot token is valid. Safe to call on every page load. */
+export async function getSlackStatus(): Promise<{
+  ok: boolean;
+  error?: string;
+  channel?: string;
+  team?: string;
+  bot_user?: string;
+}> {
+  try {
+    // Don't throw if env vars are missing — return a clean "not configured" state
+    const token = process.env.SLACK_BOT_TOKEN;
+    const rawChannel = process.env.SLACK_CHANNEL;
+    if (!token || !rawChannel) {
+      return { ok: false, error: 'Slack not configured (SLACK_BOT_TOKEN or SLACK_CHANNEL missing)' };
+    }
+    const channel = rawChannel.replace(/^#/, '');
+
+    const res = await fetch(`${SLACK_API}/auth.test`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || 'auth.test failed', channel };
+    return { ok: true, channel, team: data.team, bot_user: data.user };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+}
+
 /** Add an acknowledgment reaction to a message */
 export async function acknowledgeMessage(channel: string, ts: string, reaction: string) {
   return addReaction(channel, ts, reaction);
