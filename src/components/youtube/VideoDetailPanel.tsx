@@ -218,6 +218,7 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
   const [fullLoading, setFullLoading] = useState(false);
   const [extendedLoading, setExtendedLoading] = useState(false);
   const [factCheckLoading, setFactCheckLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
   const [isStarred, setIsStarred] = useState(false);
   const [readProgress, setReadProgress] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -241,6 +242,7 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
     setFullLoading(false);
     setExtendedLoading(false);
     setFactCheckLoading(false);
+    setSummaryError(null);
     setIsStarred(false);
     setReadProgress(0);
   }, [video?.video_id]);
@@ -273,6 +275,7 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
     if (!video || miniLoading) return;
     const targetId = video.video_id;
     setMiniLoading(true);
+    setSummaryError(null);
     try {
       const res = await fetch("/api/youtube/summarize", {
         method: "POST",
@@ -283,8 +286,12 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
       if (data.summary) {
         updateIfCurrent(targetId, setMiniSummary, 'mini', data.summary);
         onVideoUpdate?.(targetId, { mini_summary: data.summary });
+      } else if (data.error && currentVideoIdRef.current === targetId) {
+        setSummaryError(data.error);
       }
-    } catch { /* silent */ }
+    } catch {
+      if (currentVideoIdRef.current === targetId) setSummaryError('Network error, please retry');
+    }
     finally {
       if (currentVideoIdRef.current === targetId) setMiniLoading(false);
     }
@@ -294,6 +301,7 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
     if (!video || fullLoading) return;
     const targetId = video.video_id;
     setFullLoading(true);
+    setSummaryError(null);
     try {
       const res = await fetch("/api/youtube/summarize", {
         method: "POST",
@@ -304,8 +312,12 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
       if (data.summary) {
         updateIfCurrent(targetId, setFullSummary, 'full', data.summary);
         onVideoUpdate?.(targetId, { full_summary: data.summary });
+      } else if (data.error && currentVideoIdRef.current === targetId) {
+        setSummaryError(data.error);
       }
-    } catch { /* silent */ }
+    } catch {
+      if (currentVideoIdRef.current === targetId) setSummaryError('Network error, please retry');
+    }
     finally {
       if (currentVideoIdRef.current === targetId) setFullLoading(false);
     }
@@ -315,6 +327,7 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
     if (!video || extendedLoading) return;
     const targetId = video.video_id;
     setExtendedLoading(true);
+    setSummaryError(null);
     try {
       const res = await fetch("/api/youtube/summarize", {
         method: "POST",
@@ -324,8 +337,12 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
       const data = await res.json();
       if (data.summary) {
         updateIfCurrent(targetId, setExtendedSummary, 'extended', data.summary);
+      } else if (data.error && currentVideoIdRef.current === targetId) {
+        setSummaryError(data.error);
       }
-    } catch { /* silent */ }
+    } catch {
+      if (currentVideoIdRef.current === targetId) setSummaryError('Network error, please retry');
+    }
     finally {
       if (currentVideoIdRef.current === targetId) setExtendedLoading(false);
     }
@@ -335,6 +352,7 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
     if (!video || factCheckLoading) return;
     const targetId = video.video_id;
     setFactCheckLoading(true);
+    setSummaryError(null);
     try {
       const res = await fetch("/api/youtube/summarize", {
         method: "POST",
@@ -344,8 +362,12 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
       const data = await res.json();
       if (data.summary) {
         updateIfCurrent(targetId, setFactCheck, 'factcheck', data.summary);
+      } else if (data.error && currentVideoIdRef.current === targetId) {
+        setSummaryError(data.error);
       }
-    } catch { /* silent */ }
+    } catch {
+      if (currentVideoIdRef.current === targetId) setSummaryError('Network error, please retry');
+    }
     finally {
       if (currentVideoIdRef.current === targetId) setFactCheckLoading(false);
     }
@@ -443,6 +465,15 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
               <p className="text-[11px] text-[#5A6A7A]">Click Generate for a quick summary</p>
             )}
           </div>
+
+          {/* Error message */}
+          {summaryError && (
+            <div className="bg-[#FF4444]/10 border border-[#FF4444]/30 rounded-sm px-3 py-2">
+              <p className="text-[11px] font-mono text-[#FF6666]">
+                <span className="font-bold">Error:</span> {summaryError}
+              </p>
+            </div>
+          )}
 
           {/* Full Analysis */}
           <div className="space-y-2 pt-3 border-t border-[#1E2A3A]">

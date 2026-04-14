@@ -9,6 +9,19 @@ const anthropic = new Anthropic({
 const SUPADATA_KEY = process.env.SUPADATA_API_KEY;
 const YT_API_KEY = process.env.YOUTUBE_API_KEY;
 
+const VALID_MODES = ['mini', 'full', 'extended', 'factcheck'] as const;
+type Mode = typeof VALID_MODES[number];
+
+// Check if a cached summary looks valid (not an error message or too short)
+function isValidCachedSummary(text: string | null | undefined, minLength = 100): boolean {
+  if (!text || typeof text !== 'string') return false;
+  if (text.length < minLength) return false;
+  // Detect fallback "no captions" messages
+  if (text.includes('does not have accessible captions')) return false;
+  if (text.toLowerCase().startsWith('error:') || text.toLowerCase().startsWith('failed:')) return false;
+  return true;
+}
+
 async function getVideoContent(videoId: string): Promise<{ content: string; isTranscript: boolean }> {
   if (SUPADATA_KEY) {
     try {
@@ -58,10 +71,30 @@ async function getVideoContent(videoId: string): Promise<{ content: string; isTr
 }
 
 export async function POST(req: NextRequest) {
-  const { video_id, mode } = await req.json() as { video_id: string; mode: 'mini' | 'full' | 'extended' | 'factcheck' };
+  // Safely parse request body
+  let body: { video_id?: string; mode?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
 
-  if (!video_id) {
+  const { video_id, mode } = body;
+
+  if (!video_id || typeof video_id !== 'string') {
     return NextResponse.json({ error: 'video_id required' }, { status: 400 });
+  }
+
+  // Validate mode
+  if (!mode || !VALID_MODES.includes(mode as Mode)) {
+    return NextResponse.json({
+      error: `Invalid mode. Must be one of: ${VALID_MODES.join(', ')}`,
+    }, { status: 400 });
+  }
+
+  // Validate API key
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: 'AI service not configured' }, { status: 500 });
   }
 
   const db = getServiceSupabase();
@@ -70,25 +103,29 @@ export async function POST(req: NextRequest) {
     .from('intel_youtube_videos')
     .select('*')
     .eq('video_id', video_id)
-    .single();
+    .maybeSingle();
 
-  if (error || !video) {
+  if (error) {
+    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+  }
+  if (!video) {
     return NextResponse.json({ error: 'Video not found' }, { status: 404 });
   }
 
-  if (mode === 'full' && video.full_summary) {
+  // Cache checks — only return valid cached content, not error messages
+  if (mode === 'full' && isValidCachedSummary(video.full_summary, 200)) {
     return NextResponse.json({ summary: video.full_summary });
   }
-  if (mode === 'mini' && video.mini_summary && video.mini_summary.length > 80) {
+  if (mode === 'mini' && isValidCachedSummary(video.mini_summary, 80)) {
     return NextResponse.json({ summary: video.mini_summary });
   }
 
   // Check cached extended/factcheck in metadata JSON column
   const metadata = video.metadata || {};
-  if (mode === 'extended' && metadata.extended_summary) {
+  if (mode === 'extended' && isValidCachedSummary(metadata.extended_summary, 500)) {
     return NextResponse.json({ summary: metadata.extended_summary });
   }
-  if (mode === 'factcheck' && metadata.factcheck) {
+  if (mode === 'factcheck' && isValidCachedSummary(metadata.factcheck, 500)) {
     return NextResponse.json({ summary: metadata.factcheck });
   }
 
@@ -98,6 +135,28 @@ export async function POST(req: NextRequest) {
   if (!hasContent) {
     const fallback = `This video from ${video.channel_name} titled "${video.title}" does not have accessible captions or a detailed description. Open the video on YouTube to watch it directly.`;
     return NextResponse.json({ summary: fallback });
+  }
+
+  // Helper: safely merge new field into video metadata (avoids race condition
+  // where two concurrent updates overwrite each other's JSONB changes)
+  async function safeUpdateMetadata(field: string, value: string) {
+    const { data: fresh } = await db
+      .from('intel_youtube_videos')
+      .select('metadata')
+      .eq('video_id', video_id)
+      .maybeSingle();
+    const freshMeta = fresh?.metadata || {};
+    return db
+      .from('intel_youtube_videos')
+      .update({ metadata: { ...freshMeta, [field]: value } })
+      .eq('video_id', video_id);
+  }
+
+  // Helper: extract text from Claude response safely
+  function extractSummary(response: { content: Array<{ type: string; text?: string }> }): string {
+    if (!response.content || response.content.length === 0) return '';
+    const first = response.content[0];
+    return first.type === 'text' && first.text ? first.text : '';
   }
 
   if (mode === 'mini') {
@@ -113,13 +172,18 @@ Title: ${video.title}
 Channel: ${video.channel_name}
 ${isTranscript ? 'Transcript' : 'Video Info'}: ${content.slice(0, 4000)}`,
         }],
-      });
+      }, { signal: AbortSignal.timeout(55000) });
 
-      const summary = response.content[0].type === 'text' ? response.content[0].text : '';
+      const summary = extractSummary(response);
+      if (!summary || summary.length < 30) {
+        return NextResponse.json({ error: 'AI returned empty response, please retry' }, { status: 502 });
+      }
       await db.from('intel_youtube_videos').update({ mini_summary: summary }).eq('video_id', video_id);
       return NextResponse.json({ summary });
     } catch (err) {
-      return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed' }, { status: 500 });
+      const msg = err instanceof Error ? err.message : 'Failed';
+      console.error('Mini summary failed:', msg);
+      return NextResponse.json({ error: 'Failed to generate summary, please retry' }, { status: 500 });
     }
   }
 
@@ -212,16 +276,19 @@ RULES:
 - Be analytical and objective. Call out weak arguments clearly.
 - Do not pad or use filler. Every sentence should carry information.`,
         }],
-      });
+      }, { signal: AbortSignal.timeout(55000) });
 
-      const summary = response.content[0].type === 'text' ? response.content[0].text : '';
-      // Cache in metadata
-      await db.from('intel_youtube_videos').update({
-        metadata: { ...metadata, extended_summary: summary },
-      }).eq('video_id', video_id);
+      const summary = extractSummary(response);
+      if (!summary || summary.length < 500) {
+        return NextResponse.json({ error: 'AI returned insufficient content, please retry' }, { status: 502 });
+      }
+      // Safely merge (avoid race with concurrent factcheck updates)
+      await safeUpdateMetadata('extended_summary', summary);
       return NextResponse.json({ summary });
     } catch (err) {
-      return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed' }, { status: 500 });
+      const msg = err instanceof Error ? err.message : 'Failed';
+      console.error('Extended summary failed:', msg);
+      return NextResponse.json({ error: 'Failed to generate longer breakdown, please retry' }, { status: 500 });
     }
   }
 
@@ -329,15 +396,19 @@ PROCESS DISCIPLINE REMINDERS:
 - Present the strongest version of counter-evidence, not the weakest.
 - Only analyze what is ACTUALLY in the content. Never fabricate.`,
         }],
-      });
+      }, { signal: AbortSignal.timeout(55000) });
 
-      const summary = response.content[0].type === 'text' ? response.content[0].text : '';
-      await db.from('intel_youtube_videos').update({
-        metadata: { ...metadata, factcheck: summary },
-      }).eq('video_id', video_id);
+      const summary = extractSummary(response);
+      if (!summary || summary.length < 500) {
+        return NextResponse.json({ error: 'AI returned insufficient content, please retry' }, { status: 502 });
+      }
+      // Safely merge (avoid race with concurrent extended updates)
+      await safeUpdateMetadata('factcheck', summary);
       return NextResponse.json({ summary });
     } catch (err) {
-      return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed' }, { status: 500 });
+      const msg = err instanceof Error ? err.message : 'Failed';
+      console.error('Factcheck failed:', msg);
+      return NextResponse.json({ error: 'Failed to generate fact check, please retry' }, { status: 500 });
     }
   }
 
@@ -390,12 +461,17 @@ RULES:
 - Use direct quotes where they strengthen the analysis.
 - Be analytical and objective. Call out weak arguments clearly.`,
       }],
-    });
+    }, { signal: AbortSignal.timeout(55000) });
 
-    const summary = response.content[0].type === 'text' ? response.content[0].text : '';
+    const summary = extractSummary(response);
+    if (!summary || summary.length < 300) {
+      return NextResponse.json({ error: 'AI returned insufficient content, please retry' }, { status: 502 });
+    }
     await db.from('intel_youtube_videos').update({ full_summary: summary }).eq('video_id', video_id);
     return NextResponse.json({ summary });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed' }, { status: 500 });
+    const msg = err instanceof Error ? err.message : 'Failed';
+    console.error('Full summary failed:', msg);
+    return NextResponse.json({ error: 'Failed to generate summary, please retry' }, { status: 500 });
   }
 }
