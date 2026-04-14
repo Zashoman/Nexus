@@ -164,13 +164,18 @@ export default function RoboXIntelPage() {
               <CompaniesTab
                 companies={companies}
                 onCompanyClick={handleCompanyClick}
+                onCompaniesUpdated={loadCompanies}
               />
             )}
             {activeTab === 'sources' && (
               <SourcesTab sources={sources} onUpdate={loadSources} />
             )}
             {activeTab === 'media' && (
-              <MediaTab contacts={mediaContacts} pitches={pitches} />
+              <MediaTab
+                contacts={mediaContacts}
+                pitches={pitches}
+                onUpdated={loadMedia}
+              />
             )}
           </>
         )}

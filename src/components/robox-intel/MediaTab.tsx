@@ -1,10 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import type { MediaContact, PitchAngle } from '@/types/robox-intel';
+import { AddMediaContactModal } from './AddMediaContactModal';
+import { AddPitchModal } from './AddPitchModal';
 
 interface MediaTabProps {
   contacts: MediaContact[];
   pitches: PitchAngle[];
+  onUpdated?: () => void;
 }
 
 const TYPE_COLORS = {
@@ -19,14 +23,27 @@ const RELEVANCE_COLORS = {
   low: { bg: '#6B728020', color: '#A1A1AA', label: 'Low' },
 };
 
-export function MediaTab({ contacts, pitches }: MediaTabProps) {
+export function MediaTab({ contacts, pitches, onUpdated }: MediaTabProps) {
+  const [contactOpen, setContactOpen] = useState(false);
+  const [pitchOpen, setPitchOpen] = useState(false);
+
   return (
     <div className="space-y-6">
       {/* Pitch Angles */}
       <section className="rounded-lg border border-[#F97316]/30 bg-[#F97316]/5 p-5">
-        <h2 className="text-[11px] font-semibold tracking-[0.2em] text-[#FB923C] mb-4">
-          PITCH ANGLES
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[11px] font-semibold tracking-[0.2em] text-[#FB923C]">
+            PITCH ANGLES
+          </h2>
+          {onUpdated && (
+            <button
+              onClick={() => setPitchOpen(true)}
+              className="text-[11px] px-2 py-1 rounded border border-[#F97316]/40 text-[#FB923C] hover:bg-[#F97316]/10 transition-colors"
+            >
+              + Add angle
+            </button>
+          )}
+        </div>
         <div className="space-y-3">
           {pitches.length === 0 ? (
             <p className="text-[12px] text-[#A1A1AA]">No pitch angles yet.</p>
@@ -53,9 +70,19 @@ export function MediaTab({ contacts, pitches }: MediaTabProps) {
 
       {/* Media Contacts */}
       <section>
-        <h2 className="text-[11px] font-semibold tracking-[0.2em] text-[#71717A] mb-3">
-          MEDIA CONTACTS
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[11px] font-semibold tracking-[0.2em] text-[#71717A]">
+            MEDIA CONTACTS
+          </h2>
+          {onUpdated && (
+            <button
+              onClick={() => setContactOpen(true)}
+              className="text-[11px] px-2 py-1 rounded border border-[#27272A] text-[#A1A1AA] hover:text-[#FAFAFA] hover:border-[#3F3F46] transition-colors"
+            >
+              + Add contact
+            </button>
+          )}
+        </div>
         <div className="rounded-lg border border-[#27272A] overflow-hidden">
           <table className="w-full text-[12px]">
             <thead>
@@ -152,6 +179,21 @@ export function MediaTab({ contacts, pitches }: MediaTabProps) {
           are ready the moment you cross the threshold.
         </p>
       </section>
+
+      {onUpdated && (
+        <>
+          <AddMediaContactModal
+            open={contactOpen}
+            onClose={() => setContactOpen(false)}
+            onAdded={onUpdated}
+          />
+          <AddPitchModal
+            open={pitchOpen}
+            onClose={() => setPitchOpen(false)}
+            onAdded={onUpdated}
+          />
+        </>
+      )}
     </div>
   );
 }

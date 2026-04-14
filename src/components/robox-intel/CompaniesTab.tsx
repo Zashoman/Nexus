@@ -4,10 +4,12 @@ import { useState } from 'react';
 import type { Company, CompanyTier } from '@/types/robox-intel';
 import { TIER_COLORS } from '@/types/robox-intel';
 import { TrendingPanel } from './TrendingPanel';
+import { AddCompanyModal } from './AddCompanyModal';
 
 interface CompaniesTabProps {
   companies: Company[];
   onCompanyClick?: (company: Company) => void;
+  onCompaniesUpdated?: () => void;
 }
 
 const TIER_LABELS: Record<CompanyTier, string> = {
@@ -17,9 +19,14 @@ const TIER_LABELS: Record<CompanyTier, string> = {
   competitor: 'Competitor',
 };
 
-export function CompaniesTab({ companies, onCompanyClick }: CompaniesTabProps) {
+export function CompaniesTab({
+  companies,
+  onCompanyClick,
+  onCompaniesUpdated,
+}: CompaniesTabProps) {
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState<CompanyTier | 'all'>('all');
+  const [addOpen, setAddOpen] = useState(false);
 
   const filtered = companies.filter((c) => {
     if (tierFilter !== 'all' && c.tier !== tierFilter) return false;
@@ -75,13 +82,23 @@ export function CompaniesTab({ companies, onCompanyClick }: CompaniesTabProps) {
             />
           ))}
         </div>
-        <input
-          type="text"
-          placeholder="Search..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="px-3 py-1.5 bg-[#0B0B0D] border border-[#27272A] rounded-md text-[12px] text-[#FAFAFA] placeholder-[#52525B] focus:outline-none focus:border-[#3F3F46] w-40"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Search..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="px-3 py-1.5 bg-[#0B0B0D] border border-[#27272A] rounded-md text-[12px] text-[#FAFAFA] placeholder-[#52525B] focus:outline-none focus:border-[#3F3F46] w-40"
+          />
+          {onCompaniesUpdated && (
+            <button
+              onClick={() => setAddOpen(true)}
+              className="px-3 py-1.5 text-[12px] rounded-md bg-[#3B82F6]/10 border border-[#3B82F6]/30 text-[#60A5FA] hover:bg-[#3B82F6]/20 transition-colors"
+            >
+              + Add
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="rounded-lg border border-[#27272A] overflow-hidden">
@@ -161,6 +178,14 @@ export function CompaniesTab({ companies, onCompanyClick }: CompaniesTabProps) {
           </tbody>
         </table>
       </div>
+
+      {onCompaniesUpdated && (
+        <AddCompanyModal
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          onAdded={onCompaniesUpdated}
+        />
+      )}
     </div>
   );
 }
