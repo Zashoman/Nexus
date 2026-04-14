@@ -19,6 +19,7 @@ import Card from '@/components/outreach/ui/Card';
 import Badge from '@/components/outreach/ui/Badge';
 import Button from '@/components/outreach/ui/Button';
 import EmptyState from '@/components/outreach/ui/EmptyState';
+import { apiFetch } from '@/lib/api-client';
 
 interface Prospect {
   id: string;
@@ -84,7 +85,7 @@ export default function PitchStudioPage() {
     }
 
     // Load content libraries
-    fetch('/api/outreach/content')
+    apiFetch('/api/outreach/content')
       .then((r) => r.json())
       .then((data) => {
         setCaseStudies(data.case_studies || []);
@@ -93,7 +94,7 @@ export default function PitchStudioPage() {
       .catch(() => {});
 
     // Load Instantly campaigns for import modal
-    fetch('/api/outreach/instantly/campaigns')
+    apiFetch('/api/outreach/instantly/campaigns')
       .then((r) => r.json())
       .then((data) => setInstantlyCampaigns(data.campaigns || []))
       .catch(() => {});
@@ -106,7 +107,7 @@ export default function PitchStudioPage() {
     try {
       // For now, download CSV (Instantly write access not yet enabled)
       const active = prospects.filter((p) => p.status === 'approved' || p.status === 'edited');
-      const res = await fetch('/api/outreach/apollo/csv', {
+      const res = await apiFetch('/api/outreach/apollo/csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prospects: active }),
@@ -173,7 +174,7 @@ export default function PitchStudioPage() {
     setRevising(true);
 
     try {
-      const res = await fetch('/api/outreach/revise', {
+      const res = await apiFetch('/api/outreach/revise', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -225,7 +226,7 @@ export default function PitchStudioPage() {
 
   const downloadCsv = async () => {
     try {
-      const res = await fetch('/api/outreach/apollo/csv', {
+      const res = await apiFetch('/api/outreach/apollo/csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prospects: approvedProspects }),

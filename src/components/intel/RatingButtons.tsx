@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { RatingValue } from '@/types/intel';
+import { apiFetch } from '@/lib/api-client';
 
 interface RatingButtonsProps {
   itemId: string;
@@ -27,7 +28,7 @@ export default function RatingButtons({
     setLoading(true);
 
     try {
-      const res = await fetch('/api/intel/rate', {
+      const res = await apiFetch('/api/intel/rate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ item_id: itemId, rating: value }),

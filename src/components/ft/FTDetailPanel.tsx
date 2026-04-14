@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import type { IntelItem, RatingValue } from "@/types/intel";
+import { apiFetch } from "@/lib/api-client";
 
 interface FTDetailPanelProps {
   item: IntelItem | null;
@@ -52,7 +53,7 @@ export default function FTDetailPanel({ item, onClose }: FTDetailPanelProps) {
             onClick={async () => {
               const newStarred = !isStarred;
               setIsStarred(newStarred);
-              await fetch("/api/intel/rate", {
+              await apiFetch("/api/intel/rate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ item_id: item.id, rating: newStarred ? "starred" : "signal" }),

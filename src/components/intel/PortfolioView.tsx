@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { apiFetch } from '@/lib/api-client';
 
 interface WatchlistEntry {
   id: string;
@@ -66,8 +67,8 @@ export default function PortfolioView() {
   async function fetchData() {
     try {
       const [watchRes, stockRes] = await Promise.all([
-        fetch('/api/intel/watchlist'),
-        fetch('/api/intel/stocks'),
+        apiFetch('/api/intel/watchlist'),
+        apiFetch('/api/intel/stocks'),
       ]);
       const watchData = await watchRes.json();
       const stockData = await stockRes.json();
@@ -87,7 +88,7 @@ export default function PortfolioView() {
     if (!addForm.symbol.trim() || !addForm.company_name.trim()) return;
     setAdding(true);
     try {
-      await fetch('/api/intel/watchlist', {
+      await apiFetch('/api/intel/watchlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -111,7 +112,7 @@ export default function PortfolioView() {
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/intel/watchlist?id=${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/intel/watchlist?id=${id}`, { method: 'DELETE' });
     if (watchlist.find((w: WatchlistEntry) => w.id === id)?.symbol === selectedSymbol) {
       setSelectedSymbol(null);
     }

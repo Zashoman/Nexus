@@ -21,6 +21,7 @@ import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card, { CardHeader } from '@/components/outreach/ui/Card';
 import Badge from '@/components/outreach/ui/Badge';
 import Button from '@/components/outreach/ui/Button';
+import { apiFetch } from '@/lib/api-client';
 
 interface ApolloPerson {
   id: string;
@@ -83,7 +84,7 @@ export default function SalesPage() {
     setAiParsing(true);
     setError(null);
     try {
-      const res = await fetch('/api/outreach/apollo/ai-search', {
+      const res = await apiFetch('/api/outreach/apollo/ai-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: aiQuery }),
@@ -114,7 +115,7 @@ export default function SalesPage() {
     setLookalikeReasoning('');
     setError(null);
     try {
-      const res = await fetch('/api/outreach/apollo/lookalike', {
+      const res = await apiFetch('/api/outreach/apollo/lookalike', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: lookalikeQuery }),
@@ -169,7 +170,7 @@ export default function SalesPage() {
     setPeople([]);
     setExcluded(new Set());
     try {
-      const res = await fetch('/api/outreach/apollo/search', {
+      const res = await apiFetch('/api/outreach/apollo/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -202,7 +203,7 @@ export default function SalesPage() {
     setGenerating(true);
     setError(null);
     try {
-      const res = await fetch('/api/outreach/apollo/openers', {
+      const res = await apiFetch('/api/outreach/apollo/openers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prospects: active }),
@@ -233,7 +234,7 @@ export default function SalesPage() {
     if (active.length === 0) return;
     setDownloading(true);
     try {
-      const res = await fetch('/api/outreach/apollo/csv', {
+      const res = await apiFetch('/api/outreach/apollo/csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prospects: active }),
@@ -272,7 +273,7 @@ export default function SalesPage() {
 
   const loadHistory = async () => {
     try {
-      const res = await fetch('/api/outreach/apollo/history');
+      const res = await apiFetch('/api/outreach/apollo/history');
       const data = await res.json();
       setSearchHistory(data.searches || []);
     } catch { /* silent */ }

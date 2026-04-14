@@ -29,6 +29,7 @@ import Card from '@/components/outreach/ui/Card';
 import Badge from '@/components/outreach/ui/Badge';
 import Button from '@/components/outreach/ui/Button';
 import EmptyState from '@/components/outreach/ui/EmptyState';
+import { apiFetch } from '@/lib/api-client';
 
 interface InstantlyEmail {
   id: string;
@@ -189,7 +190,7 @@ export default function InboxPage() {
     try {
       const params = new URLSearchParams({ limit: '100', replies_only: 'true' });
       if (campaignId) params.set('campaign_id', campaignId);
-      const res = await fetch(`/api/outreach/instantly/replies?${params}`);
+      const res = await apiFetch(`/api/outreach/instantly/replies?${params}`);
       const data = await res.json();
       if (data.error) { setError(data.error); setEmails([]); }
       else {
@@ -231,7 +232,7 @@ export default function InboxPage() {
         account_email: e.eaccount || e.account_email || '',
       }));
 
-      const res = await fetch('/api/outreach/slack/push', {
+      const res = await apiFetch('/api/outreach/slack/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ replies: payload }),
@@ -251,7 +252,7 @@ export default function InboxPage() {
 
   const fetchCampaigns = useCallback(async () => {
     try {
-      const res = await fetch('/api/outreach/instantly/campaigns');
+      const res = await apiFetch('/api/outreach/instantly/campaigns');
       const data = await res.json();
       const list = data.campaigns || [];
       setCampaigns(list);
@@ -272,7 +273,7 @@ export default function InboxPage() {
         campaignContext: getCampaignName(e.campaign_id),
       }));
 
-      const res = await fetch('/api/outreach/classify', {
+      const res = await apiFetch('/api/outreach/classify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ replies }),
@@ -292,7 +293,7 @@ export default function InboxPage() {
     setDraftLoading(email.id);
     try {
       const classification = classifications[email.id];
-      const res = await fetch('/api/outreach/draft', {
+      const res = await apiFetch('/api/outreach/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -13,6 +13,7 @@ import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card, { CardHeader } from '@/components/outreach/ui/Card';
 import Badge from '@/components/outreach/ui/Badge';
 import Button from '@/components/outreach/ui/Button';
+import { apiFetch } from '@/lib/api-client';
 
 interface AnalyticsData {
   campaigns: Array<{ id: string; name: string; type: string; status: string }>;
@@ -35,10 +36,10 @@ export default function AnalyticsPage() {
     setLoading(true);
     try {
       const [dashRes, learnRes, remRes, instRes] = await Promise.all([
-        fetch('/api/outreach/dashboard').then((r) => r.json()).catch(() => ({})),
-        fetch('/api/outreach/learning').then((r) => r.json()).catch(() => ({})),
-        fetch('/api/outreach/reminders').then((r) => r.json()).catch(() => ({ counts: {} })),
-        fetch('/api/outreach/instantly/test').then((r) => r.json()).catch(() => ({ ok: false })),
+        apiFetch('/api/outreach/dashboard').then((r) => r.json()).catch(() => ({})),
+        apiFetch('/api/outreach/learning').then((r) => r.json()).catch(() => ({})),
+        apiFetch('/api/outreach/reminders').then((r) => r.json()).catch(() => ({ counts: {} })),
+        apiFetch('/api/outreach/instantly/test').then((r) => r.json()).catch(() => ({ ok: false })),
       ]);
 
       setData({

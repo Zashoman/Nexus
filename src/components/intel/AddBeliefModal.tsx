@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { CATEGORY_LABELS, type IntelCategory, type IntelBelief } from '@/types/intel';
+import { apiFetch } from '@/lib/api-client';
 
 interface AddBeliefModalProps {
   onClose: () => void;
@@ -28,7 +29,7 @@ export default function AddBeliefModal({
 
     try {
       if (editBelief) {
-        await fetch('/api/intel/beliefs', {
+        await apiFetch('/api/intel/beliefs', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -38,7 +39,7 @@ export default function AddBeliefModal({
           }),
         });
       } else {
-        await fetch('/api/intel/beliefs', {
+        await apiFetch('/api/intel/beliefs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

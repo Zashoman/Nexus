@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import type { IntelItem, IntelBeliefEvidence, RatingValue } from '@/types/intel';
 import RatingButtons from './RatingButtons';
+import { apiFetch } from '@/lib/api-client';
 
 interface DetailPanelProps {
   item: IntelItem | null;
@@ -219,7 +220,7 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
 
     if (!item.ai_summary) {
       setSummaryLoading(true);
-      fetch('/api/intel/summarize', {
+      apiFetch('/api/intel/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ item_id: targetId }),
@@ -272,7 +273,7 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
             onClick={async () => {
               const newStarred = !isStarred;
               setIsStarred(newStarred);
-              await fetch('/api/intel/rate', {
+              await apiFetch('/api/intel/rate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ item_id: item.id, rating: newStarred ? 'starred' : 'signal' }),
@@ -352,7 +353,7 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
                 const targetId = item.id;
                 setDeepLoading(true);
                 try {
-                  const res = await fetch('/api/intel/deep-analysis', {
+                  const res = await apiFetch('/api/intel/deep-analysis', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ item_id: targetId }),
@@ -421,7 +422,7 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
             onKeyDown={async (e) => {
               if (e.key === 'Enter' && feedback.trim()) {
                 // Save to rating system
-                await fetch('/api/intel/rate', {
+                await apiFetch('/api/intel/rate', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -431,7 +432,7 @@ export default function DetailPanel({ item, onClose }: DetailPanelProps) {
                   }),
                 });
                 // Also save to feedback database for browsing/editing
-                await fetch('/api/intel/feedback', {
+                await apiFetch('/api/intel/feedback', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({

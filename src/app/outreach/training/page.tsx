@@ -16,6 +16,7 @@ import Card, { CardHeader } from '@/components/outreach/ui/Card';
 import Badge from '@/components/outreach/ui/Badge';
 import Button from '@/components/outreach/ui/Button';
 import EmptyState from '@/components/outreach/ui/EmptyState';
+import { apiFetch } from '@/lib/api-client';
 
 interface IngestionJob {
   id: string;
@@ -69,7 +70,7 @@ export default function TrainingPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/outreach/training/status');
+      const res = await apiFetch('/api/outreach/training/status');
       const json = await res.json();
       setData(json);
       // If a job is currently running, poll for updates
@@ -89,7 +90,7 @@ export default function TrainingPage() {
   const startIngestion = async () => {
     setRunning(true);
     try {
-      const res = await fetch('/api/outreach/training/ingest', { method: 'POST' });
+      const res = await apiFetch('/api/outreach/training/ingest', { method: 'POST' });
       await res.json();
       // Start polling
       setTimeout(fetchData, 1500);

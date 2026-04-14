@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { apiFetch } from '@/lib/api-client';
 
 interface Source {
   id: string;
@@ -56,8 +57,8 @@ export default function SettingsView() {
     setLoading(true);
     try {
       const [srcRes, expRes] = await Promise.all([
-        fetch('/api/intel/sources'),
-        fetch('/api/intel/experts'),
+        apiFetch('/api/intel/sources'),
+        apiFetch('/api/intel/experts'),
       ]);
       const srcData = await srcRes.json();
       const expData = await expRes.json();
@@ -71,7 +72,7 @@ export default function SettingsView() {
   }
 
   async function toggleSource(id: string, isActive: boolean) {
-    await fetch('/api/intel/sources', {
+    await apiFetch('/api/intel/sources', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, is_active: !isActive }),
@@ -81,7 +82,7 @@ export default function SettingsView() {
 
   async function addSource() {
     if (!addSourceForm.name || !addSourceForm.url) return;
-    await fetch('/api/intel/sources', {
+    await apiFetch('/api/intel/sources', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -99,7 +100,7 @@ export default function SettingsView() {
 
   async function addExpert() {
     if (!addExpertForm.name) return;
-    await fetch('/api/intel/experts', {
+    await apiFetch('/api/intel/experts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -117,7 +118,7 @@ export default function SettingsView() {
   }
 
   async function removeExpert(id: string) {
-    await fetch(`/api/intel/experts?id=${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/intel/experts?id=${id}`, { method: 'DELETE' });
     fetchData();
   }
 

@@ -20,6 +20,7 @@ import Button from '@/components/outreach/ui/Button';
 import Badge from '@/components/outreach/ui/Badge';
 import { useAuth } from '@/components/outreach/AuthProvider';
 import type { CampaignType, CampaignSensitivity } from '@/types/outreach';
+import { apiFetch } from '@/lib/api-client';
 
 type Step = 'type' | 'details' | 'goals' | 'constraints' | 'review';
 
@@ -136,7 +137,7 @@ export default function NewCampaignPage() {
       const dailySends = parseInt(form.max_daily_sends);
       const pollingMin = parseInt(form.polling_interval);
 
-      const res = await fetch('/api/outreach/campaigns', {
+      const res = await apiFetch('/api/outreach/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

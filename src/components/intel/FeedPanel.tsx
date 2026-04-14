@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import type { IntelItem, IntelCategory, RatingValue } from '@/types/intel';
 import ItemCard from './ItemCard';
+import { apiFetch } from '@/lib/api-client';
 
 interface FeedPanelProps {
   category: IntelCategory | 'all';
@@ -38,7 +39,7 @@ export default function FeedPanel({
           params.set('category', category);
         }
 
-        const res = await fetch(`/api/intel/items?${params}`);
+        const res = await apiFetch(`/api/intel/items?${params}`);
         const data = await res.json();
         const newItems = data.items || [];
 
@@ -63,7 +64,7 @@ export default function FeedPanel({
         }
 
         if (!showFiltered) {
-          const filteredRes = await fetch(
+          const filteredRes = await apiFetch(
             `/api/intel/items?category=${category !== 'all' ? category : ''}&include_filtered=true&limit=1`
           );
           const filteredData = await filteredRes.json();
@@ -95,7 +96,7 @@ export default function FeedPanel({
   async function handleRate(itemId: string, rating: RatingValue) {
     setRatings((prev) => ({ ...prev, [itemId]: rating }));
     try {
-      const res = await fetch('/api/intel/rate', {
+      const res = await apiFetch('/api/intel/rate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ item_id: itemId, rating }),
@@ -111,7 +112,7 @@ export default function FeedPanel({
 
   async function handleDismiss(itemId: string) {
     try {
-      await fetch('/api/intel/items', {
+      await apiFetch('/api/intel/items', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ item_id: itemId, is_dismissed: true }),

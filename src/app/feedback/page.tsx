@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api-client';
 
 interface FeedbackEntry {
   id: string;
@@ -26,7 +27,7 @@ export default function FeedbackPage() {
   const fetchFeedback = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/intel/feedback?limit=100');
+      const res = await apiFetch('/api/intel/feedback?limit=100');
       const json = await res.json();
       if (json.data) setEntries(json.data);
     } catch { /* silent */ }
@@ -44,7 +45,7 @@ export default function FeedbackPage() {
     if (!editingId) return;
     setSaving(true);
     try {
-      await fetch('/api/intel/feedback', {
+      await apiFetch('/api/intel/feedback', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: editingId, feedback_note: editText }),
@@ -57,7 +58,7 @@ export default function FeedbackPage() {
 
   const deleteFeedback = async (id: string) => {
     try {
-      await fetch(`/api/intel/feedback?id=${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/intel/feedback?id=${id}`, { method: 'DELETE' });
       setEntries(prev => prev.filter(e => e.id !== id));
     } catch { /* silent */ }
   };

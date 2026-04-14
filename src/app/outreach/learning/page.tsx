@@ -13,6 +13,7 @@ import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card from '@/components/outreach/ui/Card';
 import Badge from '@/components/outreach/ui/Badge';
 import Button from '@/components/outreach/ui/Button';
+import { apiFetch } from '@/lib/api-client';
 import EmptyState from '@/components/outreach/ui/EmptyState';
 
 interface Revision {
@@ -60,7 +61,7 @@ export default function LearningPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/outreach/learning');
+      const res = await apiFetch('/api/outreach/learning');
       const json = await res.json();
       setData(json);
     } catch (err) {

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import type { IntelItem, RatingValue } from '@/types/intel';
 import DroneItemCard from './DroneItemCard';
+import { apiFetch } from '@/lib/api-client';
 
 interface DroneFeedPanelProps {
   subcategory: string;
@@ -42,7 +43,7 @@ export default function DroneFeedPanel({
           category: 'drones_autonomous',
         });
 
-        const res = await fetch(`/api/intel/items?${params}`);
+        const res = await apiFetch(`/api/intel/items?${params}`);
         const data = await res.json();
         let newItems: IntelItem[] = data.items || [];
 

@@ -19,6 +19,7 @@ import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card from '@/components/outreach/ui/Card';
 import Badge from '@/components/outreach/ui/Badge';
 import Button from '@/components/outreach/ui/Button';
+import { apiFetch } from '@/lib/api-client';
 
 interface DashboardData {
   campaigns: Array<{ id: string; name: string; type: string; status: string; created_at: string }>;
@@ -44,15 +45,15 @@ export default function DashboardPage() {
     setLoading(true);
     try {
       const [dashRes, remRes, learnRes] = await Promise.all([
-        fetch('/api/outreach/dashboard').then((r) => r.json()),
-        fetch('/api/outreach/reminders').then((r) => r.json()).catch(() => ({ counts: { overdue: 0, due_soon: 0, upcoming: 0 } })),
-        fetch('/api/outreach/learning').then((r) => r.json()).catch(() => ({ total_revisions: 0, last_week: 0 })),
+        apiFetch('/api/outreach/dashboard').then((r) => r.json()),
+        apiFetch('/api/outreach/reminders').then((r) => r.json()).catch(() => ({ counts: { overdue: 0, due_soon: 0, upcoming: 0 } })),
+        apiFetch('/api/outreach/learning').then((r) => r.json()).catch(() => ({ total_revisions: 0, last_week: 0 })),
       ]);
 
       // Check Instantly
       let instantlyData = { connected: false, campaign_count: 0 };
       try {
-        const instRes = await fetch('/api/outreach/instantly/test');
+        const instRes = await apiFetch('/api/outreach/instantly/test');
         const inst = await instRes.json();
         instantlyData = { connected: inst.ok, campaign_count: inst.campaign_count || 0 };
       } catch { /* silent */ }
@@ -60,7 +61,7 @@ export default function DashboardPage() {
       // Check slack drafts
       let slackData = { pending: 0, approved: 0, sent: 0 };
       try {
-        const slackRes = await fetch('/api/outreach/dashboard');
+        const slackRes = await apiFetch('/api/outreach/dashboard');
         const slack = await slackRes.json();
         slackData = {
           pending: slack.metrics?.pending_approvals || 0,

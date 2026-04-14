@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { apiFetch } from "@/lib/api-client";
 
 interface Video {
   id: string;
@@ -277,7 +278,7 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
     setMiniLoading(true);
     setSummaryError(null);
     try {
-      const res = await fetch("/api/youtube/summarize", {
+      const res = await apiFetch("/api/youtube/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ video_id: targetId, mode: "mini" }),
@@ -303,7 +304,7 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
     setFullLoading(true);
     setSummaryError(null);
     try {
-      const res = await fetch("/api/youtube/summarize", {
+      const res = await apiFetch("/api/youtube/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ video_id: targetId, mode: "full" }),
@@ -329,7 +330,7 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
     setExtendedLoading(true);
     setSummaryError(null);
     try {
-      const res = await fetch("/api/youtube/summarize", {
+      const res = await apiFetch("/api/youtube/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ video_id: targetId, mode: "extended" }),
@@ -354,7 +355,7 @@ export default function VideoDetailPanel({ video, onClose, onVideoUpdate }: Vide
     setFactCheckLoading(true);
     setSummaryError(null);
     try {
-      const res = await fetch("/api/youtube/summarize", {
+      const res = await apiFetch("/api/youtube/summarize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ video_id: targetId, mode: "factcheck" }),

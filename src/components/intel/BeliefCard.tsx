@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { IntelBelief, IntelBeliefEvidence } from '@/types/intel';
+import { apiFetch } from '@/lib/api-client';
 
 interface BeliefCardProps {
   belief: IntelBelief;
@@ -34,7 +35,7 @@ export default function BeliefCard({ belief, onEdit, onRetire }: BeliefCardProps
 
   async function fetchEvidence() {
     try {
-      const res = await fetch(`/api/intel/beliefs/${belief.id}/evidence`);
+      const res = await apiFetch(`/api/intel/beliefs/${belief.id}/evidence`);
       const data = await res.json();
       setEvidence(data.evidence || []);
     } catch {
@@ -46,7 +47,7 @@ export default function BeliefCard({ belief, onEdit, onRetire }: BeliefCardProps
     if (redTeamLoading) return;
     setRedTeamLoading(true);
     try {
-      const res = await fetch('/api/intel/red-team', {
+      const res = await apiFetch('/api/intel/red-team', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ belief_id: belief.id }),

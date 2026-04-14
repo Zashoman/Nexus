@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import YouTubeTabs from '@/components/youtube/YouTubeTabs';
 import VideoCard from '@/components/youtube/VideoCard';
+import { apiFetch } from '@/lib/api-client';
 import VideoDetailPanel from '@/components/youtube/VideoDetailPanel';
 
 interface Video {
@@ -46,7 +47,7 @@ export default function YouTubePage() {
   async function fetchFeed() {
     setLoading(true);
     try {
-      const res = await fetch('/api/youtube/feed');
+      const res = await apiFetch('/api/youtube/feed');
       const data = await res.json();
       setVideos(data.videos || []);
       setChannels(data.channels || []);
@@ -58,7 +59,7 @@ export default function YouTubePage() {
     setRefreshing(true);
     setRefreshResult(null);
     try {
-      const res = await fetch('/api/youtube/refresh', {
+      const res = await apiFetch('/api/youtube/refresh', {
         headers: { 'x-manual-refresh': 'true' },
       });
       const data = await res.json();
@@ -81,7 +82,7 @@ export default function YouTubePage() {
     if (!addForm.handle || !addForm.category) return;
     setAdding(true);
     try {
-      await fetch('/api/youtube/channels', {
+      await apiFetch('/api/youtube/channels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ handle: addForm.handle, channel_name: addForm.channel_name || undefined, category: addForm.category }),
@@ -98,7 +99,7 @@ export default function YouTubePage() {
 
   async function removeVideo(videoId: string) {
     try {
-      await fetch(`/api/youtube/feed?video_id=${videoId}`, { method: "DELETE" });
+      await apiFetch(`/api/youtube/feed?video_id=${videoId}`, { method: "DELETE" });
       setVideos((prev) => prev.filter((v: Video) => v.video_id !== videoId));
       if (selectedVideo?.video_id === videoId) {
         setSelectedVideo(null);

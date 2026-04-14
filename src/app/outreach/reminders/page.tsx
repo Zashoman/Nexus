@@ -22,6 +22,7 @@ import Card, { CardHeader } from '@/components/outreach/ui/Card';
 import Badge from '@/components/outreach/ui/Badge';
 import Button from '@/components/outreach/ui/Button';
 import EmptyState from '@/components/outreach/ui/EmptyState';
+import { apiFetch } from '@/lib/api-client';
 
 interface Reminder {
   id: string;
@@ -74,7 +75,7 @@ export default function RemindersPage() {
   const fetchReminders = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/outreach/reminders');
+      const res = await apiFetch('/api/outreach/reminders');
       const data = await res.json();
       setReminders(data.reminders || []);
       setCounts(data.counts || { overdue: 0, due_soon: 0, upcoming: 0 });
@@ -86,7 +87,7 @@ export default function RemindersPage() {
 
   const handleAction = async (id: string, action: 'snooze' | 'dismiss' | 'complete', days?: number) => {
     const reminder = reminders.find((r) => r.id === id);
-    await fetch('/api/outreach/reminders', {
+    await apiFetch('/api/outreach/reminders', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, action, days, current_snooze_count: reminder?.snooze_count || 0 }),
@@ -96,7 +97,7 @@ export default function RemindersPage() {
 
   const addReminder = async () => {
     if (!newReminder.contact_name.trim() || !newReminder.due_date) return;
-    await fetch('/api/outreach/reminders', {
+    await apiFetch('/api/outreach/reminders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

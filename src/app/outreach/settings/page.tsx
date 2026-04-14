@@ -21,6 +21,7 @@ import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card, { CardHeader } from '@/components/outreach/ui/Card';
 import Badge from '@/components/outreach/ui/Badge';
 import Button from '@/components/outreach/ui/Button';
+import { apiFetch } from '@/lib/api-client';
 
 type SettingsTab = 'integrations' | 'team' | 'writers' | 'content' | 'training' | 'guardrails' | 'notifications';
 
@@ -70,7 +71,7 @@ export default function SettingsPage() {
     setInstantlyLoading(true);
     setInstantlyError(null);
     try {
-      const res = await fetch('/api/outreach/instantly/test');
+      const res = await apiFetch('/api/outreach/instantly/test');
       const data = await res.json();
       if (data.ok) { setInstantlyConnected(true); setCampaignCount(data.campaign_count || 0); }
       else { setInstantlyError(data.error || 'Connection failed'); setInstantlyConnected(false); }
@@ -80,7 +81,7 @@ export default function SettingsPage() {
 
   const loadInstantlyCampaigns = async () => {
     try {
-      const res = await fetch('/api/outreach/instantly/campaigns');
+      const res = await apiFetch('/api/outreach/instantly/campaigns');
       const data = await res.json();
       setInstantlyCampaigns(data.campaigns || []);
     } catch { setInstantlyError('Failed to load campaigns'); }
@@ -89,7 +90,7 @@ export default function SettingsPage() {
   const loadWriters = async () => {
     setWritersLoading(true);
     try {
-      const res = await fetch('/api/outreach/writers');
+      const res = await apiFetch('/api/outreach/writers');
       const data = await res.json();
       setWriters(data.writers || []);
     } catch { /* silent */ }
@@ -99,7 +100,7 @@ export default function SettingsPage() {
   const loadContent = async () => {
     setContentLoading(true);
     try {
-      const res = await fetch('/api/outreach/content');
+      const res = await apiFetch('/api/outreach/content');
       const data = await res.json();
       setCaseStudies(data.case_studies || []);
       setArticles(data.articles || []);
@@ -110,7 +111,7 @@ export default function SettingsPage() {
   const loadTraining = async () => {
     setTrainingLoading(true);
     try {
-      const res = await fetch('/api/outreach/training-docs');
+      const res = await apiFetch('/api/outreach/training-docs');
       const data = await res.json();
       setTrainingDocs(data.documents || []);
     } catch { /* silent */ }
@@ -120,7 +121,7 @@ export default function SettingsPage() {
   const uploadTrainingDoc = async () => {
     if (!newDocTitle.trim() || !newDocContent.trim()) return;
     try {
-      await fetch('/api/outreach/training-docs', {
+      await apiFetch('/api/outreach/training-docs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newDocTitle.trim(), document_type: newDocType, content: newDocContent.trim() }),

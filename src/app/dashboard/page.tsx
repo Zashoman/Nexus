@@ -8,6 +8,7 @@ import CreditStressGauge from "@/components/dashboard/CreditStressGauge";
 import InfoTip from "@/components/dashboard/InfoTip";
 import { TOOLTIPS } from "@/lib/dashboard/tooltips";
 import PrivateCreditTab from "@/components/dashboard/PrivateCreditTab";
+import { apiFetch } from "@/lib/api-client";
 
 const TABS = [
   { key: "calendar", label: "Economic Calendar" },
@@ -73,13 +74,13 @@ export default function DashboardPage() {
     try {
       // Fetch sequentially to avoid Finnhub rate limits (60 calls/min)
       // Rates and commodities first (they cache), then scoring tabs read from cache
-      const ratesRes = await fetch("/api/dashboard/rates").then(r => r.json()).catch(() => null);
-      const commRes = await fetch("/api/dashboard/commodities").then(r => r.json()).catch(() => null);
-      const geoRes = await fetch("/api/dashboard/geo").then(r => r.json()).catch(() => null);
+      const ratesRes = await apiFetch("/api/dashboard/rates").then(r => r.json()).catch(() => null);
+      const commRes = await apiFetch("/api/dashboard/commodities").then(r => r.json()).catch(() => null);
+      const geoRes = await apiFetch("/api/dashboard/geo").then(r => r.json()).catch(() => null);
       // These read from DB (no Finnhub calls)
-      const ddRes = await fetch("/api/dashboard/demand-destruction").then(r => r.json()).catch(() => null);
-      const hormuzRes = await fetch("/api/dashboard/hormuz").then(r => r.json()).catch(() => null);
-      const creditRes = await fetch("/api/dashboard/private-credit").then(r => r.json()).catch(() => null);
+      const ddRes = await apiFetch("/api/dashboard/demand-destruction").then(r => r.json()).catch(() => null);
+      const hormuzRes = await apiFetch("/api/dashboard/hormuz").then(r => r.json()).catch(() => null);
+      const creditRes = await apiFetch("/api/dashboard/private-credit").then(r => r.json()).catch(() => null);
 
       const scores: Record<string, { score: number; max: number; level: string }> = {};
 
@@ -109,37 +110,37 @@ export default function DashboardPage() {
     try {
       switch (tab) {
         case "rates": {
-          const res = await fetch("/api/dashboard/rates");
+          const res = await apiFetch("/api/dashboard/rates");
           setRates(await res.json());
           break;
         }
         case "commodities": {
-          const res = await fetch("/api/dashboard/commodities");
+          const res = await apiFetch("/api/dashboard/commodities");
           setCommodities(await res.json());
           break;
         }
         case "demand": {
-          const res = await fetch("/api/dashboard/demand-destruction");
+          const res = await apiFetch("/api/dashboard/demand-destruction");
           setDdData(await res.json());
           break;
         }
         case "hormuz": {
-          const res = await fetch("/api/dashboard/hormuz");
+          const res = await apiFetch("/api/dashboard/hormuz");
           setHormuzData(await res.json());
           break;
         }
         case "credit": {
-          const res = await fetch("/api/dashboard/private-credit");
+          const res = await apiFetch("/api/dashboard/private-credit");
           setCreditData(await res.json());
           break;
         }
         case "geo": {
-          const res = await fetch("/api/dashboard/geo");
+          const res = await apiFetch("/api/dashboard/geo");
           setGeoData(await res.json());
           break;
         }
         case "earnings": {
-          const res = await fetch("/api/dashboard/calendar/earnings");
+          const res = await apiFetch("/api/dashboard/calendar/earnings");
           setEarningsData(await res.json());
           break;
         }
@@ -154,7 +155,7 @@ export default function DashboardPage() {
   async function rescore(endpoint: string) {
     setLoading(true);
     try {
-      const res = await fetch(`/api/dashboard/${endpoint}`, { method: "POST" });
+      const res = await apiFetch(`/api/dashboard/${endpoint}`, { method: "POST" });
       const data = await res.json();
       if (endpoint === "demand-destruction") setDdData({ latest: data.score, scores: [data.score] });
       if (endpoint === "hormuz") setHormuzData({ latest: data.score, scores: [data.score] });

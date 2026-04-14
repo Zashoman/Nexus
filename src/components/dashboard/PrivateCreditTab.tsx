@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api-client";
 
 interface CreditIndexData {
   index: number;
@@ -64,9 +65,9 @@ export default function PrivateCreditTab() {
     setLoading(true);
     try {
       const [idxRes, bdcRes, qualRes] = await Promise.all([
-        fetch("/api/dashboard/credit-index").then(r => r.json()).catch(() => null),
-        fetch("/api/dashboard/credit-bdc").then(r => r.json()).catch(() => null),
-        fetch("/api/dashboard/credit-qualitative").then(r => r.json()).catch(() => null),
+        apiFetch("/api/dashboard/credit-index").then(r => r.json()).catch(() => null),
+        apiFetch("/api/dashboard/credit-bdc").then(r => r.json()).catch(() => null),
+        apiFetch("/api/dashboard/credit-qualitative").then(r => r.json()).catch(() => null),
       ]);
       if (idxRes) setIndexData(idxRes);
       if (bdcRes) setBdcData(bdcRes);
@@ -79,7 +80,7 @@ export default function PrivateCreditTab() {
   }
 
   async function toggleSignal(signalKey: string, checked: boolean) {
-    await fetch("/api/dashboard/credit-qualitative", {
+    await apiFetch("/api/dashboard/credit-qualitative", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ signal_key: signalKey, is_checked: checked }),

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import TelegramTabs from "@/components/telegram/TelegramTabs";
 import MessageCard from "@/components/telegram/MessageCard";
 import MessageDetail from "@/components/telegram/MessageDetail";
+import { apiFetch } from "@/lib/api-client";
 
 interface Message {
   id: string;
@@ -44,7 +45,7 @@ export default function TelegramPage() {
   async function fetchFeed() {
     setLoading(true);
     try {
-      const res = await fetch("/api/telegram/feed");
+      const res = await apiFetch("/api/telegram/feed");
       const data = await res.json();
       setMessages(data.messages || []);
       setChannels(data.channels || []);
@@ -59,7 +60,7 @@ export default function TelegramPage() {
     if (!addForm.display_name || !addForm.category) return;
     setAdding(true);
     try {
-      await fetch("/api/telegram/channels", {
+      await apiFetch("/api/telegram/channels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(addForm),

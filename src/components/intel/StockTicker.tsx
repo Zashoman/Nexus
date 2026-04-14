@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { apiFetch } from '@/lib/api-client';
 
 interface StockQuote {
   symbol: string;
@@ -21,7 +22,7 @@ export default function StockTicker() {
 
   async function fetchQuotes() {
     try {
-      const res = await fetch('/api/intel/stock-quotes');
+      const res = await apiFetch('/api/intel/stock-quotes');
       if (!res.ok) return;
       const data = await res.json();
       if (data.quotes && data.quotes.length > 0) {

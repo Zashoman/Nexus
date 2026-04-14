@@ -10,6 +10,7 @@ import Button from '@/components/outreach/ui/Button';
 import StatusIndicator from '@/components/outreach/ui/StatusIndicator';
 import EmptyState from '@/components/outreach/ui/EmptyState';
 import type { Campaign, CampaignType } from '@/types/outreach';
+import { apiFetch } from '@/lib/api-client';
 
 const typeIcons: Record<CampaignType, typeof Megaphone> = {
   sales: Megaphone,
@@ -40,7 +41,7 @@ export default function CampaignsPage() {
 
   const fetchCampaigns = async () => {
     try {
-      const res = await fetch('/api/outreach/campaigns');
+      const res = await apiFetch('/api/outreach/campaigns');
       const data = await res.json();
       setCampaigns(data.campaigns || []);
     } catch (err) {

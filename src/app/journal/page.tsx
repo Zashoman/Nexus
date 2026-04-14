@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { apiFetch } from '@/lib/api-client';
 
 // Accent color: warm amber gold
 const A = '#D4A85C';
@@ -54,7 +55,7 @@ export default function JournalPage() {
 
   async function fetchEntries() {
     try {
-      const res = await fetch('/api/journal/entries');
+      const res = await apiFetch('/api/journal/entries');
       const data = await res.json();
       if (data.entries) setEntries(data.entries);
     } catch { /* silent */ }
@@ -63,7 +64,7 @@ export default function JournalPage() {
   async function handleBackup(entryId: string) {
     setBackupStatus('backing_up');
     try {
-      const res = await fetch('/api/journal/backup', {
+      const res = await apiFetch('/api/journal/backup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entry_id: entryId }),
@@ -95,7 +96,7 @@ export default function JournalPage() {
     if (selectedEntry?.id === entryId) setSelectedEntry(null);
     if (activeEntry?.id === entryId) setActiveEntry(null);
     try {
-      await fetch('/api/journal/delete', {
+      await apiFetch('/api/journal/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entry_id: entryId }),
@@ -111,7 +112,7 @@ export default function JournalPage() {
     setChatMessages([]);
 
     try {
-      const res = await fetch('/api/journal/analyze', {
+      const res = await apiFetch('/api/journal/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entry_text: entryText }),
@@ -138,7 +139,7 @@ export default function JournalPage() {
     setIsChatting(true);
 
     try {
-      const res = await fetch('/api/journal/chat', {
+      const res = await apiFetch('/api/journal/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

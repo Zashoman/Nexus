@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { IntelBelief, SynthesisNarrative } from '@/types/intel';
 import BeliefCard from './BeliefCard';
 import AddBeliefModal from './AddBeliefModal';
+import { apiFetch } from '@/lib/api-client';
 
 interface WeeklySynthesis {
   id: string;
@@ -44,10 +45,10 @@ export default function SynthesisView() {
     setLoading(true);
     try {
       const [beliefsRes, synthRes, weeklyRes, monthlyRes] = await Promise.all([
-        fetch('/api/intel/beliefs'),
-        fetch('/api/intel/synthesis'),
-        fetch('/api/intel/weekly-synthesis'),
-        fetch('/api/intel/monthly-synthesis'),
+        apiFetch('/api/intel/beliefs'),
+        apiFetch('/api/intel/synthesis'),
+        apiFetch('/api/intel/weekly-synthesis'),
+        apiFetch('/api/intel/monthly-synthesis'),
       ]);
       const beliefsData = await beliefsRes.json();
       const synthData = await synthRes.json();
@@ -68,7 +69,7 @@ export default function SynthesisView() {
   async function generateWeekly() {
     setGeneratingWeekly(true);
     try {
-      const res = await fetch('/api/intel/weekly-synthesis', { method: 'POST' });
+      const res = await apiFetch('/api/intel/weekly-synthesis', { method: 'POST' });
       const data = await res.json();
       if (data.synthesis) {
         setWeeklySyntheses((prev) => [data.synthesis, ...prev]);
@@ -85,7 +86,7 @@ export default function SynthesisView() {
   async function generateMonthly() {
     setGeneratingMonthly(true);
     try {
-      const res = await fetch('/api/intel/monthly-synthesis', { method: 'POST' });
+      const res = await apiFetch('/api/intel/monthly-synthesis', { method: 'POST' });
       const data = await res.json();
       if (data.synthesis) {
         setMonthlySyntheses((prev) => [data.synthesis, ...prev]);
@@ -100,7 +101,7 @@ export default function SynthesisView() {
   }
 
   async function handleRetire(id: string) {
-    await fetch(`/api/intel/beliefs?id=${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/intel/beliefs?id=${id}`, { method: 'DELETE' });
     fetchAll();
   }
 
@@ -221,7 +222,7 @@ export default function SynthesisView() {
             Daily Synthesis {synthesis?.date && <span className="text-[#8899AA]">- {synthesis.date}</span>}
           </h3>
           <button
-            onClick={() => { setGeneratingSynthesis(true); fetch('/api/intel/synthesis').then(r => r.json()).then(d => { setSynthesis(d); setGeneratingSynthesis(false); }); }}
+            onClick={() => { setGeneratingSynthesis(true); apiFetch('/api/intel/synthesis').then(r => r.json()).then(d => { setSynthesis(d); setGeneratingSynthesis(false); }); }}
             disabled={generatingSynthesis}
             className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF] cursor-pointer"
           >

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { apiFetch } from '@/lib/api-client';
 
 interface Stats {
   total_ingested: number;
@@ -42,11 +43,11 @@ export default function StatusBar() {
 
   async function fetchStats() {
     try {
-      const res = await fetch('/api/intel/items?limit=1');
+      const res = await apiFetch('/api/intel/items?limit=1');
       const data = await res.json();
       if (data.stats) setStats(data.stats);
 
-      const srcRes = await fetch('/api/intel/sources');
+      const srcRes = await apiFetch('/api/intel/sources');
       const srcData = await srcRes.json();
       if (srcData.sources) {
         setSources(srcData.sources);

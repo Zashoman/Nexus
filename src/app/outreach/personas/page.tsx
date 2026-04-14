@@ -7,6 +7,7 @@ import Card from '@/components/outreach/ui/Card';
 import Badge from '@/components/outreach/ui/Badge';
 import Button from '@/components/outreach/ui/Button';
 import EmptyState from '@/components/outreach/ui/EmptyState';
+import { apiFetch } from '@/lib/api-client';
 
 interface Writer {
   id: string;
@@ -28,7 +29,7 @@ export default function PersonasPage() {
   const fetchWriters = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/outreach/writers');
+      const res = await apiFetch('/api/outreach/writers');
       const data = await res.json();
       setWriters(data.writers || []);
     } catch { /* silent */ }

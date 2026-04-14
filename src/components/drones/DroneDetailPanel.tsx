@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import type { IntelItem, RatingValue } from '@/types/intel';
 import RatingButtons from '@/components/intel/RatingButtons';
+import { apiFetch } from '@/lib/api-client';
 
 interface DroneDetailPanelProps {
   item: IntelItem | null;
@@ -106,7 +107,7 @@ export default function DroneDetailPanel({ item, onClose }: DroneDetailPanelProp
 
     if (!item.ai_summary) {
       setSummaryLoading(true);
-      fetch('/api/intel/summarize', {
+      apiFetch('/api/intel/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ item_id: targetId }),
@@ -187,7 +188,7 @@ export default function DroneDetailPanel({ item, onClose }: DroneDetailPanelProp
             className="w-full bg-[#0B0E11] border border-[#1E2A3A] rounded-sm px-2 py-1.5 text-[13px] text-[#E8EAED] placeholder-[#5A6A7A] focus:outline-none focus:border-[#FF8C00]"
             onKeyDown={async (e) => {
               if (e.key === 'Enter' && feedback.trim()) {
-                await fetch('/api/intel/rate', {
+                await apiFetch('/api/intel/rate', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ item_id: item.id, rating: 'signal', feedback_note: feedback }),

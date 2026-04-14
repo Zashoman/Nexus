@@ -5,6 +5,7 @@ import type { IntelItem } from "@/types/intel";
 import FTTabs from "@/components/ft/FTTabs";
 import FTItemCard from "@/components/ft/FTItemCard";
 import FTDetailPanel from "@/components/ft/FTDetailPanel";
+import { apiFetch } from "@/lib/api-client";
 
 export default function FTPage() {
   const [activeTab, setActiveTab] = useState("all");
@@ -29,7 +30,7 @@ export default function FTPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ limit: "100" });
-      const res = await fetch(`/api/intel/items?${params}`);
+      const res = await apiFetch(`/api/intel/items?${params}`);
       const data = await res.json();
       // Filter to only FT items
       let ftItems = (data.items || []).filter((item: IntelItem) =>
@@ -61,7 +62,7 @@ export default function FTPage() {
 
   async function handleDismiss(itemId: string) {
     try {
-      await fetch("/api/intel/items", {
+      await apiFetch("/api/intel/items", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ item_id: itemId, is_dismissed: true }),

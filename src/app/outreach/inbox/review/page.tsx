@@ -16,6 +16,7 @@ import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card from '@/components/outreach/ui/Card';
 import Badge from '@/components/outreach/ui/Badge';
 import Button from '@/components/outreach/ui/Button';
+import { apiFetch } from '@/lib/api-client';
 
 interface ReviewReply {
   id: string;
@@ -88,7 +89,7 @@ export default function ReviewPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/outreach/batch-review');
+      const res = await apiFetch('/api/outreach/batch-review');
       const json = await res.json();
       if (json.error) {
         setError(json.error);
@@ -153,7 +154,7 @@ export default function ReviewPage() {
         account_email: r.account_email,
       }));
 
-      const res = await fetch('/api/outreach/slack/push', {
+      const res = await apiFetch('/api/outreach/slack/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
