@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function GET(req: NextRequest) {
   const db = getServiceSupabase();
@@ -120,6 +121,9 @@ export async function GET(req: NextRequest) {
 
 // Dismiss/archive an item
 export async function PATCH(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
   const body = await req.json();
   const { item_id, is_dismissed } = body as { item_id: string; is_dismissed: boolean };

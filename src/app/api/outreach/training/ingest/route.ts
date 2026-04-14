@@ -1,8 +1,12 @@
 import { NextResponse, after } from 'next/server';
 import { createIngestionJob, runIngestion } from '@/lib/outreach/ingestion';
+import { requireAuth } from '@/lib/api-auth';
 
 // POST: trigger a new ingestion job
-export async function POST() {
+export async function POST(request: Request) {
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const jobId = await createIngestionJob();
 

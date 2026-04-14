@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { updateFilterProfile } from '@/lib/intel/filter-learner';
+import { requireAuth } from '@/lib/api-auth';
 import type { RatingValue, IntelItem } from '@/types/intel';
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
 
   const body = await req.json();

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { getCached, setCache, fetchFRED, fetchFinnhubQuote } from '@/lib/dashboard/cache';
+import { requireAuth } from '@/lib/api-auth';
 
 function scoreEMHY(price: number | null): { value: number | null; score: number } {
   if (!price) return { value: null, score: 0 };
@@ -52,7 +53,10 @@ export async function GET() {
   return NextResponse.json({ scores: scores || [], latest: scores?.[0] || null });
 }
 
-export async function POST() {
+export async function POST(req: Request) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
 
   // Fetch all data

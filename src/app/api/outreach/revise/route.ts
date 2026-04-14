@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import type { SlackDraftContext } from '@/lib/outreach/draft-store';
+import { requireAuth } from '@/lib/api-auth';
 
 // POST: regenerate a draft based on user feedback
 export async function POST(request: Request) {
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const { context, feedback } = await request.json() as { context: SlackDraftContext; feedback: string };
 

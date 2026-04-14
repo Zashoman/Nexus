@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/api-auth';
 
 async function deleteFromGoogleSheet(webhookUrl: string, entryNumber: number): Promise<boolean> {
   const payload = JSON.stringify({ action: 'delete', entry_number: entryNumber });
@@ -30,6 +31,9 @@ async function deleteFromGoogleSheet(webhookUrl: string, entryNumber: number): P
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const { entry_id } = await req.json();
 
   if (!entry_id) {

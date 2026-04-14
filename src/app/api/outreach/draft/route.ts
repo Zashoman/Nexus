@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { buildDraftSystemPrompt, buildDraftContext } from '@/lib/outreach/prompt';
+import { requireAuth } from '@/lib/api-auth';
 
 // POST: generate a draft reply to an email
 export async function POST(request: Request) {
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const { sender_name, sender_email, subject, reply_text, full_thread_html, campaign_name, account_email, classification_summary } = await request.json();
 

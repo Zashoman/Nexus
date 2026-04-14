@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function GET() {
   const db = getServiceSupabase();
@@ -62,6 +63,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
   const body = await req.json();
 
@@ -95,6 +99,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');

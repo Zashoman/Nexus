@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { fetchFRED } from '@/lib/dashboard/cache';
 import { fetchYahooQuote } from '@/lib/dashboard/yahoo';
+import { requireAuth } from '@/lib/api-auth';
 import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
@@ -54,7 +55,10 @@ export async function GET() {
   return NextResponse.json({ scores: scores || [], latest: scores?.[0] || null });
 }
 
-export async function POST() {
+export async function POST(req: Request) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
   const dayOfCrisis = Math.floor((Date.now() - CRISIS_START.getTime()) / (1000 * 60 * 60 * 24));
 

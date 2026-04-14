@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { ApolloPerson } from '@/lib/outreach/apollo';
+import { requireAuth } from '@/lib/api-auth';
 
 interface ProspectWithOpener extends ApolloPerson {
   subject?: string;
@@ -17,6 +18,9 @@ function csvEscape(value: string | number | undefined | null): string {
 
 // POST: download a CSV of prospects with openers, ready to import to Instantly
 export async function POST(request: Request) {
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const { prospects } = await request.json() as { prospects: ProspectWithOpener[] };
 

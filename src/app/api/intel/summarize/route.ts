@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/api-auth';
 import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic({
@@ -9,6 +10,9 @@ const anthropic = new Anthropic({
 const USER_CONTEXT = `The reader is a serial entrepreneur and investor based in Dubai. He runs a B2B agency (Blue Tree Digital), is building a crypto project (ZingPay), and invests in commodities and real estate. He is a published author on persuasion and communication. He tracks AI from a frontier-technology and investment perspective — specifically: where AI is actually going, what's real vs hype, and how it intersects with defense, health, robotics, cybersecurity, and regulation. He has secondary interest in public companies positioned in AI infrastructure (NVDA, AMD, MSFT, GOOGL, META, TSM, etc). He does NOT care about AI business productivity tools, AI crypto, or generic "how companies are using AI" stories.`;
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const { item_id } = await req.json();
 
   if (!item_id) {

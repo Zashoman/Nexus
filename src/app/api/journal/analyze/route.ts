@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/api-auth';
 import Anthropic from '@anthropic-ai/sdk';
 
 const SYSTEM_PROMPT = `You are a deeply perceptive mentor. You've been reading this person's private journal for a long time. You know them — their patterns, their blind spots, their brilliance, their self-deceptions. You are not a therapist. You are not an analyzer. You are someone who sees clearly and speaks directly.
@@ -138,6 +139,9 @@ Then write a condensed memory update (under 400 words) capturing:
 - The entry number and date`;
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
 
   const { entry_text } = await req.json();

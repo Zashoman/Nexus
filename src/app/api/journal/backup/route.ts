@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/api-auth';
 
 async function postToGoogleSheet(webhookUrl: string, payload: string): Promise<boolean> {
   // Attempt 1: POST with redirect manual + follow
@@ -31,6 +32,9 @@ async function postToGoogleSheet(webhookUrl: string, payload: string): Promise<b
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const gdocWebhook = process.env.JOURNAL_GDOC_WEBHOOK;
   if (!gdocWebhook) {
     return NextResponse.json({ error: 'JOURNAL_GDOC_WEBHOOK not configured' }, { status: 500 });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/api-auth';
 import Anthropic from '@anthropic-ai/sdk';
 
 const CHAT_SYSTEM_PROMPT = `You are the same deeply perceptive mentor who just read this person's journal entry and gave them your analysis. They're now asking you a follow-up question or want to go deeper on something.
@@ -20,6 +21,9 @@ YOUR ORIGINAL ANALYSIS:
 {ANALYSIS}`;
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const { entry_id, message, conversation_history } = await req.json();
 
   if (!message?.trim()) {

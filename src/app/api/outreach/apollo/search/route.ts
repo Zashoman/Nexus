@@ -3,9 +3,13 @@ import { searchPeople, type ApolloSearchFilters } from '@/lib/outreach/apollo';
 import { scoreAndSortProspects } from '@/lib/outreach/qualification';
 import { getExcludedEmails } from '@/lib/outreach/exclusion';
 import { getServiceSupabase } from '@/lib/outreach/supabase';
+import { requireAuth } from '@/lib/api-auth';
 
 // POST: search Apollo for prospects, score + sort, save search
 export async function POST(request: Request) {
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     const filters: ApolloSearchFilters = {

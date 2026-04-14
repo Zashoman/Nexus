@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { DEFAULT_SOURCES } from '@/lib/intel/sources-config';
+import { requireAuth } from '@/lib/api-auth';
 
 export async function GET() {
   const db = getServiceSupabase();
@@ -38,6 +39,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
   const body = await req.json();
 
@@ -89,6 +93,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
   const body = await req.json();
 

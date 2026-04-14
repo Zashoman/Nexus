@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/outreach/supabase';
+import { requireAuth } from '@/lib/api-auth';
 
 // GET: fetch content libraries (case studies + articles)
 export async function GET(request: Request) {
@@ -36,6 +37,9 @@ export async function GET(request: Request) {
 
 // POST: add a new case study or article
 export async function POST(request: Request) {
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     const supabase = getServiceSupabase();

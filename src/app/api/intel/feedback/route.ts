@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/api-auth';
 
 // GET — list all feedback entries
 export async function GET(req: NextRequest) {
@@ -20,6 +21,9 @@ export async function GET(req: NextRequest) {
 
 // POST — add new feedback
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
   const body = await req.json();
 
@@ -47,6 +51,9 @@ export async function POST(req: NextRequest) {
 
 // PUT — update existing feedback
 export async function PUT(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
   const body = await req.json();
   const { id, feedback_note, rating } = body;
@@ -70,6 +77,9 @@ export async function PUT(req: NextRequest) {
 
 // DELETE — remove feedback entry
 export async function DELETE(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
   const id = req.nextUrl.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });

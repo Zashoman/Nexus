@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { postReplyToSlack, postBatchHeader, postInboxSectionHeader } from '@/lib/outreach/slack';
 import { saveSlackDraft } from '@/lib/outreach/draft-store';
+import { requireAuth } from '@/lib/api-auth';
 
 interface PushReply {
   id: string;
@@ -20,6 +21,9 @@ interface PushReply {
 
 // POST: push classified replies with drafts to Slack
 export async function POST(request: Request) {
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const { replies, accounts, campaigns } = await request.json() as {
       replies: PushReply[];

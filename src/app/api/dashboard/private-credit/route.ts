@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
 import { fetchFRED, fetchFinnhubQuote } from '@/lib/dashboard/cache';
+import { requireAuth } from '@/lib/api-auth';
 
 function getStressLevel(score: number): string {
   if (score <= 5) return 'calm';
@@ -62,7 +63,10 @@ export async function GET() {
   return NextResponse.json({ scores: scores || [], latest: scores?.[0] || null });
 }
 
-export async function POST() {
+export async function POST(req: Request) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
 
   const [hyOas, cccOas, bbOas, bizdQuote, bklnQuote, arccQuote, obdcQuote, fskQuote] = await Promise.all([

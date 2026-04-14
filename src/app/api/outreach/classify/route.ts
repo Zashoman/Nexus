@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { classifyReplies } from '@/lib/outreach/classifier';
+import { requireAuth } from '@/lib/api-auth';
 
 // POST: classify a batch of email replies using Claude
 export async function POST(request: Request) {
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const { replies } = await request.json();
 

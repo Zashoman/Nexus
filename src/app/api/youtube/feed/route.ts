@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase';
+import { requireAuth } from '@/lib/api-auth';
 
 // This endpoint ONLY reads from the database
 // YouTube API calls happen in /api/youtube/refresh (cron job every 6 hours)
@@ -30,6 +31,9 @@ export async function GET() {
 
 // Mark video as dismissed (not deleted — prevents re-insertion)
 export async function DELETE(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   const db = getServiceSupabase();
   const { searchParams } = new URL(req.url);
   const videoId = searchParams.get("video_id");

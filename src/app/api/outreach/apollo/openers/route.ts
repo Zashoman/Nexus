@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import type { ApolloPerson } from '@/lib/outreach/apollo';
+import { requireAuth } from '@/lib/api-auth';
 
 interface OpenerResult {
   person_id: string;
@@ -10,6 +11,9 @@ interface OpenerResult {
 
 // POST: generate personalized openers for a list of prospects
 export async function POST(request: Request) {
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const { prospects, campaign_context } = await request.json() as {
       prospects: ApolloPerson[];

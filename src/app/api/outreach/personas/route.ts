@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/outreach/supabase';
+import { requireAuth } from '@/lib/api-auth';
 
 // GET: List all personas
 export async function GET() {
@@ -23,6 +24,9 @@ export async function GET() {
 
 // POST: Create a new persona
 export async function POST(request: Request) {
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     const supabase = getServiceSupabase();
