@@ -18,6 +18,7 @@ import {
   Hash,
   Zap,
   MessageSquareHeart,
+  CalendarClock,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card from '@/components/outreach/ui/Card';
@@ -62,6 +63,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [slackTesting, setSlackTesting] = useState(false);
   const [slackTestResult, setSlackTestResult] = useState<string | null>(null);
+  const [weeklyRunning, setWeeklyRunning] = useState(false);
+  const [weeklyResult, setWeeklyResult] = useState<string | null>(null);
 
   const fetchDashboard = async () => {
     setLoading(true);
@@ -129,6 +132,41 @@ export default function DashboardPage() {
       setSlackTestResult(`Failed: ${msg}`);
     } finally {
       setSlackTesting(false);
+    }
+  };
+
+  const runWeeklySummary = async () => {
+    // This can post a lot of messages to Slack if the week has been active.
+    // Confirm before firing.
+    const confirmed = typeof window !== 'undefined'
+      ? window.confirm(
+          'Run the weekly inbox digest now?\n\nThis will scan up to 500 Instantly replies from the last 7 days, classify them, draft responses for actionable ones, and post a digest to your Slack channel.\n\nTakes ~1-2 minutes depending on volume.',
+        )
+      : true;
+    if (!confirmed) return;
+
+    setWeeklyRunning(true);
+    setWeeklyResult('Running — scanning inboxes, classifying replies, drafting responses...');
+    try {
+      const res = await fetch('/api/outreach/cron/weekly-summary', { method: 'POST' });
+      const json = await res.json();
+      if (json.error) {
+        setWeeklyResult(`Failed: ${json.error}`);
+      } else {
+        const parts = [
+          `✅ Posted to Slack.`,
+          `${json.total_replies || 0} replies this week`,
+          json.actionable_replies ? `${json.actionable_replies} actionable` : null,
+          json.duration_ms ? `${(json.duration_ms / 1000).toFixed(0)}s` : null,
+        ].filter(Boolean);
+        setWeeklyResult(parts.join(' · '));
+        setTimeout(fetchDashboard, 1000);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed';
+      setWeeklyResult(`Failed: ${msg}`);
+    } finally {
+      setWeeklyRunning(false);
     }
   };
 
@@ -267,12 +305,26 @@ export default function DashboardPage() {
             >
               Send test message
             </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={runWeeklySummary}
+              loading={weeklyRunning}
+              icon={<CalendarClock className="w-3.5 h-3.5" />}
+            >
+              Run weekly summary
+            </Button>
             <Link href="/outreach/inbox"><Button variant="ghost" size="sm">Push more</Button></Link>
           </div>
         </div>
         {slackTestResult && (
           <div className={`mb-3 text-[11px] px-3 py-2 rounded-md ${slackTestResult.startsWith('Failed') ? 'bg-bt-red-bg/50 text-bt-red' : 'bg-bt-green-bg/50 text-bt-green'}`}>
             {slackTestResult}
+          </div>
+        )}
+        {weeklyResult && (
+          <div className={`mb-3 text-[11px] px-3 py-2 rounded-md ${weeklyResult.startsWith('Failed') ? 'bg-bt-red-bg/50 text-bt-red' : weeklyResult.startsWith('Running') ? 'bg-bt-primary-bg/50 text-bt-primary' : 'bg-bt-green-bg/50 text-bt-green'}`}>
+            {weeklyResult}
           </div>
         )}
 
