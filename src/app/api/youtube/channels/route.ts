@@ -55,11 +55,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'channel_id (or handle), channel_name, and category required' }, { status: 400 });
   }
 
+  // Normalize category to lowercase so "Health" and "health" don't create duplicate tabs
+  const normalizedCategory = category.toLowerCase().trim();
+
   const rss_url = `https://www.youtube.com/feeds/videos.xml?channel_id=${channel_id}`;
 
   const { data, error } = await db
     .from('intel_youtube_channels')
-    .insert({ channel_id, channel_name, category, rss_url })
+    .insert({ channel_id, channel_name, category: normalizedCategory, rss_url })
     .select()
     .single();
 
@@ -70,6 +73,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ channel: data }, { status: 201 });
+}
+
+// Normalize all existing channel categories to lowercase + also normalize videos
+export async function PATCH() {
+  const db = getServiceSupabase();
+
+  // Fetch all channels
+  const { data: channels, error: chErr } = await db
+    .from('intel_youtube_channels')
+    .select('id, channel_id, category');
+
+  if (chErr) return NextResponse.json({ error: chErr.message }, { status: 500 });
+
+  let channelsUpdated = 0;
+  let videosUpdated = 0;
+
+  for (const ch of channels || []) {
+    const normalized = (ch.category || '').toLowerCase().trim();
+    if (normalized && normalized !== ch.category) {
+      // Update channel
+      await db.from('intel_youtube_channels').update({ category: normalized }).eq('id', ch.id);
+      channelsUpdated++;
+
+      // Update any videos already ingested with the old-case category
+      const { data: videoUpdate } = await db
+        .from('intel_youtube_videos')
+        .update({ category: normalized })
+        .eq('channel_id', ch.channel_id)
+        .neq('category', normalized)
+        .select('id');
+      videosUpdated += videoUpdate?.length || 0;
+    }
+  }
+
+  return NextResponse.json({
+    channels_updated: channelsUpdated,
+    videos_updated: videosUpdated,
+  });
 }
 
 export async function DELETE(req: NextRequest) {
