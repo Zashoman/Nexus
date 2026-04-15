@@ -152,13 +152,39 @@ async function run() {
   const campaignMap: Record<string, string> = {};
   campaigns.forEach((c) => { campaignMap[c.id] = c.name; });
 
-  // 2. Pull 500 recent unibox emails (wider net for weekly window)
-  const allEmails = await listUniboxEmails({ limit: 500 });
-
   // 3. Date window: last 7 days (to now)
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86400 * 1000);
   const windowStartMs = sevenDaysAgo.getTime();
+
+  // 2. Page through the Instantly unibox. Instantly caps `limit` at 100
+  //    per request, so we paginate 100 at a time (up to 10 pages = 1000
+  //    emails), and stop early once the oldest email in a page falls
+  //    outside our 7-day window. Instantly returns newest-first.
+  const PAGE_SIZE = 100;
+  const MAX_PAGES = 10;
+  type InstantlyEmailRow = Awaited<ReturnType<typeof listUniboxEmails>>[number];
+  const allEmails: InstantlyEmailRow[] = [];
+  let pagesFetched = 0;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const batch = await listUniboxEmails({ limit: PAGE_SIZE, skip: page * PAGE_SIZE });
+    pagesFetched = page + 1;
+    if (batch.length === 0) break;
+    allEmails.push(...batch);
+
+    // Short page → no more data available.
+    if (batch.length < PAGE_SIZE) break;
+
+    // If the oldest email in this batch is already older than our
+    // window, all subsequent pages will be even older — stop here.
+    let oldestTs = Infinity;
+    for (const e of batch) {
+      const ts = parseTimestamp(e as unknown as Record<string, unknown>);
+      if (ts > 0 && ts < oldestTs) oldestTs = ts;
+    }
+    if (Number.isFinite(oldestTs) && oldestTs < windowStartMs) break;
+  }
 
   // 4. Filter to inbound replies within the 7-day window
   const inbound = allEmails.filter((e) => {
@@ -401,6 +427,8 @@ async function run() {
     inboxes: byInbox.map((r) => ({ inbox: r.inbox, total: r.total, actionable: r.actionable })),
     accounts_scanned: allAccounts,
     campaigns: [...campaignNames],
+    pages_fetched: pagesFetched,
+    total_emails_scanned: allEmails.length,
     duration_ms: Date.now() - startTime,
   });
 }

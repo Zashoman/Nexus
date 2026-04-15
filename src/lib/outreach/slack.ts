@@ -131,7 +131,7 @@ export async function postReplyToSlack(params: {
           elements: [
             {
               type: 'mrkdwn',
-              text: `_Reply in this thread with feedback to revise (e.g. "make it shorter", "mention our case study")_`,
+              text: `_To revise: *tag @Blue Tree Brain* in the thread with your changes (e.g. "@Blue Tree Brain make it shorter"). Replies that don't tag me are ignored so the team can chat freely._`,
             },
           ],
         },

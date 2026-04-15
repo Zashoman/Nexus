@@ -1,11 +1,50 @@
 import { NextResponse, after } from 'next/server';
-import { acknowledgeMessage, postThreadReply } from '@/lib/outreach/slack';
+import { acknowledgeMessage, postThreadReply, getSlackStatus } from '@/lib/outreach/slack';
 import { getSlackDraft, updateSlackDraft, updateDraftStatus } from '@/lib/outreach/draft-store';
 import { getServiceSupabase } from '@/lib/outreach/supabase';
 import { logRevision } from '@/lib/outreach/learning';
 import { recordInteraction } from '@/lib/outreach/relationship';
 import { buildDraftSystemPrompt, buildDraftContext } from '@/lib/outreach/prompt';
 import Anthropic from '@anthropic-ai/sdk';
+
+// Module-level cache of the bot's own Slack user ID.
+// We need it to tell whether a thread reply was addressed to the bot
+// (so we can revise) vs. team-to-team chatter in the thread (so we
+// leave it alone). Cached so we don't hit auth.test on every event.
+let cachedBotUserId: string | null = null;
+
+async function getBotUserId(): Promise<string | null> {
+  if (cachedBotUserId) return cachedBotUserId;
+  if (process.env.SLACK_BOT_USER_ID) {
+    cachedBotUserId = process.env.SLACK_BOT_USER_ID;
+    return cachedBotUserId;
+  }
+  try {
+    const status = await getSlackStatus();
+    if (status.ok && status.bot_user) {
+      // getSlackStatus returns the username ("bot_user"); auth.test also
+      // gives back user_id. We need the user_id for @-mention matching,
+      // so fetch it directly here.
+      const token = process.env.SLACK_BOT_TOKEN;
+      if (!token) return null;
+      const res = await fetch('https://slack.com/api/auth.test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (data?.ok && typeof data.user_id === 'string') {
+        cachedBotUserId = data.user_id;
+        return cachedBotUserId;
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+  return null;
+}
 
 // Log every incoming event to Supabase for debugging
 async function logEvent(eventType: string, data: Record<string, unknown>) {
@@ -112,7 +151,7 @@ async function handleReaction(event: {
       status: 'approved',
     },
     pencil2: {
-      reply: `✏️ <@${user}> wants to revise. *Reply in this thread* with your changes (e.g. "make it shorter", "mention our case study", "tone it down").`,
+      reply: `✏️ <@${user}> wants to revise. *Tag me in your reply* below with what you want changed (e.g. \`@Blue Tree Brain make it shorter\` or \`@Blue Tree Brain mention our case study\`). Replies that don't tag me are ignored so the team can chat freely.`,
       ack: 'eyes',
     },
     x: {
@@ -171,14 +210,43 @@ async function handleThreadReply(event: {
   // Skip empty messages or system messages
   if (!text || text.trim().length === 0) return;
 
-  // Clean the feedback text — remove Slack formatting AND HTML tags to prevent prompt injection
+  // GUARDRAIL: only act as a revision request when the bot is explicitly
+  // @-mentioned. Without this, any thread reply (including team-to-team
+  // chatter like "@Elena @James let's send these daily") would be parsed
+  // as revision feedback and would rewrite the draft. We exit silently
+  // when not addressed — no "reminder" spam in the channel.
+  const botUserId = await getBotUserId();
+  if (!botUserId) {
+    await logEvent('thread_reply_skipped', { reason: 'bot_user_id_unknown' });
+    return;
+  }
+  const botMentionPattern = new RegExp(`<@${botUserId}>`);
+  if (!botMentionPattern.test(text)) {
+    await logEvent('thread_reply_skipped', {
+      reason: 'bot_not_mentioned',
+      text: text.substring(0, 140),
+    });
+    return;
+  }
+
+  // Clean the feedback text — strip the bot mention and any other Slack
+  // mentions, plus any HTML to prevent prompt injection.
   const cleanText = text
-    .replace(/<@[A-Z0-9]+>/g, '')  // Remove Slack @mentions
+    .replace(/<@[A-Z0-9]+>/g, '')  // Remove Slack @mentions (bot + humans)
     .replace(/<[^>]*>/g, '')        // Remove HTML/script tags
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>')  // Decode HTML entities
     .replace(/<[^>]*>/g, '')        // Second pass after entity decode
     .trim();
-  if (!cleanText) return;
+
+  // If the only content was the mention itself, treat as a no-op.
+  if (!cleanText) {
+    await postThreadReply(
+      channel,
+      thread_ts,
+      `👋 <@${user}> — tag me with what you want changed (e.g. "make it shorter", "mention our case study", "tone it down").`,
+    );
+    return;
+  }
 
   // Acknowledge immediately with a text message — feels conversational
   await acknowledgeMessage(channel, event.ts, 'eyes');
