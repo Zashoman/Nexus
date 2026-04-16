@@ -161,13 +161,18 @@ async function run() {
   //    per request, so we paginate 100 at a time (up to 10 pages = 1000
   //    emails), and stop early once the oldest email in a page falls
   //    outside our 7-day window. Instantly returns newest-first.
+  //    Throttle between pages to stay under Instantly's 20 requests/min.
   const PAGE_SIZE = 100;
   const MAX_PAGES = 10;
+  const DELAY_BETWEEN_PAGES_MS = 3500;
   type InstantlyEmailRow = Awaited<ReturnType<typeof listUniboxEmails>>[number];
   const allEmails: InstantlyEmailRow[] = [];
   let pagesFetched = 0;
 
   for (let page = 0; page < MAX_PAGES; page++) {
+    if (page > 0) {
+      await new Promise((r) => setTimeout(r, DELAY_BETWEEN_PAGES_MS));
+    }
     const batch = await listUniboxEmails({ limit: PAGE_SIZE, skip: page * PAGE_SIZE });
     pagesFetched = page + 1;
     if (batch.length === 0) break;

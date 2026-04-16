@@ -23,7 +23,12 @@ export const maxDuration = 60;
 // ============================================================
 
 const PAGE_SIZE = 100;
-const MAX_PAGES = 20; // Up to 2,000 emails — covers months of activity
+const MAX_PAGES = 10; // Up to 1,000 emails — balances coverage vs. rate limit
+// Instantly caps at 20 requests/minute. We need a gap between page fetches
+// so a 10-page crawl fits under the cap AND leaves headroom for the user's
+// other traffic (weekly summary, daily summary, inbox page, etc.).
+// 3,500ms between calls = 17 requests/min max per endpoint invocation.
+const DELAY_BETWEEN_PAGES_MS = 3500;
 
 function normalise(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -89,6 +94,13 @@ export async function GET(request: Request) {
     let totalScanned = 0;
 
     for (let page = 0; page < maxPages; page++) {
+      // Throttle: skip the delay on the first page, pause between subsequent
+      // pages so we stay under Instantly's 20/minute limit and don't
+      // starve other concurrent endpoints (weekly summary, etc.).
+      if (page > 0) {
+        await new Promise((r) => setTimeout(r, DELAY_BETWEEN_PAGES_MS));
+      }
+
       const batch = await listUniboxEmails({
         limit: PAGE_SIZE,
         skip: page * PAGE_SIZE,
