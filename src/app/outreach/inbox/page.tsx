@@ -23,6 +23,7 @@ import {
   XCircle,
   Clock3,
   BotMessageSquare,
+  Globe,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card from '@/components/outreach/ui/Card';
@@ -182,6 +183,44 @@ export default function InboxPage() {
   const [activeTab, setActiveTab] = useState<InboxTab>('all');
   const [search, setSearch] = useState('');
   const [totalFetched, setTotalFetched] = useState(0);
+
+  // Deep search state — for finding replies beyond the last 100
+  interface DeepMatch {
+    id: string;
+    sender_email: string;
+    sender_name: string;
+    subject: string;
+    campaign_name: string;
+    inbox: string;
+    timestamp: string;
+    preview: string;
+  }
+  const [deepSearching, setDeepSearching] = useState(false);
+  const [deepResults, setDeepResults] = useState<DeepMatch[] | null>(null);
+  const [deepError, setDeepError] = useState<string | null>(null);
+  const [deepMeta, setDeepMeta] = useState<{ pages_fetched?: number; emails_scanned?: number } | null>(null);
+
+  const runDeepSearch = useCallback(async () => {
+    if (!search.trim()) return;
+    setDeepSearching(true);
+    setDeepResults(null);
+    setDeepError(null);
+    setDeepMeta(null);
+    try {
+      const res = await fetch(`/api/outreach/instantly/search?q=${encodeURIComponent(search.trim())}`);
+      const data = await res.json();
+      if (data.error) {
+        setDeepError(data.error);
+      } else {
+        setDeepResults(data.matches || []);
+        setDeepMeta({ pages_fetched: data.pages_fetched, emails_scanned: data.emails_scanned });
+      }
+    } catch (err: unknown) {
+      setDeepError(err instanceof Error ? err.message : 'Deep search failed');
+    } finally {
+      setDeepSearching(false);
+    }
+  }, [search]);
 
   const fetchEmails = useCallback(async (campaignId?: string) => {
     setLoading(true);
@@ -499,10 +538,26 @@ export default function InboxPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search replies..."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.shiftKey) {
+                e.preventDefault();
+                runDeepSearch();
+              }
+            }}
+            placeholder="Search replies (Shift+Enter = search all of Instantly)"
             className="w-full h-9 pl-9 pr-4 rounded-lg border border-bt-border bg-bt-surface text-sm text-bt-text placeholder:text-bt-text-tertiary focus:outline-none focus:ring-2 focus:ring-bt-primary focus:border-transparent transition-shadow"
           />
         </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={runDeepSearch}
+          disabled={!search.trim() || deepSearching}
+          loading={deepSearching}
+          icon={<Globe className="w-3.5 h-3.5" />}
+        >
+          Search all of Instantly
+        </Button>
         <div className="relative">
           <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-bt-text-tertiary pointer-events-none" />
           <select
@@ -518,6 +573,82 @@ export default function InboxPage() {
           <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-bt-text-tertiary pointer-events-none" />
         </div>
       </div>
+
+      {/* Deep search results (when user explicitly searched all of Instantly) */}
+      {(deepResults !== null || deepError) && (
+        <div className="rounded-xl border border-bt-border bg-bt-surface p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Globe className="w-4 h-4 text-bt-primary" />
+              <h3 className="text-sm font-semibold text-bt-text">Instantly deep search</h3>
+              {deepMeta && (
+                <span className="text-[11px] text-bt-text-tertiary">
+                  scanned {deepMeta.emails_scanned} emails across {deepMeta.pages_fetched} pages
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => { setDeepResults(null); setDeepError(null); setDeepMeta(null); }}
+              className="text-[11px] text-bt-text-tertiary hover:text-bt-text"
+            >
+              Close
+            </button>
+          </div>
+
+          {deepError && (
+            <div className="text-xs text-bt-red">{deepError}</div>
+          )}
+
+          {deepResults && deepResults.length === 0 && (
+            <div className="text-xs text-bt-text-secondary">
+              No match found in the last 2,000 Instantly emails for <strong>&quot;{search}&quot;</strong>.
+              Either the reply is older than that, or it isn&apos;t in Instantly at all. Check the inbox in Instantly directly.
+            </div>
+          )}
+
+          {deepResults && deepResults.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs text-bt-text-secondary">
+                Found <strong>{deepResults.length}</strong> match{deepResults.length === 1 ? '' : 'es'} for <strong>&quot;{search}&quot;</strong>.
+              </p>
+              <div className="divide-y divide-bt-border border border-bt-border rounded-lg">
+                {deepResults.map((m) => (
+                  <div key={m.id} className="px-4 py-2.5 text-xs">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-bt-text truncate">{m.sender_name}</span>
+                          <span className="text-bt-text-tertiary">·</span>
+                          <span className="text-bt-text-secondary truncate">{m.sender_email}</span>
+                        </div>
+                        <div className="text-[11px] text-bt-text-tertiary mt-0.5 truncate">
+                          {m.subject}
+                        </div>
+                        {m.preview && (
+                          <div className="text-[11px] text-bt-text-secondary mt-1 line-clamp-2">{m.preview}</div>
+                        )}
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <Badge variant="default" size="sm">{m.campaign_name}</Badge>
+                          {m.inbox && <span className="text-[10px] text-bt-text-tertiary">via <code>{m.inbox}</code></span>}
+                          {m.timestamp && (
+                            <span className="text-[10px] text-bt-text-tertiary tabular-nums">
+                              {new Date(m.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-bt-text-tertiary">
+                These matches live in Instantly&apos;s archive. To push one to Slack, you&apos;d need to open it in Instantly and reply there, or ask me to build a &quot;push one from archive&quot; action.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Loading */}
       {loading && (
