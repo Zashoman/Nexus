@@ -198,21 +198,34 @@ export default function InboxPage() {
     timestamp: string;
     preview: string;
   }
+  interface DeepLead {
+    id: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    company_name: string;
+    campaign_id: string;
+    campaign_name: string | null;
+    status: number | string | null;
+    status_summary: string;
+    last_step_from: string;
+    last_step_timestamp_executed: string;
+    created_at: string;
+  }
   const [deepSearching, setDeepSearching] = useState(false);
   const [deepResults, setDeepResults] = useState<DeepMatch[] | null>(null);
+  const [deepLeads, setDeepLeads] = useState<DeepLead[] | null>(null);
   const [deepError, setDeepError] = useState<string | null>(null);
-  const [deepMeta, setDeepMeta] = useState<{ pages_fetched?: number; emails_scanned?: number } | null>(null);
+  const [deepMeta, setDeepMeta] = useState<{ pages_fetched?: number; emails_scanned?: number; leads_error?: string | null } | null>(null);
 
   const runDeepSearch = useCallback(async () => {
     if (!search.trim()) return;
     setDeepSearching(true);
     setDeepResults(null);
+    setDeepLeads(null);
     setDeepError(null);
     setDeepMeta(null);
     try {
-      // Scope to the currently-selected campaign if any. Massively widens
-      // time coverage since we're not sharing pagination budget with every
-      // other campaign in the unibox.
       const params = new URLSearchParams({ q: search.trim() });
       if (selectedCampaign) params.set('campaign_id', selectedCampaign);
       const res = await fetch(`/api/outreach/instantly/search?${params.toString()}`);
@@ -221,7 +234,12 @@ export default function InboxPage() {
         setDeepError(data.error);
       } else {
         setDeepResults(data.matches || []);
-        setDeepMeta({ pages_fetched: data.pages_fetched, emails_scanned: data.emails_scanned });
+        setDeepLeads(data.leads || []);
+        setDeepMeta({
+          pages_fetched: data.pages_fetched,
+          emails_scanned: data.emails_scanned,
+          leads_error: data.leads_error ?? null,
+        });
       }
     } catch (err: unknown) {
       setDeepError(err instanceof Error ? err.message : 'Deep search failed');
@@ -602,7 +620,7 @@ export default function InboxPage() {
             </div>
             <button
               type="button"
-              onClick={() => { setDeepResults(null); setDeepError(null); setDeepMeta(null); }}
+              onClick={() => { setDeepResults(null); setDeepLeads(null); setDeepError(null); setDeepMeta(null); }}
               className="text-[11px] text-bt-text-tertiary hover:text-bt-text"
             >
               Close
@@ -613,10 +631,57 @@ export default function InboxPage() {
             <div className="text-xs text-bt-red">{deepError}</div>
           )}
 
-          {deepResults && deepResults.length === 0 && (
+          {/* Leads section — people in the campaign, regardless of whether
+              we've ever sent them an email. This is a completely different
+              Instantly data source than the email feed. */}
+          {deepLeads && deepLeads.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs text-bt-text-secondary">
+                <strong>{deepLeads.length}</strong> lead match{deepLeads.length === 1 ? '' : 'es'} (from Instantly&apos;s contact list):
+              </p>
+              <div className="divide-y divide-bt-border border border-bt-border rounded-lg">
+                {deepLeads.map((l) => {
+                  const fullName = [l.first_name, l.last_name].filter(Boolean).join(' ') || l.email || '(unknown)';
+                  return (
+                    <div key={l.id || l.email} className="px-4 py-2.5 text-xs">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="primary" size="sm">Lead</Badge>
+                        <span className="font-medium text-bt-text truncate">{fullName}</span>
+                        <span className="text-bt-text-tertiary">·</span>
+                        <span className="text-bt-text-secondary truncate">{l.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[11px] text-bt-text-tertiary">
+                        {l.company_name && <span>{l.company_name}</span>}
+                        {l.campaign_name && <Badge variant="default" size="sm">{l.campaign_name}</Badge>}
+                        {l.status_summary && <span>status: {l.status_summary}</span>}
+                        {l.last_step_timestamp_executed && (
+                          <span className="tabular-nums">
+                            last step: {new Date(l.last_step_timestamp_executed).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {deepMeta?.leads_error && (
+            <div className="text-[11px] text-bt-amber">
+              Leads search failed: {deepMeta.leads_error}
+            </div>
+          )}
+
+          {deepResults && deepResults.length === 0 && (!deepLeads || deepLeads.length === 0) && (
             <div className="text-xs text-bt-text-secondary">
-              No match found in the last {(deepMeta?.emails_scanned ?? 0).toLocaleString()} Instantly emails for <strong>&quot;{search}&quot;</strong>.
-              Either the reply is older than that, or it isn&apos;t in Instantly at all. Check the inbox in Instantly directly.
+              No match found for <strong>&quot;{search}&quot;</strong> in {(deepMeta?.emails_scanned ?? 0).toLocaleString()} emails or in the campaign&apos;s lead list. Either the reply is older than that window, or it isn&apos;t in Instantly at all.
+            </div>
+          )}
+
+          {deepResults && deepResults.length === 0 && deepLeads && deepLeads.length > 0 && (
+            <div className="text-[11px] text-bt-text-tertiary pt-1">
+              ℹ️ Found the lead above, but no corresponding email in the {(deepMeta?.emails_scanned ?? 0).toLocaleString()}-email scan. The lead exists in Instantly but either hasn&apos;t been emailed yet, or the email is older than the scan window.
             </div>
           )}
 

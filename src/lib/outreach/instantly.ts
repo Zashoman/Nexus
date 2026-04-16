@@ -1,9 +1,12 @@
 // ============================================================
 // Instantly API Client — READ-ONLY
 // ============================================================
-// SAFETY: This client only exposes GET methods.
-// No POST, PUT, DELETE, or PATCH methods exist.
-// No emails can be sent through this client.
+// SAFETY: This client only makes READ operations against Instantly.
+// Most endpoints use GET. The one exception is POST /leads/list,
+// which is a read-only filter-query endpoint (Instantly's standard
+// pattern for leads); no leads are ever created or mutated here.
+// No emails are sent through this client, and there are no write
+// methods for campaigns, inboxes, or accounts.
 // ============================================================
 
 const INSTANTLY_API_V2 = 'https://api.instantly.ai/api/v2';
@@ -195,4 +198,89 @@ export async function testConnection(): Promise<{ ok: boolean; error?: string; c
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: message };
   }
+}
+
+// -----------------------------------------------------------
+// Leads (READ-ONLY POST — /leads/list uses POST with a JSON
+// body for filtering, but is itself a pure read operation.
+// No leads are created or modified here.)
+// -----------------------------------------------------------
+
+export interface InstantlyLead {
+  id?: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  company_name?: string;
+  campaign?: string;
+  status?: number | string;
+  created_at?: string;
+  last_step_from?: string;
+  last_step_timestamp_executed?: string;
+  personalization?: string;
+  payload?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** List leads, optionally filtered by search string, campaign, or status.
+ *  Uses POST /api/v2/leads/list (Instantly's standard filter-query pattern
+ *  for leads). This is a pure read operation; no leads are mutated. */
+export async function listLeads(params: {
+  search?: string;
+  campaign_id?: string;
+  limit?: number;
+  starting_after?: string;
+}): Promise<{ items: InstantlyLead[]; next_starting_after?: string }> {
+  const body: Record<string, unknown> = {
+    limit: params.limit || 50,
+  };
+  if (params.search) body.search = params.search;
+  if (params.campaign_id) body.campaign = params.campaign_id;
+  if (params.starting_after) body.starting_after = params.starting_after;
+
+  const url = `${INSTANTLY_API_V2}/leads/list`;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getApiKey()}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (res.status === 429 && attempt < 2) {
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Instantly leads API error (${res.status}): ${text.substring(0, 300)}`);
+      }
+      const text = await res.text();
+      let data: unknown;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`Instantly leads API returned non-JSON: ${text.substring(0, 200)}`);
+      }
+
+      const d = data as Record<string, unknown>;
+      const items = (d.items || d.data || []) as InstantlyLead[];
+      const next = d.next_starting_after as string | undefined;
+      return { items, next_starting_after: next };
+    } catch (err) {
+      if (attempt < 2 && err instanceof Error && (err.message.includes('429') || err.message.includes('fetch'))) {
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw new Error('Instantly leads API: max retries exceeded');
 }

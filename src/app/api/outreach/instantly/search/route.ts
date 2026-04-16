@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listUniboxEmails, listCampaigns } from '@/lib/outreach/instantly';
+import { listUniboxEmails, listCampaigns, listLeads } from '@/lib/outreach/instantly';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -204,6 +204,39 @@ export async function GET(request: Request) {
       return bt - at;
     });
 
+    // ALSO query the leads API. This catches prospects who are in the
+    // campaign's lead list but may not have any email yet in the unibox
+    // (e.g. paused campaigns, scheduled-but-not-sent, bounced, etc.).
+    let leadHits: Array<Record<string, unknown>> = [];
+    let leadsError: string | null = null;
+    try {
+      const leadsResult = await listLeads({
+        search: q,
+        campaign_id: campaignId || undefined,
+        limit: 100,
+      });
+      leadHits = (leadsResult.items || []).filter((lead) =>
+        matches(lead as unknown as Record<string, unknown>, queryLower),
+      ) as Array<Record<string, unknown>>;
+    } catch (err) {
+      leadsError = err instanceof Error ? err.message : String(err);
+    }
+
+    const leadResults = leadHits.map((lead) => ({
+      id: normalise(lead.id),
+      email: normalise(lead.email),
+      first_name: normalise(lead.first_name),
+      last_name: normalise(lead.last_name),
+      company_name: normalise(lead.company_name),
+      campaign_id: normalise(lead.campaign),
+      campaign_name: campaignMap[normalise(lead.campaign)] || null,
+      status: lead.status,
+      status_summary: normalise(lead.status_summary),
+      last_step_from: normalise(lead.last_step_from),
+      last_step_timestamp_executed: normalise(lead.last_step_timestamp_executed),
+      created_at: normalise(lead.created_at),
+    }));
+
     return NextResponse.json({
       ok: true,
       query: q,
@@ -213,6 +246,9 @@ export async function GET(request: Request) {
       pages_fetched: pagesFetched,
       emails_scanned: totalScanned,
       matches: results,
+      lead_match_count: leadResults.length,
+      leads: leadResults,
+      leads_error: leadsError,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Search failed';
