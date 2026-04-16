@@ -357,6 +357,7 @@ export default function InboxPage() {
     ? tabFiltered.filter((e) => {
         const q = search.toLowerCase();
         return getSenderName(e).toLowerCase().includes(q) ||
+               getSenderEmail(e).toLowerCase().includes(q) ||
                getSubject(e).toLowerCase().includes(q) ||
                getEmailBodyPlain(e).toLowerCase().includes(q);
       })
