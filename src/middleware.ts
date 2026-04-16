@@ -25,9 +25,14 @@ import type { NextRequest } from 'next/server';
 const PROTECTED_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
 // Paths that should always be publicly accessible (no origin check)
-// These are either webhooks from third parties or truly public endpoints
+// These are either webhooks from third parties or truly public endpoints.
+// Third-party webhooks originate from the provider's own infrastructure,
+// so they don't carry a matching Origin header. We bypass the origin
+// check for them and (where possible) rely on provider-specific request
+// signing at the route level for authentication.
 const PUBLIC_API_PATHS = [
   '/api/telegram/webhook', // Telegram sends webhooks from their own infrastructure
+  '/api/outreach/slack/events', // Slack Events API — signed requests from slack.com
 ];
 
 // Paths that are allowed to be called with just the CRON_SECRET
