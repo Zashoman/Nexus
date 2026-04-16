@@ -207,7 +207,12 @@ export default function InboxPage() {
     setDeepError(null);
     setDeepMeta(null);
     try {
-      const res = await fetch(`/api/outreach/instantly/search?q=${encodeURIComponent(search.trim())}`);
+      // Scope to the currently-selected campaign if any. Massively widens
+      // time coverage since we're not sharing pagination budget with every
+      // other campaign in the unibox.
+      const params = new URLSearchParams({ q: search.trim() });
+      if (selectedCampaign) params.set('campaign_id', selectedCampaign);
+      const res = await fetch(`/api/outreach/instantly/search?${params.toString()}`);
       const data = await res.json();
       if (data.error) {
         setDeepError(data.error);
@@ -220,7 +225,7 @@ export default function InboxPage() {
     } finally {
       setDeepSearching(false);
     }
-  }, [search]);
+  }, [search, selectedCampaign]);
 
   const fetchEmails = useCallback(async (campaignId?: string) => {
     setLoading(true);
@@ -581,6 +586,11 @@ export default function InboxPage() {
             <div className="flex items-center gap-2">
               <Globe className="w-4 h-4 text-bt-primary" />
               <h3 className="text-sm font-semibold text-bt-text">Instantly deep search</h3>
+              {selectedCampaign && (
+                <span className="text-[11px] text-bt-primary">
+                  · scoped to {campaigns.find((c) => c.id === selectedCampaign)?.name || 'selected campaign'}
+                </span>
+              )}
               {deepMeta && (
                 <span className="text-[11px] text-bt-text-tertiary">
                   scanned {deepMeta.emails_scanned} emails across {deepMeta.pages_fetched} pages

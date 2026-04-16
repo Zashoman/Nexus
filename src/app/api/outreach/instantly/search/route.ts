@@ -77,6 +77,7 @@ export async function GET(request: Request) {
     const q = (url.searchParams.get('q') || '').trim();
     const maxPagesParam = parseInt(url.searchParams.get('max_pages') || String(MAX_PAGES), 10);
     const maxPages = Math.max(1, Math.min(MAX_PAGES, maxPagesParam));
+    const campaignId = url.searchParams.get('campaign_id') || undefined;
 
     if (!q) {
       return NextResponse.json({ error: 'q query parameter is required' }, { status: 400 });
@@ -104,6 +105,7 @@ export async function GET(request: Request) {
       const batch = await listUniboxEmails({
         limit: PAGE_SIZE,
         skip: page * PAGE_SIZE,
+        campaign_id: campaignId,
       });
       pagesFetched = page + 1;
       if (batch.length === 0) break;
@@ -172,6 +174,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       query: q,
+      campaign_id: campaignId,
+      campaign_name: campaignId ? (campaignMap[campaignId] || null) : null,
       match_count: results.length,
       pages_fetched: pagesFetched,
       emails_scanned: totalScanned,
