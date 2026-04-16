@@ -40,35 +40,44 @@ function normalise(value: unknown): string {
   }
 }
 
-function matches(email: Record<string, unknown>, queryLower: string): boolean {
-  // Check from_address_json first (most reliable for sender info)
-  const fromJson = email.from_address_json as Array<{ address?: string; name?: string }> | undefined;
-  const addrFromJson = fromJson?.[0]?.address || '';
-  const nameFromJson = fromJson?.[0]?.name || '';
+/**
+ * Recursively search every string value in an object/array for the query.
+ * This is intentionally "dumb" — we don't try to pick the right field,
+ * we just check them all. That way any combination of FROM/TO/CC/BCC/lead/
+ * subject/body/preview/html/custom-Instantly-field that contains the
+ * query will match. HTML tags are stripped in a lightweight pass so we
+ * don't false-positive on attribute names.
+ */
+function deepSearchAnyString(value: unknown, queryLower: string, depth = 0): boolean {
+  if (depth > 10) return false; // guard against cycles / pathological nesting
+  if (value === null || value === undefined) return false;
 
-  const candidates = [
-    addrFromJson,
-    nameFromJson,
-    normalise(email.from_address_email),
-    normalise(email.from_name),
-    normalise(email.lead),
-    normalise(email.subject),
-    normalise(email.content_preview),
-    normalise(email.text_body),
-  ];
-
-  // Also consider the body payload (can be object or string)
-  const body = email.body;
-  if (body && typeof body === 'object' && body !== null) {
-    const b = body as Record<string, unknown>;
-    candidates.push(normalise(b.text));
-    candidates.push(normalise(b.html).replace(/<[^>]*>/g, ' '));
-  } else if (typeof body === 'string') {
-    candidates.push(body.replace(/<[^>]*>/g, ' '));
+  if (typeof value === 'string') {
+    // Strip HTML tags before matching so e.g. "img" inside "<img>" doesn't
+    // cause false positives when searching for short substrings.
+    const stripped = value.includes('<') ? value.replace(/<[^>]*>/g, ' ') : value;
+    return stripped.toLowerCase().includes(queryLower);
   }
 
-  const hay = candidates.join(' | ').toLowerCase();
-  return hay.includes(queryLower);
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (deepSearchAnyString(item, queryLower, depth + 1)) return true;
+    }
+    return false;
+  }
+
+  if (typeof value === 'object') {
+    for (const v of Object.values(value as Record<string, unknown>)) {
+      if (deepSearchAnyString(v, queryLower, depth + 1)) return true;
+    }
+    return false;
+  }
+
+  return false;
+}
+
+function matches(email: Record<string, unknown>, queryLower: string): boolean {
+  return deepSearchAnyString(email, queryLower);
 }
 
 export async function GET(request: Request) {
@@ -151,10 +160,34 @@ export async function GET(request: Request) {
       }
       preview = preview.substring(0, 400);
 
+      // Recipient fields (so outbound/sent emails are readable in the UI)
+      const toJson = raw.to_address_json as Array<{ address?: string; name?: string }> | undefined;
+      const toEmail =
+        toJson?.[0]?.address ||
+        normalise(raw.to_address_email) ||
+        normalise(raw.to_address_email_list) ||
+        normalise(raw.to_address) ||
+        '';
+      const toName = toJson?.[0]?.name || normalise(raw.to_name) || '';
+
+      // Direction hint. Blue Tree-domain sender = outbound pitch; everything
+      // else we treat as an inbound reply from the prospect.
+      const BLUE_TREE_DOMAINS_LOCAL = [
+        'bluetree.ai', 'bluetreesaas.org', 'bluetreeailinks.org',
+        'bluetreegrow.org', 'bluetreedigitalpr.com', 'bluetreeaidigital.org',
+        'bluetreeteams.org', 'bluetreedigitalpr.org', 'bluetreeaidigital.com',
+        'bluetreecontent.com', 'bluetreebrand.com', 'bluetrees.org',
+      ];
+      const senderDomain = (senderEmail.split('@')[1] || '').toLowerCase();
+      const direction = BLUE_TREE_DOMAINS_LOCAL.includes(senderDomain) ? 'sent' : 'received';
+
       return {
         id: normalise(raw.id),
+        direction,
         sender_email: senderEmail,
         sender_name: senderName,
+        to_email: toEmail,
+        to_name: toName,
         subject,
         campaign_id: campaignId,
         campaign_name: campaignName,

@@ -187,8 +187,11 @@ export default function InboxPage() {
   // Deep search state — for finding replies beyond the last 100
   interface DeepMatch {
     id: string;
+    direction?: 'sent' | 'received';
     sender_email: string;
     sender_name: string;
+    to_email?: string;
+    to_name?: string;
     subject: string;
     campaign_name: string;
     inbox: string;
@@ -623,34 +626,46 @@ export default function InboxPage() {
                 Found <strong>{deepResults.length}</strong> match{deepResults.length === 1 ? '' : 'es'} for <strong>&quot;{search}&quot;</strong>.
               </p>
               <div className="divide-y divide-bt-border border border-bt-border rounded-lg">
-                {deepResults.map((m) => (
-                  <div key={m.id} className="px-4 py-2.5 text-xs">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-bt-text truncate">{m.sender_name}</span>
-                          <span className="text-bt-text-tertiary">·</span>
-                          <span className="text-bt-text-secondary truncate">{m.sender_email}</span>
-                        </div>
-                        <div className="text-[11px] text-bt-text-tertiary mt-0.5 truncate">
-                          {m.subject}
-                        </div>
-                        {m.preview && (
-                          <div className="text-[11px] text-bt-text-secondary mt-1 line-clamp-2">{m.preview}</div>
-                        )}
-                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                          <Badge variant="default" size="sm">{m.campaign_name}</Badge>
-                          {m.inbox && <span className="text-[10px] text-bt-text-tertiary">via <code>{m.inbox}</code></span>}
-                          {m.timestamp && (
-                            <span className="text-[10px] text-bt-text-tertiary tabular-nums">
-                              {new Date(m.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                            </span>
+                {deepResults.map((m) => {
+                  const isSent = m.direction === 'sent';
+                  const headline = isSent
+                    ? `→ ${m.to_name || m.to_email || '(unknown recipient)'}`
+                    : m.sender_name;
+                  const secondary = isSent
+                    ? m.to_email
+                    : m.sender_email;
+                  return (
+                    <div key={m.id} className="px-4 py-2.5 text-xs">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant={isSent ? 'teal' : 'info'} size="sm">
+                              {isSent ? 'Sent' : 'Received'}
+                            </Badge>
+                            <span className="font-medium text-bt-text truncate">{headline}</span>
+                            <span className="text-bt-text-tertiary">·</span>
+                            <span className="text-bt-text-secondary truncate">{secondary}</span>
+                          </div>
+                          <div className="text-[11px] text-bt-text-tertiary mt-0.5 truncate">
+                            {m.subject}
+                          </div>
+                          {m.preview && (
+                            <div className="text-[11px] text-bt-text-secondary mt-1 line-clamp-2">{m.preview}</div>
                           )}
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <Badge variant="default" size="sm">{m.campaign_name}</Badge>
+                            {m.inbox && <span className="text-[10px] text-bt-text-tertiary">via <code>{m.inbox}</code></span>}
+                            {m.timestamp && (
+                              <span className="text-[10px] text-bt-text-tertiary tabular-nums">
+                                {new Date(m.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <p className="text-[11px] text-bt-text-tertiary">
                 These matches live in Instantly&apos;s archive. To push one to Slack, you&apos;d need to open it in Instantly and reply there, or ask me to build a &quot;push one from archive&quot; action.
