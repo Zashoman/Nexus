@@ -602,7 +602,7 @@ export default function InboxPage() {
 
           {deepResults && deepResults.length === 0 && (
             <div className="text-xs text-bt-text-secondary">
-              No match found in the last 2,000 Instantly emails for <strong>&quot;{search}&quot;</strong>.
+              No match found in the last {(deepMeta?.emails_scanned ?? 0).toLocaleString()} Instantly emails for <strong>&quot;{search}&quot;</strong>.
               Either the reply is older than that, or it isn&apos;t in Instantly at all. Check the inbox in Instantly directly.
             </div>
           )}
