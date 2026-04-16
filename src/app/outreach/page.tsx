@@ -65,6 +65,8 @@ export default function DashboardPage() {
   const [slackTestResult, setSlackTestResult] = useState<string | null>(null);
   const [weeklyRunning, setWeeklyRunning] = useState(false);
   const [weeklyResult, setWeeklyResult] = useState<string | null>(null);
+  const [dailyRunning, setDailyRunning] = useState(false);
+  const [dailyResult, setDailyResult] = useState<string | null>(null);
 
   const fetchDashboard = async () => {
     setLoading(true);
@@ -132,6 +134,40 @@ export default function DashboardPage() {
       setSlackTestResult(`Failed: ${msg}`);
     } finally {
       setSlackTesting(false);
+    }
+  };
+
+  const runDailyReview = async () => {
+    const confirmed = typeof window !== 'undefined'
+      ? window.confirm(
+          'Run the daily inbox review now?\n\nThis scans the last 100 Instantly replies, classifies them, drafts responses for actionable ones, and posts the daily digest to your Slack channel. Takes ~30-60 seconds.',
+        )
+      : true;
+    if (!confirmed) return;
+
+    setDailyRunning(true);
+    setDailyResult('Running — fetching, classifying, drafting...');
+    try {
+      const res = await fetch('/api/outreach/cron/daily-summary', { method: 'POST' });
+      const json = await res.json();
+      if (json.error) {
+        setDailyResult(`Failed: ${json.error}`);
+      } else {
+        const parts = [
+          json.count > 0 ? `✅ Posted to Slack.` : '✅ Done.',
+          json.count > 0
+            ? `${json.count} ${json.count === 1 ? 'reply' : 'replies'} pushed`
+            : (json.message || 'No actionable replies today'),
+          json.duration_ms ? `${(json.duration_ms / 1000).toFixed(0)}s` : null,
+        ].filter(Boolean);
+        setDailyResult(parts.join(' · '));
+        setTimeout(fetchDashboard, 1000);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed';
+      setDailyResult(`Failed: ${msg}`);
+    } finally {
+      setDailyRunning(false);
     }
   };
 
@@ -308,18 +344,32 @@ export default function DashboardPage() {
             <Button
               variant="primary"
               size="sm"
+              onClick={runDailyReview}
+              loading={dailyRunning}
+              icon={<Inbox className="w-3.5 h-3.5" />}
+            >
+              Run daily review
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
               onClick={runWeeklySummary}
               loading={weeklyRunning}
               icon={<CalendarClock className="w-3.5 h-3.5" />}
             >
               Run weekly summary
             </Button>
-            <Link href="/outreach/inbox"><Button variant="ghost" size="sm">Push more</Button></Link>
+            <Link href="/outreach/inbox"><Button variant="ghost" size="sm">Open Inbox</Button></Link>
           </div>
         </div>
         {slackTestResult && (
           <div className={`mb-3 text-[11px] px-3 py-2 rounded-md ${slackTestResult.startsWith('Failed') ? 'bg-bt-red-bg/50 text-bt-red' : 'bg-bt-green-bg/50 text-bt-green'}`}>
             {slackTestResult}
+          </div>
+        )}
+        {dailyResult && (
+          <div className={`mb-3 text-[11px] px-3 py-2 rounded-md ${dailyResult.startsWith('Failed') ? 'bg-bt-red-bg/50 text-bt-red' : dailyResult.startsWith('Running') ? 'bg-bt-primary-bg/50 text-bt-primary' : 'bg-bt-green-bg/50 text-bt-green'}`}>
+            {dailyResult}
           </div>
         )}
         {weeklyResult && (
