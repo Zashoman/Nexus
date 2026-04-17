@@ -91,8 +91,31 @@ export interface ApolloSearchResponse {
   };
 }
 
+function normalizePerson(raw: Record<string, unknown>): ApolloPerson {
+  const org = raw.organization as Record<string, unknown> | undefined;
+  return {
+    id: raw.id as string,
+    first_name: (raw.first_name as string) || undefined,
+    last_name: (raw.last_name as string) || (raw.last_name_obfuscated as string) || undefined,
+    title: (raw.title as string) || undefined,
+    email: (raw.email as string) || undefined,
+    headline: (raw.headline as string) || undefined,
+    city: (raw.city as string) || undefined,
+    state: (raw.state as string) || undefined,
+    country: (raw.country as string) || undefined,
+    organization: org ? {
+      name: (org.name as string) || undefined,
+      industry: (org.industry as string) || undefined,
+      estimated_num_employees: (org.estimated_num_employees as number) || undefined,
+      short_description: (org.short_description as string) || undefined,
+      founded_year: (org.founded_year as number) || undefined,
+    } : undefined,
+  };
+}
+
 function normalizeSearchResponse(raw: Record<string, unknown>): ApolloSearchResponse {
-  const people = (raw.people || raw.contacts || raw.results || []) as ApolloPerson[];
+  const rawPeople = (raw.people || raw.contacts || raw.results || []) as Array<Record<string, unknown>>;
+  const people = rawPeople.map(normalizePerson);
   const pagination = raw.pagination as Record<string, number> | undefined;
   return {
     people,
