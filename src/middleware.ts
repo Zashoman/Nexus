@@ -83,6 +83,61 @@ function isInternalPath(pathname: string): boolean {
 }
 
 // ------------------------------------------------------------
+// App-wide password gate (for personal intelligence app)
+// ------------------------------------------------------------
+const INTEL_DOMAINS = ['intelapp.dev', 'www.intelapp.dev'];
+
+function isIntelDomain(host: string): boolean {
+  const h = host.toLowerCase().split(':')[0];
+  return INTEL_DOMAINS.includes(h);
+}
+
+const LOGIN_PAGE_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login — Intel App</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: #0B0E11; color: #E8EAED; font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .card {
+      background: #161B22; border: 1px solid #1E2A3A; border-radius: 12px;
+      padding: 40px; width: 100%; max-width: 380px; text-align: center;
+    }
+    h1 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+    p { font-size: 13px; color: #8B949E; margin-bottom: 24px; }
+    input {
+      width: 100%; height: 44px; padding: 0 14px; border-radius: 8px;
+      border: 1px solid #1E2A3A; background: #0D1117; color: #E8EAED;
+      font-size: 14px; outline: none; margin-bottom: 16px;
+    }
+    input:focus { border-color: #4488FF; }
+    button {
+      width: 100%; height: 44px; border-radius: 8px; border: none;
+      background: #4488FF; color: white; font-size: 14px; font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #5599FF; }
+    .err { color: #F85149; font-size: 12px; margin-top: 12px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Intelligence App</h1>
+    <p>Enter the access password to continue.</p>
+    <form method="GET">
+      <input type="password" name="key" placeholder="Password" autofocus required />
+      <button type="submit">Enter</button>
+    </form>
+  </div>
+</body>
+</html>`;
+
+// ------------------------------------------------------------
 // Journal password gate
 // ------------------------------------------------------------
 function isJournalPath(pathname: string): boolean {
@@ -142,6 +197,53 @@ export function middleware(request: NextRequest) {
       }
       // Treat bare / as "go to the outreach landing page"
       return NextResponse.redirect(new URL('/outreach', request.url));
+    }
+  }
+
+  // ------------------------------------------------------------
+  // Gate 1.5: App-wide password gate for intelapp.dev.
+  //   If APP_PASSWORD is set and the host is intelapp.dev, every
+  //   page and API route requires a cookie. First visit shows a
+  //   clean login form. Cookie is set for 30 days.
+  // ------------------------------------------------------------
+  const appPassword = process.env.APP_PASSWORD;
+  if (appPassword && isIntelDomain(host) && !isInternalPath(pathname)) {
+    // Allow cron jobs through (they carry CRON_SECRET)
+    const authHeader = request.headers.get('authorization');
+    const cronSecret = process.env.CRON_SECRET;
+    const hasValidCronSecret = cronSecret && authHeader === `Bearer ${cronSecret}`;
+    const appSecret = process.env.APP_SECRET;
+    const hasValidAppSecret = appSecret && authHeader === `Bearer ${appSecret}`;
+
+    if (!hasValidCronSecret && !hasValidAppSecret) {
+      const cookie = request.cookies.get('app_auth')?.value;
+      const queryKey = request.nextUrl.searchParams.get('key');
+
+      // Query-param login: set cookie + redirect to clean URL
+      if (queryKey && queryKey === appPassword) {
+        const cleanUrl = new URL(request.nextUrl.toString());
+        cleanUrl.searchParams.delete('key');
+        const response = NextResponse.redirect(cleanUrl);
+        response.cookies.set('app_auth', appPassword, {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+          path: '/',
+          maxAge: 60 * 60 * 24 * 30,
+        });
+        return response;
+      }
+
+      // No valid cookie → block
+      if (cookie !== appPassword) {
+        if (pathname.startsWith('/api/')) {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        return new NextResponse(LOGIN_PAGE_HTML, {
+          status: 401,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        });
+      }
     }
   }
 
