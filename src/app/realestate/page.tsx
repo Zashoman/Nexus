@@ -128,23 +128,15 @@ export default function RealEstateDashboard() {
               {seeding ? 'Loading...' : 'Load History'}
             </button>
           )}
-          {isOwner && (
-            <button onClick={() => setRefreshOpen(true)}
-              className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#4488FF] border border-[#4488FF]/30 rounded-sm hover:bg-[#4488FF]/10">
-              Refresh
-            </button>
-          )}
-          <a href="/feedback"
-            className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#8899AA] border border-[#1E2A3A] rounded-sm hover:bg-[#1A2332] hover:text-[#E8EAED]">
-            Database
-          </a>
-          {isLoggedIn ? (
+          <button onClick={() => setRefreshOpen(true)}
+            className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#4488FF] border border-[#4488FF]/30 rounded-sm hover:bg-[#4488FF]/10">
+            Refresh
+          </button>
+          {isLoggedIn && (
             <>
               <span className="text-[10px] font-mono text-[#5A6A7A]">{user!.email}</span>
               <button onClick={signOut} className="text-[10px] font-mono text-[#FF4444] hover:text-[#FF6666]">Logout</button>
             </>
-          ) : (
-            <a href="/realestate/login" className="text-[10px] font-mono text-[#4488FF] hover:text-[#6699FF]">Owner Login</a>
           )}
         </div>
       </header>

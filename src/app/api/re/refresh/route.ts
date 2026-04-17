@@ -1,12 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUser, isOwner } from '@/lib/realestate/auth';
+import { NextResponse } from 'next/server';
 import { autoRefreshData } from '@/lib/realestate/claude';
 
-export async function POST(request: NextRequest) {
-  const user = await getAuthUser(request);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!(await isOwner(user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
+// Public refresh: anyone can pull the latest market data.
+// This is intentional — the refresh hits Claude + writes weekly
+// stats to Supabase. Rate-limited only by the underlying APIs.
+export async function POST() {
   try {
     const result = await autoRefreshData();
     return NextResponse.json({ data: result });

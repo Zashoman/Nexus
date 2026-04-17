@@ -219,12 +219,26 @@ export function middleware(request: NextRequest) {
   //   page navigations get a redirect to /outreach.
   // ------------------------------------------------------------
   if (isOutreachOnlyDeployment(host)) {
+    // Clean-URL shortcuts:
+    //   /        → rewrite to /outreach/login  (login page at root)
+    //   /app     → rewrite to /outreach        (dashboard lives at /app)
+    //   /app/*   → rewrite to /outreach/*      (subroutes mirrored)
+    if (pathname === '/') {
+      return NextResponse.rewrite(new URL('/outreach/login', request.url));
+    }
+    if (pathname === '/app') {
+      return NextResponse.rewrite(new URL('/outreach', request.url));
+    }
+    if (pathname.startsWith('/app/')) {
+      const rest = pathname.slice('/app'.length); // keeps leading slash
+      return NextResponse.rewrite(new URL(`/outreach${rest}`, request.url));
+    }
+
     if (!isOutreachPath(pathname) && !isInternalPath(pathname)) {
       if (pathname.startsWith('/api/')) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
       }
-      // Treat bare / as "go to the outreach landing page"
-      return NextResponse.redirect(new URL('/outreach', request.url));
+      return NextResponse.redirect(new URL('/', request.url));
     }
   }
 

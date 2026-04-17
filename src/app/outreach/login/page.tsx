@@ -18,7 +18,7 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      router.push('/outreach');
+      router.push('/app');
     }
   }, [user, router]);
 
@@ -29,7 +29,7 @@ export default function LoginPage() {
 
     try {
       await signIn(email, password);
-      router.push('/outreach');
+      router.push('/app');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to sign in';
       setError(message);
