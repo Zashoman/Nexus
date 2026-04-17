@@ -91,20 +91,47 @@ export interface ApolloSearchResponse {
   };
 }
 
-/** Search for prospects matching the filters */
+/** Search for prospects matching the filters.
+ *  Uses URL query params (Apollo's documented approach for api_search). */
 export async function searchPeople(filters: ApolloSearchFilters): Promise<ApolloSearchResponse> {
-  const data = await apolloPost<ApolloSearchResponse>('/mixed_people/api_search', {
-    page: filters.page || 1,
-    per_page: filters.per_page || 25,
-    person_titles: filters.person_titles,
-    organization_industries: filters.organization_industries,
-    organization_num_employees_ranges: filters.organization_num_employees_ranges,
-    person_locations: filters.person_locations,
-    organization_locations: filters.organization_locations,
-    organization_funding_stage: filters.organization_funding_stage,
-    q_keywords: filters.q_keywords,
+  const apiKey = getApiKey();
+  const url = new URL(`${APOLLO_API_BASE}/mixed_people/api_search`);
+
+  url.searchParams.set('page', String(filters.page || 1));
+  url.searchParams.set('per_page', String(filters.per_page || 25));
+
+  const appendArray = (key: string, values?: string[]) => {
+    if (!values?.length) return;
+    for (const v of values) url.searchParams.append(`${key}[]`, v);
+  };
+
+  appendArray('person_titles', filters.person_titles);
+  appendArray('organization_industries', filters.organization_industries);
+  appendArray('organization_num_employees_ranges', filters.organization_num_employees_ranges);
+  appendArray('person_locations', filters.person_locations);
+  appendArray('organization_locations', filters.organization_locations);
+  appendArray('organization_funding_stage', filters.organization_funding_stage);
+
+  if (filters.q_keywords) {
+    url.searchParams.set('q_keywords', filters.q_keywords);
+  }
+
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      'accept': 'application/json',
+      'X-Api-Key': apiKey,
+    },
   });
-  return data;
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Apollo API error (${res.status}): ${text.substring(0, 500)}`);
+  }
+
+  return res.json();
 }
 
 /** Test the API connection by doing a small search */
