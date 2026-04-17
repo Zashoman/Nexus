@@ -56,6 +56,10 @@ function isOutreachOnlyDeployment(host: string): boolean {
   if (process.env.DEPLOYMENT_MODE === 'outreach-only') return true;
 
   const h = host.toLowerCase();
+
+  // Custom domains for Blue Tree Brain (outreach-only app)
+  if (h === 'bluetreebrainapp.com' || h === 'www.bluetreebrainapp.com') return true;
+
   // Matches every bluetreebrain Vercel deployment (preview + production,
   // including the Git-based preview URL pattern).
   if (h.startsWith('bluetreebrain')) return true;
