@@ -91,6 +91,20 @@ export interface ApolloSearchResponse {
   };
 }
 
+function normalizeSearchResponse(raw: Record<string, unknown>): ApolloSearchResponse {
+  const people = (raw.people || raw.contacts || raw.results || []) as ApolloPerson[];
+  const pagination = raw.pagination as Record<string, number> | undefined;
+  return {
+    people,
+    pagination: {
+      page: pagination?.page ?? 1,
+      per_page: pagination?.per_page ?? people.length,
+      total_entries: pagination?.total_entries ?? pagination?.total ?? people.length,
+      total_pages: pagination?.total_pages ?? 1,
+    },
+  };
+}
+
 /** Search for prospects matching the filters.
  *  Uses URL query params (Apollo's documented approach for api_search). */
 export async function searchPeople(filters: ApolloSearchFilters): Promise<ApolloSearchResponse> {
@@ -131,7 +145,8 @@ export async function searchPeople(filters: ApolloSearchFilters): Promise<Apollo
     throw new Error(`Apollo API error (${res.status}): ${text.substring(0, 500)}`);
   }
 
-  return res.json();
+  const raw = await res.json();
+  return normalizeSearchResponse(raw as Record<string, unknown>);
 }
 
 /** Test the API connection by doing a small search */
