@@ -131,7 +131,7 @@ export async function postReplyToSlack(params: {
           elements: [
             {
               type: 'mrkdwn',
-              text: `_Reply in this thread with feedback to revise (e.g. "make it shorter", "mention our case study")_`,
+              text: `_To revise: *tag @Blue Tree Brain* in the thread with your changes (e.g. "@Blue Tree Brain make it shorter"). Replies that don't tag me are ignored so the team can chat freely._`,
             },
           ],
         },
@@ -236,6 +236,149 @@ export async function postInboxSectionHeader(inbox: string, count: number) {
   });
 }
 
+// -----------------------------------------------------------------
+// Weekly summary header — a richer digest with per-inbox breakdown.
+// Posted once at the start of a weekly digest run. Individual reply
+// cards are posted below it for the actionable replies only.
+// -----------------------------------------------------------------
+export interface WeeklyInboxBreakdown {
+  inbox: string;
+  total: number;
+  actionable: number;
+  by_category: Record<string, number>;
+}
+
+export async function postWeeklySummaryHeader(params: {
+  date_from: Date;
+  date_to: Date;
+  total_replies: number;
+  actionable_replies: number;
+  by_inbox: WeeklyInboxBreakdown[];
+  by_category: Record<string, number>;
+  priority_counts: { high: number; medium: number; low: number };
+  campaigns: string[];
+}) {
+  const channel = getChannel();
+
+  const fromLabel = params.date_from.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const toLabel = params.date_to.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  const { high, medium, low } = params.priority_counts;
+  const priorityLine = [
+    high > 0 ? `🔴 *${high}* urgent` : '',
+    medium > 0 ? `🟡 *${medium}* medium` : '',
+    low > 0 ? `⚪ *${low}* low` : '',
+  ].filter(Boolean).join('  ');
+
+  // Category labels (human-readable)
+  const categoryLabels: Record<string, string> = {
+    interested: 'Interested',
+    meeting_request: 'Meeting',
+    question: 'Question',
+    not_now_later: 'Not now / later',
+    not_interested: 'Not interested',
+    out_of_office: 'OOO',
+    auto_reply: 'Auto-reply',
+    wrong_person: 'Wrong person',
+    unsubscribe: 'Unsubscribe',
+  };
+
+  // Overall category breakdown line
+  const categoryBreakdown = Object.entries(params.by_category)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `*${n}* ${categoryLabels[k] || k}`)
+    .join('  ·  ');
+
+  const blocks: Record<string, unknown>[] = [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: `📅 Weekly Inbox Digest — ${fromLabel} – ${toLabel}`,
+      },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text:
+          `*${params.total_replies}* prospect ${params.total_replies === 1 ? 'reply' : 'replies'} this week` +
+          (params.actionable_replies > 0
+            ? ` · *${params.actionable_replies}* need ${params.actionable_replies === 1 ? 'a response' : 'responses'}`
+            : ' · nothing urgent') +
+          (priorityLine ? `\n${priorityLine}` : ''),
+      },
+    },
+  ];
+
+  if (categoryBreakdown) {
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Category breakdown:*\n${categoryBreakdown}`,
+      },
+    });
+  }
+
+  // Per-inbox breakdown (compact table-ish layout)
+  if (params.by_inbox.length > 0) {
+    const inboxLines = params.by_inbox
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10)
+      .map((row) => {
+        const topCategories = Object.entries(row.by_category)
+          .filter(([, n]) => n > 0)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([k, n]) => `${n} ${categoryLabels[k] || k}`)
+          .join(', ');
+        return `• \`${row.inbox}\` — *${row.total}* ${row.total === 1 ? 'reply' : 'replies'}${row.actionable > 0 ? ` (${row.actionable} actionable)` : ''}${topCategories ? ` — _${topCategories}_` : ''}`;
+      })
+      .join('\n');
+
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Per-inbox breakdown:*\n${inboxLines}${params.by_inbox.length > 10 ? `\n_+${params.by_inbox.length - 10} more inboxes_` : ''}`,
+      },
+    });
+  }
+
+  if (params.campaigns.length > 0) {
+    const display = params.campaigns.slice(0, 8);
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*Campaigns this week:* ${display.join(' · ')}${params.campaigns.length > 8 ? ` _+${params.campaigns.length - 8} more_` : ''}`,
+      },
+    });
+  }
+
+  blocks.push({
+    type: 'context',
+    elements: [
+      {
+        type: 'mrkdwn',
+        text: params.actionable_replies > 0
+          ? `👇 Actionable replies below — each has an AI-drafted response · React: ✅ send · ✏️ revise · ❌ skip · 💤 later`
+          : '✨ Clean week — nothing actionable in the inboxes.',
+      },
+    ],
+  });
+  blocks.push({ type: 'divider' });
+
+  return slackPost('/chat.postMessage', {
+    channel,
+    text: `📅 Weekly Inbox Digest — ${fromLabel} – ${toLabel} — ${params.total_replies} replies`,
+    blocks,
+    unfurl_links: false,
+  });
+}
+
 /** Test Slack connection */
 export async function testSlackConnection(): Promise<{ ok: boolean; error?: string; channel?: string }> {
   try {
@@ -245,6 +388,40 @@ export async function testSlackConnection(): Promise<{ ok: boolean; error?: stri
       text: '✅ Blue Tree Brain connected to Slack successfully.',
     });
     return { ok: true, channel };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+}
+
+/** Lightweight Slack health check — does NOT post a message.
+ *  Calls auth.test to verify the bot token is valid. Safe to call on every page load. */
+export async function getSlackStatus(): Promise<{
+  ok: boolean;
+  error?: string;
+  channel?: string;
+  team?: string;
+  bot_user?: string;
+}> {
+  try {
+    // Don't throw if env vars are missing — return a clean "not configured" state
+    const token = process.env.SLACK_BOT_TOKEN;
+    const rawChannel = process.env.SLACK_CHANNEL;
+    if (!token || !rawChannel) {
+      return { ok: false, error: 'Slack not configured (SLACK_BOT_TOKEN or SLACK_CHANNEL missing)' };
+    }
+    const channel = rawChannel.replace(/^#/, '');
+
+    const res = await fetch(`${SLACK_API}/auth.test`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || 'auth.test failed', channel };
+    return { ok: true, channel, team: data.team, bot_user: data.user };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: message };

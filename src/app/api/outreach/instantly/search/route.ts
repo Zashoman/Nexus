@@ -1,0 +1,257 @@
+import { NextResponse } from 'next/server';
+import { listUniboxEmails, listCampaigns, listLeads } from '@/lib/outreach/instantly';
+
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
+// ============================================================
+// Deep search across the Instantly unibox
+// ============================================================
+// The normal /api/outreach/instantly/replies endpoint only
+// fetches the most recent 100 emails because that's Instantly's
+// per-request cap. When a user or team member asks "why didn't
+// we reply to <specific person>?" the answer is often "that
+// email is older than the 100 most recent and nobody saw it".
+//
+// This endpoint paginates through Instantly up to MAX_PAGES
+// pages (100 per page) looking for any match on:
+//   - sender email (case-insensitive substring)
+//   - sender name
+//   - subject line
+//   - visible body preview
+// Returns every match with enough context to act on it.
+// ============================================================
+
+const PAGE_SIZE = 100;
+const MAX_PAGES = 10; // Up to 1,000 emails — balances coverage vs. rate limit
+// Instantly caps at 20 requests/minute. We need a gap between page fetches
+// so a 10-page crawl fits under the cap AND leaves headroom for the user's
+// other traffic (weekly summary, daily summary, inbox page, etc.).
+// 3,500ms between calls = 17 requests/min max per endpoint invocation.
+const DELAY_BETWEEN_PAGES_MS = 3500;
+
+function normalise(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  try {
+    return String(value);
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Recursively search every string value in an object/array for the query.
+ * This is intentionally "dumb" — we don't try to pick the right field,
+ * we just check them all. That way any combination of FROM/TO/CC/BCC/lead/
+ * subject/body/preview/html/custom-Instantly-field that contains the
+ * query will match. HTML tags are stripped in a lightweight pass so we
+ * don't false-positive on attribute names.
+ */
+function deepSearchAnyString(value: unknown, queryLower: string, depth = 0): boolean {
+  if (depth > 10) return false; // guard against cycles / pathological nesting
+  if (value === null || value === undefined) return false;
+
+  if (typeof value === 'string') {
+    // Strip HTML tags before matching so e.g. "img" inside "<img>" doesn't
+    // cause false positives when searching for short substrings.
+    const stripped = value.includes('<') ? value.replace(/<[^>]*>/g, ' ') : value;
+    return stripped.toLowerCase().includes(queryLower);
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (deepSearchAnyString(item, queryLower, depth + 1)) return true;
+    }
+    return false;
+  }
+
+  if (typeof value === 'object') {
+    for (const v of Object.values(value as Record<string, unknown>)) {
+      if (deepSearchAnyString(v, queryLower, depth + 1)) return true;
+    }
+    return false;
+  }
+
+  return false;
+}
+
+function matches(email: Record<string, unknown>, queryLower: string): boolean {
+  return deepSearchAnyString(email, queryLower);
+}
+
+export async function GET(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const q = (url.searchParams.get('q') || '').trim();
+    const maxPagesParam = parseInt(url.searchParams.get('max_pages') || String(MAX_PAGES), 10);
+    const maxPages = Math.max(1, Math.min(MAX_PAGES, maxPagesParam));
+    const campaignId = url.searchParams.get('campaign_id') || undefined;
+
+    if (!q) {
+      return NextResponse.json({ error: 'q query parameter is required' }, { status: 400 });
+    }
+
+    const queryLower = q.toLowerCase();
+
+    // Campaigns for friendly name lookup
+    const campaigns = await listCampaigns();
+    const campaignMap: Record<string, string> = {};
+    campaigns.forEach((c) => { campaignMap[c.id] = c.name; });
+
+    const matchedEmails: Array<Record<string, unknown>> = [];
+    let pagesFetched = 0;
+    let totalScanned = 0;
+
+    for (let page = 0; page < maxPages; page++) {
+      // Throttle: skip the delay on the first page, pause between subsequent
+      // pages so we stay under Instantly's 20/minute limit and don't
+      // starve other concurrent endpoints (weekly summary, etc.).
+      if (page > 0) {
+        await new Promise((r) => setTimeout(r, DELAY_BETWEEN_PAGES_MS));
+      }
+
+      const batch = await listUniboxEmails({
+        limit: PAGE_SIZE,
+        skip: page * PAGE_SIZE,
+        campaign_id: campaignId,
+      });
+      pagesFetched = page + 1;
+      if (batch.length === 0) break;
+      totalScanned += batch.length;
+
+      for (const email of batch) {
+        const raw = email as unknown as Record<string, unknown>;
+        if (matches(raw, queryLower)) {
+          matchedEmails.push(raw);
+        }
+      }
+
+      // Short page = no more data
+      if (batch.length < PAGE_SIZE) break;
+    }
+
+    // Build a clean response payload
+    const results = matchedEmails.map((raw) => {
+      const fromJson = raw.from_address_json as Array<{ address?: string; name?: string }> | undefined;
+      const senderEmail = fromJson?.[0]?.address || normalise(raw.from_address_email) || normalise(raw.lead);
+      const senderName =
+        fromJson?.[0]?.name ||
+        normalise(raw.from_name) ||
+        senderEmail ||
+        'Unknown';
+      const campaignId = normalise(raw.campaign_id);
+      const campaignName = campaignMap[campaignId] || 'Unknown campaign';
+      const subject = normalise(raw.subject) || '(no subject)';
+      const eaccount = normalise(raw.eaccount);
+      const timestamp =
+        normalise(raw.timestamp_email) ||
+        normalise(raw.timestamp_created) ||
+        normalise(raw.timestamp) ||
+        normalise(raw.date);
+
+      // Short preview of the body
+      let preview = normalise(raw.content_preview);
+      if (!preview && typeof raw.body === 'object' && raw.body !== null) {
+        const b = raw.body as Record<string, unknown>;
+        preview = (normalise(b.text) || normalise(b.html)).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      } else if (!preview && typeof raw.body === 'string') {
+        preview = (raw.body as string).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      }
+      preview = preview.substring(0, 400);
+
+      // Recipient fields (so outbound/sent emails are readable in the UI)
+      const toJson = raw.to_address_json as Array<{ address?: string; name?: string }> | undefined;
+      const toEmail =
+        toJson?.[0]?.address ||
+        normalise(raw.to_address_email) ||
+        normalise(raw.to_address_email_list) ||
+        normalise(raw.to_address) ||
+        '';
+      const toName = toJson?.[0]?.name || normalise(raw.to_name) || '';
+
+      // Direction hint. Blue Tree-domain sender = outbound pitch; everything
+      // else we treat as an inbound reply from the prospect.
+      const BLUE_TREE_DOMAINS_LOCAL = [
+        'bluetree.ai', 'bluetreesaas.org', 'bluetreeailinks.org',
+        'bluetreegrow.org', 'bluetreedigitalpr.com', 'bluetreeaidigital.org',
+        'bluetreeteams.org', 'bluetreedigitalpr.org', 'bluetreeaidigital.com',
+        'bluetreecontent.com', 'bluetreebrand.com', 'bluetrees.org',
+      ];
+      const senderDomain = (senderEmail.split('@')[1] || '').toLowerCase();
+      const direction = BLUE_TREE_DOMAINS_LOCAL.includes(senderDomain) ? 'sent' : 'received';
+
+      return {
+        id: normalise(raw.id),
+        direction,
+        sender_email: senderEmail,
+        sender_name: senderName,
+        to_email: toEmail,
+        to_name: toName,
+        subject,
+        campaign_id: campaignId,
+        campaign_name: campaignName,
+        inbox: eaccount,
+        timestamp,
+        preview,
+      };
+    });
+
+    // Sort newest first by timestamp when we have one
+    results.sort((a, b) => {
+      const at = new Date(a.timestamp || 0).getTime();
+      const bt = new Date(b.timestamp || 0).getTime();
+      return bt - at;
+    });
+
+    // ALSO query the leads API. This catches prospects who are in the
+    // campaign's lead list but may not have any email yet in the unibox
+    // (e.g. paused campaigns, scheduled-but-not-sent, bounced, etc.).
+    let leadHits: Array<Record<string, unknown>> = [];
+    let leadsError: string | null = null;
+    try {
+      const leadsResult = await listLeads({
+        search: q,
+        campaign_id: campaignId || undefined,
+        limit: 100,
+      });
+      leadHits = (leadsResult.items || []).filter((lead) =>
+        matches(lead as unknown as Record<string, unknown>, queryLower),
+      ) as Array<Record<string, unknown>>;
+    } catch (err) {
+      leadsError = err instanceof Error ? err.message : String(err);
+    }
+
+    const leadResults = leadHits.map((lead) => ({
+      id: normalise(lead.id),
+      email: normalise(lead.email),
+      first_name: normalise(lead.first_name),
+      last_name: normalise(lead.last_name),
+      company_name: normalise(lead.company_name),
+      campaign_id: normalise(lead.campaign),
+      campaign_name: campaignMap[normalise(lead.campaign)] || null,
+      status: lead.status,
+      status_summary: normalise(lead.status_summary),
+      last_step_from: normalise(lead.last_step_from),
+      last_step_timestamp_executed: normalise(lead.last_step_timestamp_executed),
+      created_at: normalise(lead.created_at),
+    }));
+
+    return NextResponse.json({
+      ok: true,
+      query: q,
+      campaign_id: campaignId,
+      campaign_name: campaignId ? (campaignMap[campaignId] || null) : null,
+      match_count: results.length,
+      pages_fetched: pagesFetched,
+      emails_scanned: totalScanned,
+      matches: results,
+      lead_match_count: leadResults.length,
+      leads: leadResults,
+      leads_error: leadsError,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Search failed';
+    return NextResponse.json({ error: message, matches: [] }, { status: 500 });
+  }
+}

@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Lightbulb,
   Clock,
+  Sparkles,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card, { CardHeader } from '@/components/outreach/ui/Card';
@@ -65,6 +66,7 @@ export default function TrainingPage() {
   const [data, setData] = useState<TrainingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -100,6 +102,18 @@ export default function TrainingPage() {
     }
   };
 
+  const loadDemoData = async () => {
+    setSeeding(true);
+    try {
+      await fetch('/api/outreach/training/seed-demo', { method: 'POST' });
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   const subjectLines = data?.patterns.filter((p) => p.pattern_type === 'subject_line') || [];
   const openers = data?.patterns.filter((p) => p.pattern_type === 'opener') || [];
   const insights = data?.patterns.find((p) => p.pattern_type === 'follow_up');
@@ -116,6 +130,16 @@ export default function TrainingPage() {
           <div className="flex items-center gap-2">
             <Button variant="secondary" size="sm" onClick={fetchData} icon={<RefreshCw className="w-3.5 h-3.5" />}>
               Refresh
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={loadDemoData}
+              loading={seeding}
+              disabled={seeding || running || isRunning}
+              icon={<Sparkles className="w-3.5 h-3.5" />}
+            >
+              Load demo data
             </Button>
             <Button
               variant="primary"
@@ -261,11 +285,16 @@ export default function TrainingPage() {
         <EmptyState
           icon={<Database className="w-8 h-8" />}
           title="No training data yet"
-          description="Click 'Run Ingestion' to scan recent emails and extract patterns. The agent will use these patterns to inform future drafts."
+          description="Click 'Run Ingestion' to scan recent emails and extract patterns. The agent will use these patterns to inform future drafts. For a quick demo, click 'Load demo data' to populate representative patterns instantly."
           action={
-            <Button variant="primary" size="sm" onClick={startIngestion} loading={running} icon={<Play className="w-3.5 h-3.5" />}>
-              Run Ingestion
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={loadDemoData} loading={seeding} icon={<Sparkles className="w-3.5 h-3.5" />}>
+                Load demo data
+              </Button>
+              <Button variant="primary" size="sm" onClick={startIngestion} loading={running} icon={<Play className="w-3.5 h-3.5" />}>
+                Run Ingestion
+              </Button>
+            </div>
           }
         />
       )}

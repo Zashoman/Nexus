@@ -14,6 +14,11 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle2,
+  MessageSquare,
+  Hash,
+  Zap,
+  MessageSquareHeart,
+  CalendarClock,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card from '@/components/outreach/ui/Card';
@@ -26,7 +31,24 @@ interface DashboardData {
   reminders: { overdue: number; due_soon: number; upcoming: number };
   instantly: { connected: boolean; campaign_count: number };
   learning: { total_revisions: number; last_week: number };
-  slack_drafts: { pending: number; approved: number; sent: number };
+  slack: SlackActivity;
+}
+
+interface SlackActivity {
+  connection: { ok: boolean; error?: string; channel?: string; team?: string };
+  counts: Record<string, number>;
+  revisions_total: number;
+  revisions_last_24h: number;
+  recent: Array<{
+    id: string;
+    slack_message_ts: string;
+    sender_name: string;
+    subject: string;
+    campaign_name: string;
+    status: string;
+    revision_count: number;
+    created_at: string;
+  }>;
 }
 
 function getGreeting(): string {
@@ -39,14 +61,29 @@ function getGreeting(): string {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [slackTesting, setSlackTesting] = useState(false);
+  const [slackTestResult, setSlackTestResult] = useState<string | null>(null);
+  const [weeklyRunning, setWeeklyRunning] = useState(false);
+  const [weeklyResult, setWeeklyResult] = useState<string | null>(null);
+  const [dailyRunning, setDailyRunning] = useState(false);
+  const [dailyResult, setDailyResult] = useState<string | null>(null);
 
   const fetchDashboard = async () => {
     setLoading(true);
     try {
-      const [dashRes, remRes, learnRes] = await Promise.all([
+      const emptySlack: SlackActivity = {
+        connection: { ok: false },
+        counts: {},
+        revisions_total: 0,
+        revisions_last_24h: 0,
+        recent: [],
+      };
+
+      const [dashRes, remRes, learnRes, slackRes] = await Promise.all([
         fetch('/api/outreach/dashboard').then((r) => r.json()),
         fetch('/api/outreach/reminders').then((r) => r.json()).catch(() => ({ counts: { overdue: 0, due_soon: 0, upcoming: 0 } })),
         fetch('/api/outreach/learning').then((r) => r.json()).catch(() => ({ total_revisions: 0, last_week: 0 })),
+        fetch('/api/outreach/slack/activity').then((r) => r.json()).catch(() => emptySlack),
       ]);
 
       // Check Instantly
@@ -57,17 +94,13 @@ export default function DashboardPage() {
         instantlyData = { connected: inst.ok, campaign_count: inst.campaign_count || 0 };
       } catch { /* silent */ }
 
-      // Check slack drafts
-      let slackData = { pending: 0, approved: 0, sent: 0 };
-      try {
-        const slackRes = await fetch('/api/outreach/dashboard');
-        const slack = await slackRes.json();
-        slackData = {
-          pending: slack.metrics?.pending_approvals || 0,
-          approved: 0,
-          sent: slack.metrics?.emails_sent_today || 0,
-        };
-      } catch { /* silent */ }
+      const slackData: SlackActivity = {
+        connection: slackRes.connection || { ok: false },
+        counts: slackRes.counts || {},
+        revisions_total: slackRes.revisions_total || 0,
+        revisions_last_24h: slackRes.revisions_last_24h || 0,
+        recent: slackRes.recent || [],
+      };
 
       setData({
         campaigns: dashRes.campaigns || [],
@@ -75,13 +108,103 @@ export default function DashboardPage() {
         reminders: remRes.counts || { overdue: 0, due_soon: 0, upcoming: 0 },
         instantly: instantlyData,
         learning: { total_revisions: learnRes.total_revisions || 0, last_week: learnRes.last_week || 0 },
-        slack_drafts: slackData,
+        slack: slackData,
       });
     } catch { /* silent */ }
     finally { setLoading(false); }
   };
 
   useEffect(() => { fetchDashboard(); }, []);
+
+  const sendSlackTest = async () => {
+    setSlackTesting(true);
+    setSlackTestResult(null);
+    try {
+      const res = await fetch('/api/outreach/slack/test');
+      const json = await res.json();
+      if (json.ok) {
+        setSlackTestResult(`Test message sent to #${json.channel || 'slack'} — check the channel.`);
+        // Refresh activity to reflect any new state
+        setTimeout(fetchDashboard, 800);
+      } else {
+        setSlackTestResult(`Failed: ${json.error || 'unknown error'}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed';
+      setSlackTestResult(`Failed: ${msg}`);
+    } finally {
+      setSlackTesting(false);
+    }
+  };
+
+  const runDailyReview = async () => {
+    const confirmed = typeof window !== 'undefined'
+      ? window.confirm(
+          'Run the daily inbox review now?\n\nThis scans the last 100 Instantly replies, classifies them, drafts responses for actionable ones, and posts the daily digest to your Slack channel. Takes ~30-60 seconds.',
+        )
+      : true;
+    if (!confirmed) return;
+
+    setDailyRunning(true);
+    setDailyResult('Running — fetching, classifying, drafting...');
+    try {
+      const res = await fetch('/api/outreach/cron/daily-summary', { method: 'POST' });
+      const json = await res.json();
+      if (json.error) {
+        setDailyResult(`Failed: ${json.error}`);
+      } else {
+        const parts = [
+          json.count > 0 ? `✅ Posted to Slack.` : '✅ Done.',
+          json.count > 0
+            ? `${json.count} ${json.count === 1 ? 'reply' : 'replies'} pushed`
+            : (json.message || 'No actionable replies today'),
+          json.duration_ms ? `${(json.duration_ms / 1000).toFixed(0)}s` : null,
+        ].filter(Boolean);
+        setDailyResult(parts.join(' · '));
+        setTimeout(fetchDashboard, 1000);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed';
+      setDailyResult(`Failed: ${msg}`);
+    } finally {
+      setDailyRunning(false);
+    }
+  };
+
+  const runWeeklySummary = async () => {
+    // This can post a lot of messages to Slack if the week has been active.
+    // Confirm before firing.
+    const confirmed = typeof window !== 'undefined'
+      ? window.confirm(
+          'Run the weekly inbox digest now?\n\nThis will scan up to 500 Instantly replies from the last 7 days, classify them, draft responses for actionable ones, and post a digest to your Slack channel.\n\nTakes ~1-2 minutes depending on volume.',
+        )
+      : true;
+    if (!confirmed) return;
+
+    setWeeklyRunning(true);
+    setWeeklyResult('Running — scanning inboxes, classifying replies, drafting responses...');
+    try {
+      const res = await fetch('/api/outreach/cron/weekly-summary', { method: 'POST' });
+      const json = await res.json();
+      if (json.error) {
+        setWeeklyResult(`Failed: ${json.error}`);
+      } else {
+        const parts = [
+          `✅ Posted to Slack.`,
+          `${json.total_replies || 0} replies this week`,
+          json.actionable_replies ? `${json.actionable_replies} actionable` : null,
+          json.duration_ms ? `${(json.duration_ms / 1000).toFixed(0)}s` : null,
+        ].filter(Boolean);
+        setWeeklyResult(parts.join(' · '));
+        setTimeout(fetchDashboard, 1000);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed';
+      setWeeklyResult(`Failed: ${msg}`);
+    } finally {
+      setWeeklyRunning(false);
+    }
+  };
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
@@ -191,6 +314,142 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* Slack activity */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-bt-text-secondary" />
+            <h2 className="text-sm font-semibold text-bt-text">Slack Activity</h2>
+            {data?.slack.connection.ok ? (
+              <Badge variant="success" size="sm" dot>Connected</Badge>
+            ) : (
+              <Badge variant="danger" size="sm" dot>Offline</Badge>
+            )}
+            {data?.slack.connection.channel && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-bt-text-tertiary">
+                <Hash className="w-3 h-3" />{data.slack.connection.channel}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={sendSlackTest}
+              loading={slackTesting}
+              icon={<Zap className="w-3.5 h-3.5" />}
+            >
+              Send test message
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={runDailyReview}
+              loading={dailyRunning}
+              icon={<Inbox className="w-3.5 h-3.5" />}
+            >
+              Run daily review
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={runWeeklySummary}
+              loading={weeklyRunning}
+              icon={<CalendarClock className="w-3.5 h-3.5" />}
+            >
+              Run weekly summary
+            </Button>
+            <Link href="/outreach/inbox"><Button variant="ghost" size="sm">Open Inbox</Button></Link>
+          </div>
+        </div>
+        {slackTestResult && (
+          <div className={`mb-3 text-[11px] px-3 py-2 rounded-md ${slackTestResult.startsWith('Failed') ? 'bg-bt-red-bg/50 text-bt-red' : 'bg-bt-green-bg/50 text-bt-green'}`}>
+            {slackTestResult}
+          </div>
+        )}
+        {dailyResult && (
+          <div className={`mb-3 text-[11px] px-3 py-2 rounded-md ${dailyResult.startsWith('Failed') ? 'bg-bt-red-bg/50 text-bt-red' : dailyResult.startsWith('Running') ? 'bg-bt-primary-bg/50 text-bt-primary' : 'bg-bt-green-bg/50 text-bt-green'}`}>
+            {dailyResult}
+          </div>
+        )}
+        {weeklyResult && (
+          <div className={`mb-3 text-[11px] px-3 py-2 rounded-md ${weeklyResult.startsWith('Failed') ? 'bg-bt-red-bg/50 text-bt-red' : weeklyResult.startsWith('Running') ? 'bg-bt-primary-bg/50 text-bt-primary' : 'bg-bt-green-bg/50 text-bt-green'}`}>
+            {weeklyResult}
+          </div>
+        )}
+
+        <Card padding="none">
+          {/* Stats strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-bt-border">
+            <div className="px-5 py-4">
+              <p className="text-[10px] text-bt-text-tertiary uppercase tracking-wider">Pending Review</p>
+              <p className="text-xl font-bold text-bt-text mt-1 tabular-nums">{data?.slack.counts.pending || 0}</p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[10px] text-bt-text-tertiary uppercase tracking-wider">Approved</p>
+              <p className="text-xl font-bold text-bt-text mt-1 tabular-nums">{data?.slack.counts.approved || 0}</p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[10px] text-bt-text-tertiary uppercase tracking-wider">Sent</p>
+              <p className="text-xl font-bold text-bt-text mt-1 tabular-nums">{data?.slack.counts.sent || 0}</p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[10px] text-bt-text-tertiary uppercase tracking-wider">Thread Lessons</p>
+              <p className="text-xl font-bold text-bt-text mt-1 tabular-nums">{data?.slack.revisions_total || 0}</p>
+              <p className="text-[10px] text-bt-text-tertiary mt-0.5">{data?.slack.revisions_last_24h || 0} in last 24h</p>
+            </div>
+          </div>
+
+          {/* Recent drafts */}
+          {data?.slack.recent && data.slack.recent.length > 0 ? (
+            <div className="divide-y divide-bt-border border-t border-bt-border">
+              {data.slack.recent.map((d) => (
+                <div key={d.id} className="flex items-center justify-between px-5 py-3 hover:bg-bt-surface-hover transition-colors">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-bt-text truncate">{d.sender_name || '(unknown sender)'}</p>
+                      <span className="text-[11px] text-bt-text-tertiary">·</span>
+                      <p className="text-[11px] text-bt-text-secondary truncate">{d.campaign_name}</p>
+                    </div>
+                    <p className="text-[11px] text-bt-text-tertiary truncate mt-0.5">{d.subject || '(no subject)'}</p>
+                  </div>
+                  <div className="flex items-center gap-2 ml-3 shrink-0">
+                    {d.revision_count > 0 && (
+                      <Badge variant="info" size="sm">{d.revision_count} revision{d.revision_count === 1 ? '' : 's'}</Badge>
+                    )}
+                    <Badge
+                      variant={
+                        d.status === 'sent' ? 'success'
+                        : d.status === 'approved' ? 'teal'
+                        : d.status === 'skipped' ? 'default'
+                        : d.status === 'snoozed' ? 'warning'
+                        : 'primary'
+                      }
+                      size="sm"
+                      dot
+                    >
+                      {d.status}
+                    </Badge>
+                    <span className="text-[11px] text-bt-text-tertiary tabular-nums">
+                      {new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="border-t border-bt-border px-5 py-6 text-center">
+              <p className="text-xs text-bt-text-secondary">
+                No Slack drafts yet. Classify replies in the <Link href="/outreach/inbox" className="text-bt-primary underline">Inbox</Link> and click <strong>Send to Slack</strong>.
+              </p>
+              {!data?.slack.connection.ok && data?.slack.connection.error && (
+                <p className="text-[11px] text-bt-red mt-2">{data.slack.connection.error}</p>
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
+
       {/* Active campaigns */}
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -231,7 +490,7 @@ export default function DashboardPage() {
       {/* Quick actions */}
       <div>
         <h2 className="text-sm font-semibold text-bt-text mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Link href="/outreach/inbox/review">
             <Card hover className="text-center py-4">
               <CheckCircle2 className="w-6 h-6 text-bt-green mx-auto mb-2" />
@@ -254,6 +513,12 @@ export default function DashboardPage() {
             <Card hover className="text-center py-4">
               <AlertTriangle className="w-6 h-6 text-bt-amber mx-auto mb-2" />
               <p className="text-xs font-medium text-bt-text">Reminders ({(data?.reminders.overdue || 0) + (data?.reminders.due_soon || 0)})</p>
+            </Card>
+          </Link>
+          <Link href="/outreach/demo">
+            <Card hover className="text-center py-4">
+              <MessageSquareHeart className="w-6 h-6 text-bt-teal mx-auto mb-2" />
+              <p className="text-xs font-medium text-bt-text">Demo Hub</p>
             </Card>
           </Link>
         </div>

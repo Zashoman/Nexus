@@ -118,14 +118,34 @@ export async function GET(request: Request) {
   }
 
   try {
-    const startTime = Date.now();
-    const supabase = getServiceSupabase();
-    const channel = (process.env.SLACK_CHANNEL || '').replace(/^#/, '');
+    return await runDailySummary();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Cron failed';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
 
-    // Validate required env vars
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set' }, { status: 500 });
-    }
+// POST: same-origin dashboard trigger. Site middleware already verifies
+// that POSTs originate from an allowed origin, so we don't need the
+// CRON_SECRET here — that's for external cron.
+export async function POST() {
+  try {
+    return await runDailySummary();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Daily summary failed';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+async function runDailySummary() {
+  const startTime = Date.now();
+  const supabase = getServiceSupabase();
+  const channel = (process.env.SLACK_CHANNEL || '').replace(/^#/, '');
+
+  // Validate required env vars
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set' }, { status: 500 });
+  }
 
     // 1. Fetch campaigns for name lookup
     const campaigns = await listCampaigns();
@@ -323,15 +343,11 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({
-      ok: true,
-      count: processed.length,
-      duration_ms: Date.now() - startTime,
-      priority_counts: priorityCounts,
-      inboxes: accounts,
-    });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Cron failed';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+  return NextResponse.json({
+    ok: true,
+    count: processed.length,
+    duration_ms: Date.now() - startTime,
+    priority_counts: priorityCounts,
+    inboxes: accounts,
+  });
 }

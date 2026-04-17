@@ -23,6 +23,7 @@ import {
   XCircle,
   Clock3,
   BotMessageSquare,
+  Globe,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card from '@/components/outreach/ui/Card';
@@ -182,6 +183,70 @@ export default function InboxPage() {
   const [activeTab, setActiveTab] = useState<InboxTab>('all');
   const [search, setSearch] = useState('');
   const [totalFetched, setTotalFetched] = useState(0);
+
+  // Deep search state — for finding replies beyond the last 100
+  interface DeepMatch {
+    id: string;
+    direction?: 'sent' | 'received';
+    sender_email: string;
+    sender_name: string;
+    to_email?: string;
+    to_name?: string;
+    subject: string;
+    campaign_name: string;
+    inbox: string;
+    timestamp: string;
+    preview: string;
+  }
+  interface DeepLead {
+    id: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    company_name: string;
+    campaign_id: string;
+    campaign_name: string | null;
+    status: number | string | null;
+    status_summary: string;
+    last_step_from: string;
+    last_step_timestamp_executed: string;
+    created_at: string;
+  }
+  const [deepSearching, setDeepSearching] = useState(false);
+  const [deepResults, setDeepResults] = useState<DeepMatch[] | null>(null);
+  const [deepLeads, setDeepLeads] = useState<DeepLead[] | null>(null);
+  const [deepError, setDeepError] = useState<string | null>(null);
+  const [deepMeta, setDeepMeta] = useState<{ pages_fetched?: number; emails_scanned?: number; leads_error?: string | null } | null>(null);
+
+  const runDeepSearch = useCallback(async () => {
+    if (!search.trim()) return;
+    setDeepSearching(true);
+    setDeepResults(null);
+    setDeepLeads(null);
+    setDeepError(null);
+    setDeepMeta(null);
+    try {
+      const params = new URLSearchParams({ q: search.trim() });
+      if (selectedCampaign) params.set('campaign_id', selectedCampaign);
+      const res = await fetch(`/api/outreach/instantly/search?${params.toString()}`);
+      const data = await res.json();
+      if (data.error) {
+        setDeepError(data.error);
+      } else {
+        setDeepResults(data.matches || []);
+        setDeepLeads(data.leads || []);
+        setDeepMeta({
+          pages_fetched: data.pages_fetched,
+          emails_scanned: data.emails_scanned,
+          leads_error: data.leads_error ?? null,
+        });
+      }
+    } catch (err: unknown) {
+      setDeepError(err instanceof Error ? err.message : 'Deep search failed');
+    } finally {
+      setDeepSearching(false);
+    }
+  }, [search, selectedCampaign]);
 
   const fetchEmails = useCallback(async (campaignId?: string) => {
     setLoading(true);
@@ -357,6 +422,7 @@ export default function InboxPage() {
     ? tabFiltered.filter((e) => {
         const q = search.toLowerCase();
         return getSenderName(e).toLowerCase().includes(q) ||
+               getSenderEmail(e).toLowerCase().includes(q) ||
                getSubject(e).toLowerCase().includes(q) ||
                getEmailBodyPlain(e).toLowerCase().includes(q);
       })
@@ -498,10 +564,26 @@ export default function InboxPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search replies..."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.shiftKey) {
+                e.preventDefault();
+                runDeepSearch();
+              }
+            }}
+            placeholder="Search replies (Shift+Enter = search all of Instantly)"
             className="w-full h-9 pl-9 pr-4 rounded-lg border border-bt-border bg-bt-surface text-sm text-bt-text placeholder:text-bt-text-tertiary focus:outline-none focus:ring-2 focus:ring-bt-primary focus:border-transparent transition-shadow"
           />
         </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={runDeepSearch}
+          disabled={!search.trim() || deepSearching}
+          loading={deepSearching}
+          icon={<Globe className="w-3.5 h-3.5" />}
+        >
+          Search all of Instantly
+        </Button>
         <div className="relative">
           <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-bt-text-tertiary pointer-events-none" />
           <select
@@ -517,6 +599,146 @@ export default function InboxPage() {
           <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-bt-text-tertiary pointer-events-none" />
         </div>
       </div>
+
+      {/* Deep search results (when user explicitly searched all of Instantly) */}
+      {(deepResults !== null || deepError) && (
+        <div className="rounded-xl border border-bt-border bg-bt-surface p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Globe className="w-4 h-4 text-bt-primary" />
+              <h3 className="text-sm font-semibold text-bt-text">Instantly deep search</h3>
+              {selectedCampaign && (
+                <span className="text-[11px] text-bt-primary">
+                  · scoped to {campaigns.find((c) => c.id === selectedCampaign)?.name || 'selected campaign'}
+                </span>
+              )}
+              {deepMeta && (
+                <span className="text-[11px] text-bt-text-tertiary">
+                  scanned {deepMeta.emails_scanned} emails across {deepMeta.pages_fetched} pages
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => { setDeepResults(null); setDeepLeads(null); setDeepError(null); setDeepMeta(null); }}
+              className="text-[11px] text-bt-text-tertiary hover:text-bt-text"
+            >
+              Close
+            </button>
+          </div>
+
+          {deepError && (
+            <div className="text-xs text-bt-red">{deepError}</div>
+          )}
+
+          {/* Leads section — people in the campaign, regardless of whether
+              we've ever sent them an email. This is a completely different
+              Instantly data source than the email feed. */}
+          {deepLeads && deepLeads.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs text-bt-text-secondary">
+                <strong>{deepLeads.length}</strong> lead match{deepLeads.length === 1 ? '' : 'es'} (from Instantly&apos;s contact list):
+              </p>
+              <div className="divide-y divide-bt-border border border-bt-border rounded-lg">
+                {deepLeads.map((l) => {
+                  const fullName = [l.first_name, l.last_name].filter(Boolean).join(' ') || l.email || '(unknown)';
+                  return (
+                    <div key={l.id || l.email} className="px-4 py-2.5 text-xs">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="primary" size="sm">Lead</Badge>
+                        <span className="font-medium text-bt-text truncate">{fullName}</span>
+                        <span className="text-bt-text-tertiary">·</span>
+                        <span className="text-bt-text-secondary truncate">{l.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[11px] text-bt-text-tertiary">
+                        {l.company_name && <span>{l.company_name}</span>}
+                        {l.campaign_name && <Badge variant="default" size="sm">{l.campaign_name}</Badge>}
+                        {l.status_summary && <span>status: {l.status_summary}</span>}
+                        {l.last_step_timestamp_executed && (
+                          <span className="tabular-nums">
+                            last step: {new Date(l.last_step_timestamp_executed).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {deepMeta?.leads_error && (
+            <div className="text-[11px] text-bt-amber">
+              Leads search failed: {deepMeta.leads_error}
+            </div>
+          )}
+
+          {deepResults && deepResults.length === 0 && (!deepLeads || deepLeads.length === 0) && (
+            <div className="text-xs text-bt-text-secondary">
+              No match found for <strong>&quot;{search}&quot;</strong> in {(deepMeta?.emails_scanned ?? 0).toLocaleString()} emails or in the campaign&apos;s lead list. Either the reply is older than that window, or it isn&apos;t in Instantly at all.
+            </div>
+          )}
+
+          {deepResults && deepResults.length === 0 && deepLeads && deepLeads.length > 0 && (
+            <div className="text-[11px] text-bt-text-tertiary pt-1">
+              ℹ️ Found the lead above, but no corresponding email in the {(deepMeta?.emails_scanned ?? 0).toLocaleString()}-email scan. The lead exists in Instantly but either hasn&apos;t been emailed yet, or the email is older than the scan window.
+            </div>
+          )}
+
+          {deepResults && deepResults.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs text-bt-text-secondary">
+                Found <strong>{deepResults.length}</strong> match{deepResults.length === 1 ? '' : 'es'} for <strong>&quot;{search}&quot;</strong>.
+              </p>
+              <div className="divide-y divide-bt-border border border-bt-border rounded-lg">
+                {deepResults.map((m) => {
+                  const isSent = m.direction === 'sent';
+                  const headline = isSent
+                    ? `→ ${m.to_name || m.to_email || '(unknown recipient)'}`
+                    : m.sender_name;
+                  const secondary = isSent
+                    ? m.to_email
+                    : m.sender_email;
+                  return (
+                    <div key={m.id} className="px-4 py-2.5 text-xs">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant={isSent ? 'teal' : 'info'} size="sm">
+                              {isSent ? 'Sent' : 'Received'}
+                            </Badge>
+                            <span className="font-medium text-bt-text truncate">{headline}</span>
+                            <span className="text-bt-text-tertiary">·</span>
+                            <span className="text-bt-text-secondary truncate">{secondary}</span>
+                          </div>
+                          <div className="text-[11px] text-bt-text-tertiary mt-0.5 truncate">
+                            {m.subject}
+                          </div>
+                          {m.preview && (
+                            <div className="text-[11px] text-bt-text-secondary mt-1 line-clamp-2">{m.preview}</div>
+                          )}
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <Badge variant="default" size="sm">{m.campaign_name}</Badge>
+                            {m.inbox && <span className="text-[10px] text-bt-text-tertiary">via <code>{m.inbox}</code></span>}
+                            {m.timestamp && (
+                              <span className="text-[10px] text-bt-text-tertiary tabular-nums">
+                                {new Date(m.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-bt-text-tertiary">
+                These matches live in Instantly&apos;s archive. To push one to Slack, you&apos;d need to open it in Instantly and reply there, or ask me to build a &quot;push one from archive&quot; action.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Loading */}
       {loading && (

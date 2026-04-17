@@ -13,6 +13,7 @@ import {
   Send,
   User,
   BookOpen,
+  ListPlus,
 } from 'lucide-react';
 import PageHeader from '@/components/outreach/layout/PageHeader';
 import Card from '@/components/outreach/ui/Card';
@@ -72,6 +73,9 @@ export default function PitchStudioPage() {
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
+  const [queueing, setQueueing] = useState(false);
+  const [queueResult, setQueueResult] = useState<string | null>(null);
+  const [queueCount, setQueueCount] = useState(0);
 
   useEffect(() => {
     // Load prospects from sessionStorage (set by the Prospects/Sales page)
@@ -97,7 +101,52 @@ export default function PitchStudioPage() {
       .then((r) => r.json())
       .then((data) => setInstantlyCampaigns(data.campaigns || []))
       .catch(() => {});
+
+    // Load current Instantly queue count
+    fetch('/api/outreach/instantly/queue?status=queued&limit=1')
+      .then((r) => r.json())
+      .then((data) => setQueueCount(data.counts?.queued || 0))
+      .catch(() => {});
   }, []);
+
+  const queueForInstantly = async () => {
+    const active = prospects.filter((p) => p.status === 'approved' || p.status === 'edited');
+    if (active.length === 0) return;
+    setQueueing(true);
+    setQueueResult(null);
+    try {
+      const res = await fetch('/api/outreach/instantly/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prospects: active.map((p) => ({
+            id: p.id,
+            first_name: p.first_name,
+            last_name: p.last_name,
+            email: p.email,
+            title: p.title,
+            organization: p.organization,
+            subject: p.subject,
+            opener: p.opener,
+          })),
+          instantly_campaign_id: selectedCampaignId || undefined,
+          instantly_campaign_name:
+            instantlyCampaigns.find((c) => c.id === selectedCampaignId)?.name || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setQueueResult(`Failed: ${data.error}`);
+      } else {
+        setQueueResult(`Staged ${data.queued} pitches for review. Visit /outreach/instantly-queue to export or import.`);
+        setQueueCount((c) => c + (data.queued || 0));
+      }
+    } catch {
+      setQueueResult('Failed to queue. Try again.');
+    } finally {
+      setQueueing(false);
+    }
+  };
 
   const handleImport = async () => {
     if (!selectedCampaignId) return;
@@ -476,11 +525,30 @@ export default function PitchStudioPage() {
               <p className="text-sm font-medium text-bt-text">
                 {approvedProspects.length} pitches approved
               </p>
-              <p className="text-xs text-bt-text-tertiary">Ready to import to Instantly</p>
+              <p className="text-xs text-bt-text-tertiary">
+                Ready to queue for Instantly
+                {queueCount > 0 && (
+                  <span className="ml-2 text-bt-primary">· {queueCount} already in queue</span>
+                )}
+              </p>
+              {queueResult && (
+                <p className={`text-[11px] mt-1 ${queueResult.startsWith('Failed') ? 'text-bt-red' : 'text-bt-green'}`}>
+                  {queueResult}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <Button variant="secondary" size="sm" onClick={downloadCsv} icon={<Send className="w-3.5 h-3.5" />}>
                 Download CSV
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={queueForInstantly}
+                loading={queueing}
+                icon={<ListPlus className="w-3.5 h-3.5" />}
+              >
+                Queue for Instantly
               </Button>
               <Button variant="success" size="lg" onClick={() => setShowImportModal(true)} icon={<Upload className="w-4 h-4" />}>
                 Import to Instantly
