@@ -90,7 +90,7 @@ export interface ApolloSearchResponse {
 
 /** Search for prospects matching the filters */
 export async function searchPeople(filters: ApolloSearchFilters): Promise<ApolloSearchResponse> {
-  const data = await apolloPost<ApolloSearchResponse>('/mixed_people/search', {
+  const data = await apolloPost<ApolloSearchResponse>('/mixed_people/api_search', {
     page: filters.page || 1,
     per_page: filters.per_page || 25,
     person_titles: filters.person_titles,
