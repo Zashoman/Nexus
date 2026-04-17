@@ -18,10 +18,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getAuthUser(request);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!(await isOwner(user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
+  // Public save: anyone can persist refreshed data to the shared DB.
+  // Intentional — this matches the "anyone can refresh" model requested
+  // by the owner. Attribution is recorded as null (no created_by user).
   const body = await request.json();
   const supabase = getServiceSupabase();
 
@@ -30,7 +29,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from('re_weekly_data')
     .upsert(
-      { ...body, created_by: user.id, updated_at: new Date().toISOString() },
+      { ...body, updated_at: new Date().toISOString() },
       { onConflict: 'week_label' }
     )
     .select()
@@ -38,12 +37,11 @@ export async function POST(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Log the update
+  // Log the update (no user attribution since this is public)
   await supabase.from('re_update_log').insert({
-    update_type: 'manual_weekly',
+    update_type: 'public_weekly_refresh',
     description: `Saved weekly data for ${body.week_label}`,
     data_snapshot: body,
-    updated_by: user.id,
   });
 
   return NextResponse.json({ data });
