@@ -49,6 +49,8 @@ export async function POST(request: Request) {
       people: scored,
       total: result.pagination.total_entries,
       pages: result.pagination.total_pages,
+      _debug_people_count: result.people.length,
+      _debug_pagination: result.pagination,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Search failed';
