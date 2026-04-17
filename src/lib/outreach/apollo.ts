@@ -99,7 +99,7 @@ function normalizePerson(raw: Record<string, unknown>): ApolloPerson {
     last_name: (raw.last_name as string) || (raw.last_name_obfuscated as string) || undefined,
     title: (raw.title as string) || undefined,
     email: (raw.email as string) || undefined,
-    headline: (raw.headline as string) || undefined,
+    name: `${(raw.first_name as string) || ''} ${(raw.last_name as string) || (raw.last_name_obfuscated as string) || ''}`.trim() || undefined,
     city: (raw.city as string) || undefined,
     state: (raw.state as string) || undefined,
     country: (raw.country as string) || undefined,
