@@ -14,14 +14,17 @@ function getApiKey(): string {
 }
 
 async function apolloPost<T>(endpoint: string, body: Record<string, unknown>): Promise<T> {
+  const apiKey = getApiKey();
   const res = await fetch(`${APOLLO_API_BASE}${endpoint}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache',
-      'X-Api-Key': getApiKey(),
+      'X-Api-Key': apiKey,
     },
-    body: JSON.stringify(body),
+    // Apollo accepts api_key in the body as well — some endpoints
+    // require it there instead of (or in addition to) the header.
+    body: JSON.stringify({ ...body, api_key: apiKey }),
   });
 
   if (!res.ok) {
