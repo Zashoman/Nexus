@@ -8,14 +8,16 @@ export const metadata: Metadata = {
   description: "Intelligence & Operations Command Center",
 };
 
-const OUTREACH_DOMAINS = [
+const STANDALONE_DOMAINS = [
   'bluetreebrainapp.com',
   'www.bluetreebrainapp.com',
+  'uaemarkettracker.com',
+  'www.uaemarkettracker.com',
 ];
 
-function isOutreachDomain(host: string): boolean {
-  const h = host.toLowerCase().split(':')[0]; // strip port
-  if (OUTREACH_DOMAINS.includes(h)) return true;
+function isStandaloneDomain(host: string): boolean {
+  const h = host.toLowerCase().split(':')[0];
+  if (STANDALONE_DOMAINS.includes(h)) return true;
   if (h.startsWith('bluetreebrain')) return true;
   if (h.startsWith('blue-tree-brain')) return true;
   if (h.includes('-bluetreebrain-')) return true;
@@ -30,7 +32,7 @@ export default async function RootLayout({
 }>) {
   const headersList = await headers();
   const host = headersList.get('host') || '';
-  const skipSidebar = isOutreachDomain(host);
+  const skipSidebar = isStandaloneDomain(host);
 
   return (
     <html lang="en" className="h-full antialiased">

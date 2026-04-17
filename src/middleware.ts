@@ -57,7 +57,7 @@ function isOutreachOnlyDeployment(host: string): boolean {
 
   const h = host.toLowerCase();
 
-  // Custom domains for Blue Tree Brain (outreach-only app)
+// Custom domains for Blue Tree Brain (outreach-only app)
   if (h === 'bluetreebrainapp.com' || h === 'www.bluetreebrainapp.com') return true;
 
   // Matches every bluetreebrain Vercel deployment (preview + production,
@@ -86,6 +86,16 @@ function isInternalPath(pathname: string): boolean {
 // App-wide password gate (for personal intelligence app)
 // ------------------------------------------------------------
 const INTEL_DOMAINS = ['intelapp.dev', 'www.intelapp.dev'];
+const RE_DOMAINS = ['uaemarkettracker.com', 'www.uaemarkettracker.com'];
+
+function isRealEstateDomain(host: string): boolean {
+  const h = host.toLowerCase().split(':')[0];
+  return RE_DOMAINS.includes(h);
+}
+
+function isRealEstatePath(pathname: string): boolean {
+  return pathname.startsWith('/realestate') || pathname.startsWith('/api/re');
+}
 
 function isIntelDomain(host: string): boolean {
   const h = host.toLowerCase().split(':')[0];
@@ -182,6 +192,24 @@ export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const method = request.method;
   const host = request.headers.get('host') || '';
+
+  // ------------------------------------------------------------
+  // Gate 0: Real estate domain isolation.
+  //   On uaemarkettracker.com, only serve the real estate module.
+  //   Root URL serves /realestate content directly (rewrite, not
+  //   redirect — so the address bar stays clean).
+  // ------------------------------------------------------------
+  if (isRealEstateDomain(host)) {
+    if (pathname === '/') {
+      return NextResponse.rewrite(new URL('/realestate', request.url));
+    }
+    if (!isRealEstatePath(pathname) && !isInternalPath(pathname)) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      }
+      return NextResponse.rewrite(new URL('/realestate', request.url));
+    }
+  }
 
   // ------------------------------------------------------------
   // Gate 1 (highest priority): Deployment-scope isolation.
