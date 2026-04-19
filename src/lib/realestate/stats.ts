@@ -19,14 +19,17 @@ function hasData(w: WeeklyData): boolean {
 export function computeKPIs(weeklyData: WeeklyData[], baselines: Baseline[]): KPIStat[] {
   const baselineMap = new Map(baselines.map(b => [b.metric_key, b.baseline_value]));
   const sorted = [...weeklyData].sort((a, b) => new Date(b.week_date).getTime() - new Date(a.week_date).getTime());
-
   // Skip rows that are entirely empty — find the most recent row with actual data
   const nonEmpty = sorted.filter(hasData);
-  const latest = nonEmpty[0];
   const recent8 = nonEmpty.slice(0, 8).reverse();
 
   return WEEKLY_KPI_KEYS.map(({ key, field, label }) => {
-    const value = latest ? (latest[field] as number | null) : null;
+    // Per-field fallback: find the most recent week where THIS specific field has a value.
+    // This handles partial auto-refresh data (e.g. Refresh fills DFM/Emaar but leaves
+    // transactions empty — the transaction KPI still shows last known value).
+    const latestWithValue = sorted.find(w => w[field] != null);
+    const value = latestWithValue ? (latestWithValue[field] as number | null) : null;
+
     const baseline = baselineMap.get(key) ?? 0;
     const changePercent = value != null && baseline > 0
       ? ((value - baseline) / baseline) * 100

@@ -33,12 +33,22 @@ export default function RealEstateDashboard() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
-      if (!res.ok) alert(json.error);
-      else {
-        alert(`Seeded ${json.weeks_seeded} weeks of data!`);
+      if (!res.ok) {
+        alert(`Seed failed: ${json.error ?? 'unknown error'}`);
+      } else if (json.errors > 0) {
+        const errorDetails = (json.results as Array<{week: string; status: string; error?: string}>)
+          .filter(r => r.status === 'error')
+          .map(r => `${r.week}: ${r.error}`)
+          .join('\n');
+        alert(`Partial seed: ${json.inserted} inserted, ${json.updated} updated, ${json.errors} errors.\n\nErrors:\n${errorDetails}`);
+        fetchData();
+      } else {
+        alert(`Seed successful: ${json.inserted} inserted, ${json.updated} updated`);
         fetchData();
       }
-    } catch { alert('Seed failed'); }
+    } catch (e) {
+      alert(`Seed exception: ${e instanceof Error ? e.message : 'unknown'}`);
+    }
     finally { setSeeding(false); }
   };
 

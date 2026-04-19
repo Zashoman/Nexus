@@ -176,12 +176,52 @@ export async function POST(request: NextRequest) {
     },
   ];
 
-  // Upsert all weekly data
-  const { error: weeklyError } = await supabase
-    .from('re_weekly_data')
-    .upsert(weeklyData.map(d => ({ ...d, created_by: user.id })), { onConflict: 'week_label' });
+  // Insert each row individually so we can see exactly which ones fail
+  const results: { week: string; status: 'inserted' | 'updated' | 'error'; error?: string }[] = [];
 
-  if (weeklyError) return NextResponse.json({ error: weeklyError.message }, { status: 500 });
+  for (const week of weeklyData) {
+    // First try without created_by (avoids RLS policies that check auth.uid())
+    const payload = { ...week };
+
+    // Check if exists
+    const { data: existing } = await supabase
+      .from('re_weekly_data')
+      .select('id')
+      .eq('week_label', week.week_label)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await supabase
+        .from('re_weekly_data')
+        .update(payload)
+        .eq('week_label', week.week_label);
+      results.push({
+        week: week.week_label,
+        status: error ? 'error' : 'updated',
+        error: error?.message,
+      });
+    } else {
+      const { error } = await supabase
+        .from('re_weekly_data')
+        .insert(payload);
+
+      // If insert fails, try with created_by as user.id as fallback
+      if (error) {
+        const { error: error2 } = await supabase
+          .from('re_weekly_data')
+          .insert({ ...payload, created_by: user.id });
+        results.push({
+          week: week.week_label,
+          status: error2 ? 'error' : 'inserted',
+          error: error2?.message ?? error.message,
+        });
+      } else {
+        results.push({ week: week.week_label, status: 'inserted' });
+      }
+    }
+  }
+
+  const errorCount = results.filter(r => r.status === 'error').length;
 
   // Update baselines to early-Feb reference point
   const newBaselines = [
@@ -203,13 +243,21 @@ export async function POST(request: NextRequest) {
       .eq('metric_key', b.metric_key);
   }
 
-  // Log
-  await supabase.from('re_update_log').insert({
-    update_type: 'manual_weekly',
-    description: 'Full reseed: 10 weeks of data (W05-W14, Feb 1 – Apr 3 2026) with all fields. Baselines updated to early-Feb pre-conflict reference. Sources: DLD, DFM, gulfbusiness, economymiddleeast, tradingview, voiceofemirates, elbatrawy, reliantsurveyors',
-    data_snapshot: { weeks: weeklyData.map(d => d.week_label), baselines_updated: true },
-    updated_by: user.id,
-  });
+  // Log (don't fail if this errors)
+  try {
+    await supabase.from('re_update_log').insert({
+      update_type: 'manual_weekly',
+      description: `Reseed complete: ${results.length - errorCount}/${results.length} weeks. ${errorCount} errors.`,
+      data_snapshot: { results, baselines_updated: true },
+      updated_by: user.id,
+    });
+  } catch { /* swallow */ }
 
-  return NextResponse.json({ success: true, weeks_seeded: weeklyData.length, baselines_updated: true });
+  return NextResponse.json({
+    success: errorCount === 0,
+    inserted: results.filter(r => r.status === 'inserted').length,
+    updated: results.filter(r => r.status === 'updated').length,
+    errors: errorCount,
+    results,
+  });
 }

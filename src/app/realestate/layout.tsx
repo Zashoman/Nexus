@@ -5,6 +5,8 @@ import AuthProvider from '@/components/realestate/AuthProvider';
 
 export default function RealEstateLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
+    document.title = 'UAE Market Tracker — Dubai RE Monitor';
+
     // Hide the Nexus sidebar nav — this module is standalone
     const nav = document.querySelector('body > nav');
     const main = document.querySelector('body > main');
