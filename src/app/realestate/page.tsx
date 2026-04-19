@@ -28,10 +28,7 @@ export default function RealEstateDashboard() {
   const handleSeed = async () => {
     setSeeding(true);
     try {
-      const res = await fetch('/api/re/seed', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch('/api/re/seed', { method: 'POST' });
       const json = await res.json();
       if (!res.ok) {
         alert(`Seed failed: ${json.error ?? 'unknown error'}`);
@@ -132,12 +129,10 @@ export default function RealEstateDashboard() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {isOwner && (
-            <button onClick={handleSeed} disabled={seeding}
-              className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#00CC66] border border-[#00CC66]/30 rounded-sm hover:bg-[#00CC66]/10 disabled:opacity-50">
-              {seeding ? 'Loading...' : 'Load History'}
-            </button>
-          )}
+          <button onClick={handleSeed} disabled={seeding}
+            className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#00CC66] border border-[#00CC66]/30 rounded-sm hover:bg-[#00CC66]/10 disabled:opacity-50">
+            {seeding ? 'Loading...' : 'Load History'}
+          </button>
           <button onClick={() => setRefreshOpen(true)}
             className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-[#4488FF] border border-[#4488FF]/30 rounded-sm hover:bg-[#4488FF]/10">
             Refresh

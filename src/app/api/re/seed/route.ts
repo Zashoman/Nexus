@@ -1,11 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServiceSupabase, getAuthUser, isOwner } from '@/lib/realestate/auth';
+import { NextResponse } from 'next/server';
+import { getServiceSupabase } from '@/lib/realestate/auth';
 
-export async function POST(request: NextRequest) {
-  const user = await getAuthUser(request);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!(await isOwner(user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
+export async function POST() {
   const supabase = getServiceSupabase();
 
   // Full 9-week dataset: Feb 1 – Apr 3 2026
@@ -205,11 +201,11 @@ export async function POST(request: NextRequest) {
         .from('re_weekly_data')
         .insert(payload);
 
-      // If insert fails, try with created_by as user.id as fallback
+      // If insert fails, try without any optional fields as fallback
       if (error) {
         const { error: error2 } = await supabase
           .from('re_weekly_data')
-          .insert({ ...payload, created_by: user.id });
+          .insert(payload);
         results.push({
           week: week.week_label,
           status: error2 ? 'error' : 'inserted',
@@ -249,7 +245,7 @@ export async function POST(request: NextRequest) {
       update_type: 'manual_weekly',
       description: `Reseed complete: ${results.length - errorCount}/${results.length} weeks. ${errorCount} errors.`,
       data_snapshot: { results, baselines_updated: true },
-      updated_by: user.id,
+      updated_by: null,
     });
   } catch { /* swallow */ }
 
