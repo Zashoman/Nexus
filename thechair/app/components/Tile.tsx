@@ -38,14 +38,47 @@ export default function Tile({ tile }: { tile: MarketTile }) {
         </div>
       )}
 
-      <div className="mt-2 flex items-center justify-between">
-        <span className="tile-meta">
-          {typeof tile.percentile === 'number'
-            ? `p${tile.percentile.toFixed(0)}`
-            : '—'}
-        </span>
-        <span className="tile-meta">{tile.duration ?? ''}</span>
+      <div className="mt-3 flex items-center gap-3">
+        <PercentileMeter value={tile.percentile} />
+        {tile.duration && (
+          <span className="mono shrink-0 text-[10px] uppercase tracking-wider text-bone-300">
+            {tile.duration}
+          </span>
+        )}
       </div>
+    </div>
+  );
+}
+
+function PercentileMeter({ value }: { value?: number }) {
+  if (typeof value !== 'number') {
+    return <div className="flex-1 mono text-[10px] text-bone-400">5y —</div>;
+  }
+  const pct = Math.max(0, Math.min(100, value));
+  // Color gradient: low=calm green, mid=elevated amber, high=stressed red
+  const barColor =
+    pct < 33
+      ? 'bg-calm/70'
+      : pct < 66
+        ? 'bg-elevated/80'
+        : 'bg-stressed/80';
+  return (
+    <div
+      className="group/meter relative flex flex-1 items-center gap-2"
+      title={`${pct.toFixed(0)}th percentile vs 5-year history`}
+    >
+      <span className="mono text-[9px] uppercase tracking-widest text-bone-400">
+        5y
+      </span>
+      <div className="relative h-1 flex-1 overflow-hidden rounded-sm bg-ink-700">
+        <div
+          className={`absolute left-0 top-0 h-full ${barColor}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="mono text-[10px] tabular-nums text-bone-200">
+        {pct.toFixed(0)}
+      </span>
     </div>
   );
 }
