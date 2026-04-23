@@ -18,7 +18,8 @@ export function getMockSnapshot(): MarketSnapshot {
         percentile: 68,
         direction: 'up',
         duration: '3d ↑',
-        note: 'Nasdaq-100 implied volatility, 30d',
+        note: 'CBOE Nasdaq-100 Volatility Index. 30-day implied vol on NDX options, like VIX for tech.',
+        description: 'Third consecutive day higher, breaking the 22 floor.',
       },
       {
         key: 'vxn_vix_ratio',
@@ -28,6 +29,8 @@ export function getMockSnapshot(): MarketSnapshot {
         percentile: 72,
         direction: 'up',
         duration: 'rising',
+        note: 'Ratio of Nasdaq vol to S&P vol. Above 1.15 = tech carrying more implied stress than the broad market.',
+        description: 'NDX dispersion widening vs SPX — tech-specific stress.',
       },
       {
         key: 'vix_term',
@@ -37,7 +40,8 @@ export function getMockSnapshot(): MarketSnapshot {
         percentile: 80,
         direction: 'up',
         duration: 'flattening',
-        note: 'Below 1.0 = inverted front end',
+        note: 'Front / third-month VIX futures ratio. Below 1.0 = inverted curve, market pricing near-term stress above longer-term.',
+        description: 'Front-month inverted vs M3 — near-term fear bid.',
       },
       {
         key: 'vvix',
@@ -46,6 +50,8 @@ export function getMockSnapshot(): MarketSnapshot {
         raw: 98.2,
         percentile: 55,
         direction: 'flat',
+        note: 'Vol-of-vol. Implied volatility of VIX options. Rising VVIX = demand for tail hedges.',
+        description: 'Mid-range, no aggressive tail bidding yet.',
       },
       {
         key: 'qqq_skew_25d',
@@ -55,7 +61,8 @@ export function getMockSnapshot(): MarketSnapshot {
         percentile: 61,
         direction: 'up',
         duration: '2d ↑',
-        note: 'Put IV(25Δ) − Call IV(25Δ)',
+        note: 'Put IV(25Δ) − Call IV(25Δ) on QQQ, in vol points. Higher skew = more demand for downside protection relative to upside.',
+        description: 'Put demand outpacing calls, no flat-skew capitulation yet.',
       },
       {
         key: 'implied_corr',
@@ -64,6 +71,8 @@ export function getMockSnapshot(): MarketSnapshot {
         raw: 0.61,
         percentile: 58,
         direction: 'up',
+        note: 'Implied correlation across NDX constituents derived from QQQ IV vs weighted single-name IV. Rising = names moving together.',
+        description: 'Dispersion compressing — names starting to move in lockstep.',
       },
       {
         key: 'realized_corr',
@@ -72,6 +81,8 @@ export function getMockSnapshot(): MarketSnapshot {
         raw: 0.48,
         percentile: 49,
         direction: 'flat',
+        note: '20-day trailing pairwise correlation across the watchlist. Leading indicator when rising fast.',
+        description: 'Realized still lagging implied — dispersion book holds.',
       },
       {
         key: 'dealer_gamma',
@@ -81,7 +92,8 @@ export function getMockSnapshot(): MarketSnapshot {
         percentile: 22,
         direction: 'down',
         duration: 'negative',
-        note: 'Below zero → dealers short gamma',
+        note: 'Estimated net gamma exposure of options dealers ($ per 1pt SPX move). Negative = dealers must sell into declines and buy into rallies, amplifying moves.',
+        description: 'Dealers short gamma — flows amplify moves both ways.',
       },
       {
         key: 'equity_pc_5d',
@@ -90,6 +102,8 @@ export function getMockSnapshot(): MarketSnapshot {
         raw: 0.72,
         percentile: 64,
         direction: 'up',
+        note: '5-day average equity-only put/call ratio. Rising = retail / hedgers buying more puts than calls.',
+        description: 'Put buying firming up, not yet extreme.',
       },
       {
         key: 'hy_oas',
@@ -98,6 +112,8 @@ export function getMockSnapshot(): MarketSnapshot {
         raw: 362,
         percentile: 44,
         direction: 'up',
+        note: 'ICE BofA US High Yield Index option-adjusted spread (BAMLH0A0HYM2). Tightest credit-stress canary — moves before equities in deeper drawdowns.',
+        description: 'Widening but contained — credit not confirming equity stress yet.',
       },
       {
         key: 'move_index',
@@ -106,6 +122,8 @@ export function getMockSnapshot(): MarketSnapshot {
         raw: 104,
         percentile: 51,
         direction: 'flat',
+        note: 'ICE BofA MOVE Index — Treasury volatility. The "VIX for bonds". Co-moves with equity vol in macro dislocations.',
+        description: 'Treasury vol benign — stress is equity-local for now.',
       },
       {
         key: 'ndx_pct_above_50dma',
@@ -114,6 +132,8 @@ export function getMockSnapshot(): MarketSnapshot {
         raw: 46,
         percentile: 38,
         direction: 'down',
+        note: 'Share of Nasdaq-100 constituents trading above their 50-day moving average. Breadth gauge — low readings signal narrow leadership.',
+        description: 'Below half — breadth deteriorating under the surface.',
       },
       {
         key: 'ndx_top10_share',
@@ -122,7 +142,8 @@ export function getMockSnapshot(): MarketSnapshot {
         raw: 81,
         percentile: 88,
         direction: 'up',
-        note: 'Leadership concentration',
+        note: 'Year-to-date return contribution from the top-10 NDX names. Extreme readings = fragile leadership concentration.',
+        description: 'Top-10 carrying 4x their weight — leadership brittle.',
       },
       {
         key: 'nyse_new_highs_lows',
@@ -131,6 +152,8 @@ export function getMockSnapshot(): MarketSnapshot {
         raw: 42 - 88,
         percentile: 28,
         direction: 'down',
+        note: 'Daily count of NYSE 52-week new highs vs 52-week new lows. Negative ratio = broad distribution below the surface.',
+        description: 'New lows outpacing new highs 2:1 — distribution under the tape.',
       },
       {
         key: 'list_iv_rank',
@@ -140,6 +163,8 @@ export function getMockSnapshot(): MarketSnapshot {
         percentile: 65,
         direction: 'up',
         duration: '+2 wk',
+        note: 'Count of watchlist names with IV-rank above 90 (52-week high IV). Rising = individual names getting re-rated.',
+        description: 'Three names at 52w-high IV — single-name stress concentrating.',
       },
       {
         key: 'vix',
@@ -148,6 +173,8 @@ export function getMockSnapshot(): MarketSnapshot {
         raw: 20.6,
         percentile: 60,
         direction: 'up',
+        note: 'CBOE S&P 500 Volatility Index. 30-day implied vol on SPX. The benchmark fear gauge.',
+        description: 'Above 20 — off-the-floor, not yet panic.',
       },
     ],
     sub_signals: {

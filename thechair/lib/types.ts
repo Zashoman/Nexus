@@ -3,13 +3,14 @@ export type Regime = 'calm' | 'elevated' | 'stressed' | 'dislocation';
 export interface MarketTile {
   key: string;
   label: string;
-  value: string;        // display value, preformatted
-  raw: number | null;   // raw numeric for charts
-  percentile?: number;  // 0-100 within 5Y lookback
+  value: string;          // display value, preformatted
+  raw: number | null;     // raw numeric for charts
+  percentile?: number;    // 0-100 within 5Y lookback
   direction?: 'up' | 'down' | 'flat';
-  duration?: string;    // "3d above 75", etc.
+  duration?: string;      // "3d ↑", etc.
   stale?: boolean;
-  note?: string;
+  note?: string;          // metric definition, surfaced in info tooltip
+  description?: string;   // "what it's doing right now" one-liner
 }
 
 export interface MarketSnapshot {
@@ -31,6 +32,7 @@ export interface WatchlistItem {
   active: boolean;
   // Enriched (optional, present on detail/list endpoints)
   price?: number;
+  change_1d?: number;     // percent, signed
   iv_rank?: number;
   drawdown_52w?: number;
   trigger_hit?: boolean;

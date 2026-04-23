@@ -1,15 +1,14 @@
 import Link from 'next/link';
 import type { Session, Regime } from '../../lib/types';
+import { store } from '../../lib/mock-store';
 
 export const dynamic = 'force-dynamic';
 
-async function fetchSessions(): Promise<Session[]> {
-  // Server-side fetch against own API. In prod single-user local, this is fine.
-  // During phase 1 the API returns mock data.
-  const base = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const res = await fetch(`${base}/api/journal`, { cache: 'no-store' });
-  if (!res.ok) return [];
-  return res.json();
+function fetchSessions(): Session[] {
+  // Phase 1: read from the in-memory store directly. Server components and API
+  // routes share the same module, so this is the same data either way and
+  // avoids an HTTP round-trip to ourselves.
+  return store.listSessions();
 }
 
 const REGIME_COLOR: Record<Regime, string> = {
@@ -19,8 +18,8 @@ const REGIME_COLOR: Record<Regime, string> = {
   dislocation: '#b5455f',
 };
 
-export default async function HistoryPage() {
-  const sessions = await fetchSessions();
+export default function HistoryPage() {
+  const sessions = fetchSessions();
   return (
     <section className="space-y-4">
       <header className="flex items-baseline justify-between border-b border-ink-700 pb-3">

@@ -28,6 +28,7 @@ class MockStore {
       archived_at: null,
       active: true,
       price: 184.2,
+      change_1d: -0.8,
       iv_rank: 42,
       drawdown_52w: -8.1,
       trigger_hit: false,
@@ -42,6 +43,7 @@ class MockStore {
       archived_at: null,
       active: true,
       price: 758.4,
+      change_1d: -2.1,
       iv_rank: 66,
       drawdown_52w: -14.2,
       trigger_hit: false,
@@ -56,9 +58,10 @@ class MockStore {
       archived_at: null,
       active: true,
       price: 212.1,
+      change_1d: 3.4,
       iv_rank: 91,
       drawdown_52w: -22.7,
-      trigger_hit: false,
+      trigger_hit: true,
     },
   ];
   private nextSessionNumber = 1;

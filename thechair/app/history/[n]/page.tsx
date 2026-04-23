@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import type { Session, Regime } from '../../../lib/types';
+import type { Regime } from '../../../lib/types';
+import { store } from '../../../lib/mock-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,15 +12,10 @@ const REGIME_COLOR: Record<Regime, string> = {
   dislocation: '#b5455f',
 };
 
-async function fetchSession(n: string): Promise<Session | null> {
-  const base = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const res = await fetch(`${base}/api/journal/${n}`, { cache: 'no-store' });
-  if (!res.ok) return null;
-  return res.json();
-}
-
-export default async function SessionDetail({ params }: { params: { n: string } }) {
-  const session = await fetchSession(params.n);
+export default function SessionDetail({ params }: { params: { n: string } }) {
+  const n = Number(params.n);
+  if (!Number.isFinite(n)) notFound();
+  const session = store.getSession(n);
   if (!session) notFound();
 
   return (

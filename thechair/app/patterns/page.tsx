@@ -1,13 +1,7 @@
-import type { PatternsReport, Regime } from '../../lib/types';
+import type { Regime } from '../../lib/types';
+import { buildPatternsReport } from '../../lib/patterns/report';
 
 export const dynamic = 'force-dynamic';
-
-async function fetchReport(): Promise<PatternsReport | null> {
-  const base = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const res = await fetch(`${base}/api/patterns`, { cache: 'no-store' });
-  if (!res.ok) return null;
-  return res.json();
-}
 
 const REGIME_COLOR: Record<Regime, string> = {
   calm: '#6ba97f',
@@ -16,15 +10,8 @@ const REGIME_COLOR: Record<Regime, string> = {
   dislocation: '#b5455f',
 };
 
-export default async function PatternsPage() {
-  const report = await fetchReport();
-  if (!report) {
-    return (
-      <div className="text-bone-400 mono text-[11px] uppercase tracking-[0.2em]">
-        patterns unavailable
-      </div>
-    );
-  }
+export default function PatternsPage() {
+  const report = buildPatternsReport();
 
   return (
     <section className="space-y-6">
@@ -94,8 +81,8 @@ export default async function PatternsPage() {
                 key={p.phrase}
                 className="flex items-baseline justify-between text-sm"
               >
-                <span className="italic text-bone-100">"{p.phrase}"</span>
-                <span className="mono text-bone-400">{p.count}×</span>
+                <span className="italic text-bone-100">&ldquo;{p.phrase}&rdquo;</span>
+                <span className="mono text-bone-400">{p.count}&times;</span>
               </li>
             ))}
           </ul>
