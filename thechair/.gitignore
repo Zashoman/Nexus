@@ -1,0 +1,25 @@
+node_modules/
+.next/
+out/
+dist/
+
+# Local env and DB
+.env.local
+.env*.local
+
+# Local DB (should live under ~/.thechair/ per spec, but guard anyway)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Tooling
+.eslintcache
+.DS_Store
+
+# Logs
+*.log
+
+# Test output
+coverage/
+.vitest/

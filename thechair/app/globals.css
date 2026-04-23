@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+html,
+body {
+  background-color: #08090b;
+  color: #e8e6df;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum' on, 'lnum' on;
+}
+
+/* Data tiles: subtle inset border, tight type */
+.tile {
+  background: linear-gradient(180deg, #10131a 0%, #0c0e12 100%);
+  border: 1px solid #1d2230;
+  border-radius: 6px;
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
+    0 -1px 0 0 rgba(0, 0, 0, 0.4) inset;
+}
+
+.tile-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6e6b63;
+}
+
+.tile-value {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum' on, 'lnum' on;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+  color: #e8e6df;
+}
+
+.tile-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #9b988d;
+}
+
+/* Regime color utility tokens used in both bg and border contexts */
+.regime-calm {
+  --regime-color: #6ba97f;
+}
+.regime-elevated {
+  --regime-color: #c9a15b;
+}
+.regime-stressed {
+  --regime-color: #c97a5b;
+}
+.regime-dislocation {
+  --regime-color: #b5455f;
+}
+
+/* Scrollbar: minimal on dark */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0c0e12;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a3040;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a4158;
+}
+
+/* Question highlight term: warm accent on current regime color */
+.highlight-term {
+  color: var(--regime-color, #d4a76a);
+  font-weight: 500;
+}
+
+/* Textarea: no default browser noise */
+textarea.journal-input {
+  background: transparent;
+  color: #f5f4f0;
+  border: none;
+  border-bottom: 1px solid #1d2230;
+  width: 100%;
+  resize: vertical;
+  padding: 12px 0;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+textarea.journal-input:focus {
+  border-bottom-color: var(--regime-color, #d4a76a);
+}
