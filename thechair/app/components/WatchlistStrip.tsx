@@ -73,7 +73,7 @@ export default function WatchlistStrip({ initial }: { initial: WatchlistItem[] }
         </div>
       ) : (
         <div className="tile overflow-x-auto">
-          <table className="w-full min-w-[920px] border-collapse">
+          <table className="w-full min-w-[820px] border-collapse">
             <thead>
               <tr className="border-b border-ink-700 text-left mono text-[9px] uppercase tracking-widest text-bone-400">
                 <th className="px-4 py-2 font-normal">Symbol</th>
@@ -92,7 +92,6 @@ export default function WatchlistStrip({ initial }: { initial: WatchlistItem[] }
                   Level
                 </th>
                 <th className="px-3 py-2 font-normal text-right">Since Entry</th>
-                <th className="px-3 py-2 font-normal text-right">IV Rk</th>
                 <th className="px-3 py-2 font-normal text-right">Trigger</th>
                 <th className="px-4 py-2 font-normal">Status</th>
               </tr>
@@ -120,15 +119,6 @@ function Row({ item }: { item: WatchlistItem }) {
           ? 'text-down'
           : 'text-bone-300';
   const changeSign = pct !== undefined && pct > 0 ? '+' : '';
-
-  const ivColor =
-    item.iv_rank === undefined
-      ? 'text-bone-300'
-      : item.iv_rank >= 80
-        ? 'text-accent'
-        : item.iv_rank >= 50
-          ? 'text-elevated'
-          : 'text-bone-300';
 
   const distanceToTrigger =
     typeof item.price === 'number' && typeof item.trigger_price === 'number'
@@ -188,9 +178,6 @@ function Row({ item }: { item: WatchlistItem }) {
         {typeof item.drawdown_from_entry === 'number'
           ? `${item.drawdown_from_entry > 0 ? '+' : ''}${item.drawdown_from_entry.toFixed(1)}%`
           : '—'}
-      </td>
-      <td className={`px-3 py-2.5 mono tabular-nums text-right text-xs ${ivColor}`}>
-        {typeof item.iv_rank === 'number' ? item.iv_rank.toFixed(0) : '—'}
       </td>
       <td className="px-3 py-2.5 mono tabular-nums text-right text-xs text-bone-300">
         {typeof item.trigger_price === 'number'
