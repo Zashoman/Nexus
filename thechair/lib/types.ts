@@ -21,11 +21,15 @@ export interface MarketSnapshot {
   sub_signals: Record<string, number>; // 0-100 contribution per sub-signal
 }
 
-// Drawdown alert thresholds, in negative percent off the high-water mark.
-// Crossing into any of these (from less-deep to at-or-deeper) emits an alert.
-// -30 is the buy signal; -25 is a heads-up; -35 / -40 are the deeper levels.
-export const DRAWDOWN_LEVELS = [25, 30, 35, 40] as const;
-export type DrawdownLevel = typeof DRAWDOWN_LEVELS[number];
+// Default drawdown alert thresholds in negative percent off the high-water mark.
+// The live levels are stored in the `settings` table and editable from /settings;
+// this constant is only the factory default used on first boot.
+export const DEFAULT_DRAWDOWN_LEVELS: readonly number[] = [25, 30, 35, 40];
+
+// Kept for backwards compatibility with earlier wiring; new code should call
+// store.getDrawdownLevels() so user edits are respected.
+export const DRAWDOWN_LEVELS = DEFAULT_DRAWDOWN_LEVELS as readonly [25, 30, 35, 40];
+export type DrawdownLevel = number;
 
 export interface WatchlistItem {
   id: number;

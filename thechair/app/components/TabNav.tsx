@@ -9,6 +9,7 @@ const TABS = [
   { href: '/history', label: 'History' },
   { href: '/patterns', label: 'Patterns' },
   { href: '/watchlist', label: 'Watchlist' },
+  { href: '/settings', label: 'Settings' },
 ];
 
 export default function TabNav() {

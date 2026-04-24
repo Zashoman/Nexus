@@ -8,7 +8,7 @@ import type {
   Alert,
   DrawdownLevel,
 } from './types';
-import { DRAWDOWN_LEVELS } from './types';
+import { DEFAULT_DRAWDOWN_LEVELS } from './types';
 import { getMockRead } from './mentor/mock';
 import { getMockSnapshot } from './market/mock';
 
@@ -27,6 +27,7 @@ class MockStore {
   private nextAlertId = 1;
   private nextSessionNumber = 1;
   private nextWatchlistId = 100;
+  private drawdownLevels: number[] = [...DEFAULT_DRAWDOWN_LEVELS];
   private watchlist: WatchlistItem[] = buildSeedWatchlist();
 
   constructor() {
@@ -75,7 +76,7 @@ class MockStore {
 
       const nowActive: DrawdownLevel[] =
         typeof dd === 'number'
-          ? DRAWDOWN_LEVELS.filter((lvl) => dd <= -lvl)
+          ? this.drawdownLevels.filter((lvl) => dd <= -lvl)
           : [];
 
       w.levels_triggered = nowActive;
@@ -326,6 +327,24 @@ class MockStore {
       acknowledged_at: new Date().toISOString(),
     };
     return true;
+  }
+
+  // ---- Settings --------------------------------------------------------
+
+  getDrawdownLevels(): number[] {
+    return [...this.drawdownLevels];
+  }
+
+  setDrawdownLevels(levels: number[]): number[] {
+    // Require all positive, distinct, sorted ascending (stored as magnitudes).
+    const cleaned = [...new Set(levels.filter((n) => n > 0 && n < 100))].sort(
+      (a, b) => a - b
+    );
+    if (cleaned.length === 0) throw new Error('must provide at least one level');
+    this.drawdownLevels = cleaned;
+    // Recompute — a tighter threshold may fire alerts on existing names.
+    this.refreshDerived({ emitAlerts: true });
+    return [...this.drawdownLevels];
   }
 
   acknowledgeAllAlerts(): number {
