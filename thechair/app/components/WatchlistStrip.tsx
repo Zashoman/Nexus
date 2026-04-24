@@ -6,6 +6,17 @@ import type { WatchlistItem } from '../../lib/types';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
+// Coloring rule for "Since Entry": treat -30% as a hard demand-attention
+// threshold (the level the investor flagged as the trigger to revisit thesis),
+// -15% as elevated, otherwise neutral or positive.
+function entryColor(pct?: number): string {
+  if (typeof pct !== 'number') return 'text-bone-300';
+  if (pct <= -30) return 'text-dislocation font-medium';
+  if (pct <= -15) return 'text-stressed';
+  if (pct >= 15) return 'text-up';
+  return 'text-bone-200';
+}
+
 export default function WatchlistStrip({ initial }: { initial: WatchlistItem[] }) {
   const { data } = useSWR<WatchlistItem[]>('/api/watchlist', fetcher, {
     fallbackData: initial,
@@ -35,12 +46,18 @@ export default function WatchlistStrip({ initial }: { initial: WatchlistItem[] }
         </div>
       ) : (
         <div className="tile overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse">
+          <table className="w-full min-w-[860px] border-collapse">
             <thead>
               <tr className="border-b border-ink-700 text-left mono text-[9px] uppercase tracking-widest text-bone-400">
                 <th className="px-4 py-2 font-normal">Symbol</th>
                 <th className="px-3 py-2 font-normal text-right">Last</th>
                 <th className="px-3 py-2 font-normal text-right">1D %</th>
+                <th
+                  className="px-3 py-2 font-normal text-right"
+                  title="% from the price when this name was added to The Chair"
+                >
+                  Since Entry
+                </th>
                 <th className="px-3 py-2 font-normal text-right">IV Rk</th>
                 <th className="px-3 py-2 font-normal text-right">52W DD</th>
                 <th className="px-3 py-2 font-normal text-right">Trigger</th>
@@ -110,6 +127,18 @@ function Row({ item }: { item: WatchlistItem }) {
       </td>
       <td className={`px-3 py-2.5 mono tabular-nums text-right text-sm ${changeColor}`}>
         {pct !== undefined ? `${changeSign}${pct.toFixed(2)}%` : '—'}
+      </td>
+      <td
+        className={`px-3 py-2.5 mono tabular-nums text-right text-sm ${entryColor(item.drawdown_from_entry)}`}
+        title={
+          typeof item.entry_price === 'number' && typeof item.entry_at === 'string'
+            ? `Entry: $${item.entry_price.toFixed(2)} on ${new Date(item.entry_at).toLocaleDateString()}`
+            : 'No entry price recorded'
+        }
+      >
+        {typeof item.drawdown_from_entry === 'number'
+          ? `${item.drawdown_from_entry > 0 ? '+' : ''}${item.drawdown_from_entry.toFixed(1)}%`
+          : '—'}
       </td>
       <td className={`px-3 py-2.5 mono tabular-nums text-right text-xs ${ivColor}`}>
         {typeof item.iv_rank === 'number' ? item.iv_rank.toFixed(0) : '—'}

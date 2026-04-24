@@ -12,12 +12,15 @@ import type {
 
 interface SalientNames {
   biggestDrawdown: WatchlistItem | null;
+  // Worst drawdown FROM ENTRY price — i.e. since the investor added it to
+  // The Chair. This is the stronger conviction-test signal than 52w drawdown.
+  worstSinceEntry: WatchlistItem | null;
   triggerHit: WatchlistItem | null;
   biggestMoveDown: WatchlistItem | null;
   biggestMoveUp: WatchlistItem | null;
-  nearTrigger: WatchlistItem | null;  // within 5% of trigger, not yet hit
-  oldestOnList: WatchlistItem | null; // on the list longest — has the thesis gone stale?
-  highIV: WatchlistItem | null;       // IV rank >= 80
+  nearTrigger: WatchlistItem | null;
+  oldestOnList: WatchlistItem | null;
+  highIV: WatchlistItem | null;
 }
 
 function pickSalient(watchlist: WatchlistItem[]): SalientNames {
@@ -25,6 +28,7 @@ function pickSalient(watchlist: WatchlistItem[]): SalientNames {
   if (active.length === 0) {
     return {
       biggestDrawdown: null,
+      worstSinceEntry: null,
       triggerHit: null,
       biggestMoveDown: null,
       biggestMoveUp: null,
@@ -36,6 +40,9 @@ function pickSalient(watchlist: WatchlistItem[]): SalientNames {
   const byDrawdown = [...active].sort(
     (a, b) => (a.drawdown_52w ?? 0) - (b.drawdown_52w ?? 0)
   );
+  const bySinceEntry = [...active]
+    .filter((w) => typeof w.drawdown_from_entry === 'number')
+    .sort((a, b) => (a.drawdown_from_entry! - b.drawdown_from_entry!));
   const byMove = [...active].sort(
     (a, b) => (a.change_1d ?? 0) - (b.change_1d ?? 0)
   );
@@ -55,8 +62,17 @@ function pickSalient(watchlist: WatchlistItem[]): SalientNames {
       return da - db;
     })[0] ?? null;
   const highIV = active.find((w) => (w.iv_rank ?? 0) >= 80) ?? null;
+
+  // Only flag "worst since entry" if it's actually a meaningful drawdown
+  // (-15% or worse). Anything tighter is just noise from picking poor entries.
+  const worstSinceEntry =
+    bySinceEntry[0] && (bySinceEntry[0].drawdown_from_entry ?? 0) <= -15
+      ? bySinceEntry[0]
+      : null;
+
   return {
     biggestDrawdown: byDrawdown[0] ?? null,
+    worstSinceEntry,
     triggerHit,
     biggestMoveDown: byMove[0] && (byMove[0].change_1d ?? 0) < 0 ? byMove[0] : null,
     biggestMoveUp:
@@ -126,7 +142,12 @@ export function getMockQuestions(
 
   if (regime === 'elevated') {
     // 3-4 questions — names moving, plan pressure.
-    if (s.biggestMoveDown) {
+    if (s.worstSinceEntry && (s.worstSinceEntry.drawdown_from_entry ?? 0) <= -25) {
+      push(
+        `${s.worstSinceEntry.ticker} is down ${Math.abs(s.worstSinceEntry.drawdown_from_entry ?? 0).toFixed(0)}% from where you added it ${daysOn(s.worstSinceEntry)} days ago. Was the entry wrong, or is the thesis broken? Be specific.`,
+        [s.worstSinceEntry.ticker, 'entry wrong', 'thesis broken']
+      );
+    } else if (s.biggestMoveDown) {
       push(
         `${s.biggestMoveDown.ticker} is down ${Math.abs(s.biggestMoveDown.change_1d ?? 0).toFixed(1)}% today at ${fmtPrice(s.biggestMoveDown.price)}. Has your plan for it changed since yesterday?`,
         [s.biggestMoveDown.ticker, 'plan for it changed']
@@ -169,7 +190,14 @@ export function getMockQuestions(
 
   if (regime === 'stressed') {
     // 5-6 questions — force plan-vs-action honesty.
-    if (s.biggestDrawdown && (s.biggestDrawdown.drawdown_52w ?? 0) < -10) {
+    // Lead with the worst since-entry name when present — that's the
+    // strongest signal that something we believed in has stopped working.
+    if (s.worstSinceEntry && (s.worstSinceEntry.drawdown_from_entry ?? 0) <= -20) {
+      push(
+        `${s.worstSinceEntry.ticker} is down ${Math.abs(s.worstSinceEntry.drawdown_from_entry ?? 0).toFixed(0)}% from where you added it. That is your conviction in action. Read the thesis out loud — does it still describe the same company you bought into?`,
+        [s.worstSinceEntry.ticker, 'conviction in action', 'same company']
+      );
+    } else if (s.biggestDrawdown && (s.biggestDrawdown.drawdown_52w ?? 0) < -10) {
       push(
         `${s.biggestDrawdown.ticker} is in a ${Math.abs(s.biggestDrawdown.drawdown_52w ?? 0).toFixed(0)}% drawdown. Read the thesis. Which one are you quietly no longer believing?`,
         [s.biggestDrawdown.ticker, 'quietly no longer believing']
@@ -224,7 +252,12 @@ export function getMockQuestions(
   }
 
   // DISLOCATION — 7-8 questions. No politeness. Names, prices, plans.
-  if (s.biggestDrawdown && (s.biggestDrawdown.drawdown_52w ?? 0) < -15) {
+  if (s.worstSinceEntry && (s.worstSinceEntry.drawdown_from_entry ?? 0) <= -25) {
+    push(
+      `${s.worstSinceEntry.ticker} is down ${Math.abs(s.worstSinceEntry.drawdown_from_entry ?? 0).toFixed(0)}% from your entry on ${new Date(s.worstSinceEntry.entry_at ?? s.worstSinceEntry.added_at).toLocaleDateString()}. This is the moment you find out what you actually believe. What is the action?`,
+      [s.worstSinceEntry.ticker, 'what you actually believe', 'the action']
+    );
+  } else if (s.biggestDrawdown && (s.biggestDrawdown.drawdown_52w ?? 0) < -15) {
     push(
       `${s.biggestDrawdown.ticker} is down ${Math.abs(s.biggestDrawdown.drawdown_52w ?? 0).toFixed(0)}% from highs. Pull up the thesis. Does it still work, or are you holding onto the name out of inertia?`,
       [s.biggestDrawdown.ticker, 'inertia']

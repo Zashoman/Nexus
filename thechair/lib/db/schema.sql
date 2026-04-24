@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS watchlist (
   thesis TEXT NOT NULL,
   trigger_price REAL,
   invalidator TEXT,
+  entry_price REAL,                               -- price captured when added to The Chair
+  entry_at TEXT,                                  -- ISO 8601 UTC, when entry_price was set
   added_at TEXT NOT NULL,
   archived_at TEXT,
   active INTEGER NOT NULL DEFAULT 1

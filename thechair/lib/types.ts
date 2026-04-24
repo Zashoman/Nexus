@@ -27,14 +27,17 @@ export interface WatchlistItem {
   thesis: string;
   trigger_price: number | null;
   invalidator: string | null;
+  entry_price: number | null;       // price when added to The Chair
+  entry_at: string | null;          // ISO 8601 UTC; when entry_price was captured
   added_at: string;
   archived_at: string | null;
   active: boolean;
   // Enriched (optional, present on detail/list endpoints)
   price?: number;
-  change_1d?: number;     // percent, signed
+  change_1d?: number;               // percent, signed
   iv_rank?: number;
-  drawdown_52w?: number;
+  drawdown_52w?: number;            // off 52-week high (independent of when added)
+  drawdown_from_entry?: number;     // signed % since this name joined the list
   trigger_hit?: boolean;
 }
 

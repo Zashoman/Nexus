@@ -24,6 +24,8 @@ class MockStore {
       thesis: 'AI infra pull-forward + software accretion; custom silicon moat.',
       trigger_price: 165,
       invalidator: 'Custom silicon share loss or hyperscaler capex cut >15%.',
+      entry_price: 200.0,
+      entry_at: new Date(Date.now() - 86400000 * 30).toISOString(),
       added_at: new Date(Date.now() - 86400000 * 30).toISOString(),
       archived_at: null,
       active: true,
@@ -39,6 +41,8 @@ class MockStore {
       thesis: 'WFE cycle troughing; memory capex recovery.',
       trigger_price: 720,
       invalidator: 'Memory capex pushed out another quarter in next guide.',
+      entry_price: 880.0,
+      entry_at: new Date(Date.now() - 86400000 * 20).toISOString(),
       added_at: new Date(Date.now() - 86400000 * 20).toISOString(),
       archived_at: null,
       active: true,
@@ -54,6 +58,8 @@ class MockStore {
       thesis: 'Vol-of-vol proxy; watch for stress-regime divergence.',
       trigger_price: 180,
       invalidator: 'BTC IV collapse to <50 sustained two weeks.',
+      entry_price: 310.0,
+      entry_at: new Date(Date.now() - 86400000 * 10).toISOString(),
       added_at: new Date(Date.now() - 86400000 * 10).toISOString(),
       archived_at: null,
       active: true,
@@ -66,6 +72,20 @@ class MockStore {
   ];
   private nextSessionNumber = 1;
   private nextWatchlistId = 4;
+
+  constructor() {
+    this.recomputeEntryDrawdowns();
+  }
+
+  private recomputeEntryDrawdowns(): void {
+    for (const w of this.watchlist) {
+      if (typeof w.price === 'number' && typeof w.entry_price === 'number' && w.entry_price > 0) {
+        w.drawdown_from_entry = ((w.price - w.entry_price) / w.entry_price) * 100;
+      } else {
+        w.drawdown_from_entry = undefined;
+      }
+    }
+  }
 
   listSessions(): Session[] {
     return [...this.sessions].sort((a, b) => b.session_number - a.session_number);
@@ -118,21 +138,78 @@ class MockStore {
   }
 
   listWatchlist(): WatchlistItem[] {
+    this.recomputeEntryDrawdowns();
     return this.watchlist.filter((w) => w.active);
   }
 
   addWatchlist(
-    item: Omit<WatchlistItem, 'id' | 'added_at' | 'archived_at' | 'active'>
+    item: Omit<
+      WatchlistItem,
+      'id' | 'added_at' | 'archived_at' | 'active' | 'entry_price' | 'entry_at' | 'drawdown_from_entry'
+    > & { entry_price?: number | null; entry_at?: string | null }
   ): WatchlistItem {
+    const now = new Date().toISOString();
+    // If caller didn't provide entry_price, capture the current price as entry.
+    const entryPrice =
+      item.entry_price !== undefined && item.entry_price !== null
+        ? item.entry_price
+        : (item.price ?? null);
     const next: WatchlistItem = {
-      ...item,
       id: this.nextWatchlistId++,
-      added_at: new Date().toISOString(),
+      ticker: item.ticker,
+      thesis: item.thesis,
+      trigger_price: item.trigger_price,
+      invalidator: item.invalidator,
+      price: item.price,
+      change_1d: item.change_1d,
+      iv_rank: item.iv_rank,
+      drawdown_52w: item.drawdown_52w,
+      trigger_hit: item.trigger_hit,
+      entry_price: entryPrice,
+      entry_at: entryPrice !== null ? (item.entry_at ?? now) : null,
+      added_at: now,
       archived_at: null,
       active: true,
     };
     this.watchlist.push(next);
+    this.recomputeEntryDrawdowns();
     return next;
+  }
+
+  bulkAdd(
+    items: Array<{
+      ticker: string;
+      thesis?: string;
+      trigger_price?: number | null;
+      invalidator?: string | null;
+      entry_price?: number | null;
+      price?: number | null;
+    }>
+  ): { added: number; skipped: string[] } {
+    const existing = new Set(
+      this.watchlist.filter((w) => w.active).map((w) => w.ticker.toUpperCase())
+    );
+    const skipped: string[] = [];
+    let added = 0;
+    for (const it of items) {
+      const ticker = it.ticker.trim().toUpperCase();
+      if (!ticker) continue;
+      if (existing.has(ticker)) {
+        skipped.push(ticker);
+        continue;
+      }
+      this.addWatchlist({
+        ticker,
+        thesis: it.thesis ?? '(thesis not yet written)',
+        trigger_price: it.trigger_price ?? null,
+        invalidator: it.invalidator ?? null,
+        entry_price: it.entry_price ?? it.price ?? null,
+        price: it.price ?? undefined,
+      });
+      existing.add(ticker);
+      added++;
+    }
+    return { added, skipped };
   }
 
   archiveWatchlist(id: number): boolean {
@@ -159,7 +236,5 @@ function deriveTags(answers: string[]): string[] {
   return tags;
 }
 
-// Next.js dev hot-reload can reload this module. Stash on globalThis so in-memory
-// state survives between reloads during development.
 const g = globalThis as unknown as { __chairStore?: MockStore };
 export const store = g.__chairStore ?? (g.__chairStore = new MockStore());
