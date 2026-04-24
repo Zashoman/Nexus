@@ -62,7 +62,7 @@ export default function AlertsBanner({ initial }: { initial: Alert[] }) {
             <Link
               href="/watchlist"
               className={`mono inline-flex items-center gap-2 rounded border px-3 py-1.5 text-xs hover:bg-ink-800 ${LEVEL_COLOR[a.level ?? 25]}`}
-              title={`At $${a.price.toFixed(2)} on ${new Date(a.captured_at).toLocaleString()}`}
+              title={`At $${a.price.toFixed(2)} on ${a.captured_at}`}
             >
               <span className="text-bone-50">{a.ticker}</span>
               <span className="opacity-70">−{a.level}%</span>

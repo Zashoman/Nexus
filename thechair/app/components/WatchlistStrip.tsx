@@ -8,10 +8,14 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 // Format price without pretending everything is USD. International tickers
 // commonly have 4-6 digit prices (KRW / JPY); render those without a $.
+// Hand-rolled thousands grouping — using toLocaleString() triggers SSR /
+// client hydration mismatches when the two runtimes default to different locales.
 function fmtPrice(p?: number): string {
   if (typeof p !== 'number') return '—';
   if (p >= 1000) {
-    return p.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const [whole, frac] = p.toFixed(2).split('.');
+    const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return frac === '00' ? grouped : `${grouped}.${frac}`;
   }
   return `$${p.toFixed(2)}`;
 }
