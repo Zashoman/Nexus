@@ -44,13 +44,18 @@ export default function WatchlistStrip({ initial }: { initial: WatchlistItem[] }
           empty — add a name
         </div>
       ) : (
-        <div className="tile overflow-hidden">
-          <table className="w-full border-collapse">
+        <div className="tile px-4 py-2">
+          <table className="border-collapse">
+            <colgroup>
+              <col className="w-[96px]" />
+              <col className="w-[112px]" />
+              <col className="w-[88px]" />
+            </colgroup>
             <thead>
-              <tr className="border-b border-ink-700 text-left mono text-[9px] uppercase tracking-widest text-bone-400">
-                <th className="px-4 py-2 font-normal">Symbol</th>
-                <th className="px-4 py-2 font-normal text-right">Last</th>
-                <th className="px-4 py-2 font-normal text-right">1D %</th>
+              <tr className="border-b border-ink-700 mono text-[9px] uppercase tracking-widest text-bone-400">
+                <th className="py-2 text-left font-normal">Symbol</th>
+                <th className="py-2 pl-4 text-right font-normal">Last</th>
+                <th className="py-2 pl-4 text-right font-normal">1D %</th>
               </tr>
             </thead>
             <tbody>
@@ -79,15 +84,15 @@ function Row({ item }: { item: WatchlistItem }) {
 
   return (
     <tr className="border-b border-ink-800 transition-colors hover:bg-ink-900/60">
-      <td className="px-4 py-2.5">
+      <td className="py-2">
         <Link
           href="/watchlist"
-          className="mono inline-flex items-baseline gap-2 text-sm text-bone-50 hover:text-accent"
+          className="mono inline-flex items-baseline gap-1.5 text-sm text-bone-50 hover:text-accent"
         >
           {item.ticker}
           {item.deepest_level ? (
             <span
-              className="mono text-[9px] uppercase tracking-widest text-stressed"
+              className="mono text-[9px] text-stressed"
               title={`Crossed −${item.deepest_level}% off the high`}
             >
               ●
@@ -95,10 +100,10 @@ function Row({ item }: { item: WatchlistItem }) {
           ) : null}
         </Link>
       </td>
-      <td className="px-4 py-2.5 mono tabular-nums text-right text-sm text-bone-100">
+      <td className="py-2 pl-4 mono tabular-nums text-right text-sm text-bone-100">
         {fmtPrice(item.price)}
       </td>
-      <td className={`px-4 py-2.5 mono tabular-nums text-right text-sm ${changeColor}`}>
+      <td className={`py-2 pl-4 mono tabular-nums text-right text-sm ${changeColor}`}>
         {pct !== undefined ? `${changeSign}${pct.toFixed(2)}%` : '—'}
       </td>
     </tr>
