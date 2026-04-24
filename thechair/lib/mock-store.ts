@@ -26,63 +26,8 @@ class MockStore {
   private alerts: Alert[] = [];
   private nextAlertId = 1;
   private nextSessionNumber = 1;
-  private nextWatchlistId = 4;
-  private watchlist: WatchlistItem[] = [
-    {
-      id: 1,
-      ticker: 'AVGO',
-      thesis: 'AI infra pull-forward + software accretion; custom silicon moat.',
-      trigger_price: 165,
-      invalidator: 'Custom silicon share loss or hyperscaler capex cut >15%.',
-      entry_price: 200.0,
-      entry_at: new Date(Date.now() - 86400000 * 30).toISOString(),
-      high_water_mark: 220.0,
-      high_water_mark_at: new Date(Date.now() - 86400000 * 22).toISOString(),
-      added_at: new Date(Date.now() - 86400000 * 30).toISOString(),
-      archived_at: null,
-      active: true,
-      price: 184.2,
-      change_1d: -0.8,
-      iv_rank: 42,
-      drawdown_52w: -16.3,
-    },
-    {
-      id: 2,
-      ticker: 'LRCX',
-      thesis: 'WFE cycle troughing; memory capex recovery.',
-      trigger_price: 720,
-      invalidator: 'Memory capex pushed out another quarter in next guide.',
-      entry_price: 880.0,
-      entry_at: new Date(Date.now() - 86400000 * 20).toISOString(),
-      high_water_mark: 1080.0,
-      high_water_mark_at: new Date(Date.now() - 86400000 * 75).toISOString(),
-      added_at: new Date(Date.now() - 86400000 * 20).toISOString(),
-      archived_at: null,
-      active: true,
-      price: 758.4,
-      change_1d: -2.1,
-      iv_rank: 66,
-      drawdown_52w: -29.8,
-    },
-    {
-      id: 3,
-      ticker: 'COIN',
-      thesis: 'Vol-of-vol proxy; watch for stress-regime divergence.',
-      trigger_price: 180,
-      invalidator: 'BTC IV collapse to <50 sustained two weeks.',
-      entry_price: 310.0,
-      entry_at: new Date(Date.now() - 86400000 * 10).toISOString(),
-      high_water_mark: 350.0,
-      high_water_mark_at: new Date(Date.now() - 86400000 * 18).toISOString(),
-      added_at: new Date(Date.now() - 86400000 * 10).toISOString(),
-      archived_at: null,
-      active: true,
-      price: 212.1,
-      change_1d: 3.4,
-      iv_rank: 91,
-      drawdown_52w: -39.4,
-    },
-  ];
+  private nextWatchlistId = 100;
+  private watchlist: WatchlistItem[] = buildSeedWatchlist();
 
   constructor() {
     // Apply enrichment + emit alerts for any current level breaches in mock data.
@@ -308,6 +253,49 @@ class MockStore {
     return { added, skipped };
   }
 
+  updateWatchlist(
+    id: number,
+    patch: Partial<
+      Pick<
+        WatchlistItem,
+        | 'thesis'
+        | 'trigger_price'
+        | 'invalidator'
+        | 'entry_price'
+        | 'high_water_mark'
+      >
+    >
+  ): WatchlistItem | null {
+    const idx = this.watchlist.findIndex((w) => w.id === id);
+    if (idx === -1) return null;
+    const current = this.watchlist[idx];
+    const now = new Date().toISOString();
+    this.watchlist[idx] = {
+      ...current,
+      thesis: patch.thesis ?? current.thesis,
+      trigger_price:
+        patch.trigger_price !== undefined ? patch.trigger_price : current.trigger_price,
+      invalidator:
+        patch.invalidator !== undefined ? patch.invalidator : current.invalidator,
+      entry_price:
+        patch.entry_price !== undefined ? patch.entry_price : current.entry_price,
+      entry_at:
+        patch.entry_price !== undefined && patch.entry_price !== null
+          ? (current.entry_at ?? now)
+          : current.entry_at,
+      high_water_mark:
+        patch.high_water_mark !== undefined
+          ? patch.high_water_mark
+          : current.high_water_mark,
+      high_water_mark_at:
+        patch.high_water_mark !== undefined && patch.high_water_mark !== null
+          ? now
+          : current.high_water_mark_at,
+    };
+    this.refreshDerived({ emitAlerts: true });
+    return this.watchlist[idx];
+  }
+
   archiveWatchlist(id: number): boolean {
     const idx = this.watchlist.findIndex((w) => w.id === id);
     if (idx === -1) return false;
@@ -363,6 +351,77 @@ function deriveTags(answers: string[]): string[] {
   if (/trim|cut|reduce/.test(text)) tags.push('reducing');
   if (/add|build|layer/.test(text)) tags.push('adding');
   return tags;
+}
+
+// ---- Seed -----------------------------------------------------------------
+// The initial watchlist matches the investor's real tracker (screens shared
+// 2026-04-24). Prices and daily % are from those screenshots. Entry prices
+// and high-water marks are intentionally null — Phase 1 cannot invent them.
+// The investor can fill highs / entries / theses inline on the /watchlist
+// page; Phase 3 polling will also backfill 52-week highs automatically.
+
+interface SeedRow {
+  ticker: string;
+  price: number;
+  change_1d: number;
+}
+
+const SEED_ROWS: SeedRow[] = [
+  // Screen 1
+  { ticker: 'SNDK', price: 932.43, change_1d: -4.76 },
+  { ticker: '005930', price: 217500, change_1d: -3.12 },   // Samsung Electronics (KRW)
+  { ticker: 'TSM', price: 382.66, change_1d: -1.23 },
+  { ticker: '3110', price: 27560, change_1d: 7.87 },       // JPY
+  { ticker: '4063', price: 6787, change_1d: 1.85 },        // Shin-Etsu Chemical (JPY)
+  { ticker: '4186', price: 9147, change_1d: 2.86 },        // Tokyo Ohka Kogyo (JPY)
+  { ticker: 'BESI', price: 241.8, change_1d: 4.09 },
+  { ticker: '042700', price: 293500, change_1d: 0.00 },    // Hanmi Semiconductor (KRW)
+  { ticker: 'VRT', price: 321.75, change_1d: 5.44 },
+  { ticker: 'NVT', price: 142.76, change_1d: 1.88 },
+  { ticker: 'LRCX', price: 258.56, change_1d: -2.63 },
+  { ticker: 'FORM', price: 148.37, change_1d: 1.50 },
+  { ticker: '6855', price: 6460, change_1d: 1.73 },        // JPY
+  { ticker: 'VICR', price: 260.13, change_1d: -1.84 },
+  // Screen 2
+  { ticker: 'ASML', price: 1417.80, change_1d: -1.79 },
+  { ticker: 'BE', price: 237.57, change_1d: 3.40 },
+  { ticker: 'CCJ', price: 123.85, change_1d: -2.07 },
+  { ticker: 'GEV', price: 1149.53, change_1d: 1.95 },
+  { ticker: 'ETN', price: 424.50, change_1d: 2.57 },
+  { ticker: 'EQT', price: 58.93, change_1d: 0.36 },
+  { ticker: 'SEI', price: 69.48, change_1d: 5.00 },
+  { ticker: 'POWL', price: 252.18, change_1d: 3.88 },
+  { ticker: 'IREN', price: 52.02, change_1d: 7.50 },
+  { ticker: 'LITE', price: 846.89, change_1d: -3.06 },
+  { ticker: 'COHR', price: 337.68, change_1d: -3.65 },
+  { ticker: 'MRVL', price: 165.56, change_1d: 5.24 },
+  { ticker: 'GLW', price: 169.50, change_1d: 0.44 },
+  { ticker: '5803', price: 6009, change_1d: 1.97 },        // Fujikura (JPY)
+  { ticker: '000660', price: 1203000, change_1d: -1.80 },  // SK Hynix (KRW)
+  { ticker: 'MU', price: 481.72, change_1d: -1.18 },
+];
+
+function buildSeedWatchlist(): WatchlistItem[] {
+  const addedAt = new Date().toISOString();
+  return SEED_ROWS.map((r, i) => ({
+    id: i + 1,
+    ticker: r.ticker,
+    thesis: '(thesis not yet written)',
+    trigger_price: null,
+    invalidator: null,
+    entry_price: null,
+    entry_at: null,
+    high_water_mark: null,
+    high_water_mark_at: null,
+    added_at: addedAt,
+    archived_at: null,
+    active: true,
+    price: r.price,
+    change_1d: r.change_1d,
+    iv_rank: undefined,
+    drawdown_52w: undefined,
+    levels_triggered: [],
+  }));
 }
 
 const g = globalThis as unknown as { __chairStore?: MockStore };

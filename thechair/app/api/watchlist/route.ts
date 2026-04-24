@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { store } from '../../../lib/mock-store';
 
 const PostBody = z.object({
-  ticker: z.string().min(1).max(8),
+  ticker: z.string().min(1).max(12),
   thesis: z.string().min(1),
   trigger_price: z.number().nullable().optional(),
   invalidator: z.string().nullable().optional(),
@@ -11,9 +11,11 @@ const PostBody = z.object({
 
 const PutBody = z.object({
   id: z.number().int().positive(),
-  thesis: z.string().min(1).optional(),
+  thesis: z.string().optional(),
   trigger_price: z.number().nullable().optional(),
   invalidator: z.string().nullable().optional(),
+  entry_price: z.number().nullable().optional(),
+  high_water_mark: z.number().nullable().optional(),
 });
 
 export const dynamic = 'force-dynamic';
@@ -34,9 +36,13 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  // Phase 1: no-op acknowledgment. Phase 2 will persist + write a thesis_revision row.
   const body = PutBody.parse(await req.json());
-  return NextResponse.json({ ok: true, id: body.id });
+  const { id, ...patch } = body;
+  const updated = store.updateWatchlist(id, patch);
+  if (!updated) {
+    return NextResponse.json({ error: 'not found' }, { status: 404 });
+  }
+  return NextResponse.json(updated);
 }
 
 export async function DELETE(req: Request) {
