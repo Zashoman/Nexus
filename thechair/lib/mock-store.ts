@@ -1,8 +1,14 @@
 // In-memory store for Phase 1. Replaced by SQLite reads/writes in Phase 2+.
-// Module-level singleton survives for the life of the dev server process,
-// which is enough to exercise the UI flow end-to-end.
 
-import type { Session, WatchlistItem, MentorQuestion, Regime } from './types';
+import type {
+  Session,
+  WatchlistItem,
+  MentorQuestion,
+  Regime,
+  Alert,
+  DrawdownLevel,
+} from './types';
+import { DRAWDOWN_LEVELS } from './types';
 import { getMockRead } from './mentor/mock';
 import { getMockSnapshot } from './market/mock';
 
@@ -17,6 +23,10 @@ interface DraftSession {
 class MockStore {
   private sessions: Session[] = [];
   private drafts = new Map<number, DraftSession>();
+  private alerts: Alert[] = [];
+  private nextAlertId = 1;
+  private nextSessionNumber = 1;
+  private nextWatchlistId = 4;
   private watchlist: WatchlistItem[] = [
     {
       id: 1,
@@ -26,14 +36,15 @@ class MockStore {
       invalidator: 'Custom silicon share loss or hyperscaler capex cut >15%.',
       entry_price: 200.0,
       entry_at: new Date(Date.now() - 86400000 * 30).toISOString(),
+      high_water_mark: 220.0,
+      high_water_mark_at: new Date(Date.now() - 86400000 * 22).toISOString(),
       added_at: new Date(Date.now() - 86400000 * 30).toISOString(),
       archived_at: null,
       active: true,
       price: 184.2,
       change_1d: -0.8,
       iv_rank: 42,
-      drawdown_52w: -8.1,
-      trigger_hit: false,
+      drawdown_52w: -16.3,
     },
     {
       id: 2,
@@ -43,14 +54,15 @@ class MockStore {
       invalidator: 'Memory capex pushed out another quarter in next guide.',
       entry_price: 880.0,
       entry_at: new Date(Date.now() - 86400000 * 20).toISOString(),
+      high_water_mark: 1080.0,
+      high_water_mark_at: new Date(Date.now() - 86400000 * 75).toISOString(),
       added_at: new Date(Date.now() - 86400000 * 20).toISOString(),
       archived_at: null,
       active: true,
       price: 758.4,
       change_1d: -2.1,
       iv_rank: 66,
-      drawdown_52w: -14.2,
-      trigger_hit: false,
+      drawdown_52w: -29.8,
     },
     {
       id: 3,
@@ -60,32 +72,93 @@ class MockStore {
       invalidator: 'BTC IV collapse to <50 sustained two weeks.',
       entry_price: 310.0,
       entry_at: new Date(Date.now() - 86400000 * 10).toISOString(),
+      high_water_mark: 350.0,
+      high_water_mark_at: new Date(Date.now() - 86400000 * 18).toISOString(),
       added_at: new Date(Date.now() - 86400000 * 10).toISOString(),
       archived_at: null,
       active: true,
       price: 212.1,
       change_1d: 3.4,
       iv_rank: 91,
-      drawdown_52w: -22.7,
-      trigger_hit: true,
+      drawdown_52w: -39.4,
     },
   ];
-  private nextSessionNumber = 1;
-  private nextWatchlistId = 4;
 
   constructor() {
-    this.recomputeEntryDrawdowns();
+    // Apply enrichment + emit alerts for any current level breaches in mock data.
+    this.refreshDerived({ emitAlerts: true });
   }
 
-  private recomputeEntryDrawdowns(): void {
+  // ---- Drawdown / level computation -------------------------------------
+
+  private refreshDerived(opts: { emitAlerts: boolean }): void {
     for (const w of this.watchlist) {
-      if (typeof w.price === 'number' && typeof w.entry_price === 'number' && w.entry_price > 0) {
-        w.drawdown_from_entry = ((w.price - w.entry_price) / w.entry_price) * 100;
-      } else {
-        w.drawdown_from_entry = undefined;
+      // since-entry
+      w.drawdown_from_entry =
+        typeof w.price === 'number' && typeof w.entry_price === 'number' && w.entry_price > 0
+          ? ((w.price - w.entry_price) / w.entry_price) * 100
+          : undefined;
+
+      // high-water mark may need to ratchet up
+      if (typeof w.price === 'number' && typeof w.high_water_mark === 'number') {
+        if (w.price > w.high_water_mark) {
+          w.high_water_mark = w.price;
+          w.high_water_mark_at = new Date().toISOString();
+        }
       }
+
+      // from-high
+      w.drawdown_from_high =
+        typeof w.price === 'number' &&
+        typeof w.high_water_mark === 'number' &&
+        w.high_water_mark > 0
+          ? ((w.price - w.high_water_mark) / w.high_water_mark) * 100
+          : undefined;
+
+      // trigger_hit (user-defined trigger_price)
+      w.trigger_hit =
+        typeof w.price === 'number' && typeof w.trigger_price === 'number'
+          ? w.price <= w.trigger_price
+          : false;
+
+      // levels_triggered: which of {25,30,35,40} is the drawdown >= ?
+      const dd = w.drawdown_from_high;
+      const previously = ((): DrawdownLevel[] => {
+        // We persist a parallel `__levels` so we can tell what's NEW this refresh.
+        return ((w as unknown as { __levels?: DrawdownLevel[] }).__levels ?? []).slice();
+      })();
+
+      const nowActive: DrawdownLevel[] =
+        typeof dd === 'number'
+          ? DRAWDOWN_LEVELS.filter((lvl) => dd <= -lvl)
+          : [];
+
+      w.levels_triggered = nowActive;
+      w.deepest_level = nowActive.length ? nowActive[nowActive.length - 1] : undefined;
+
+      if (opts.emitAlerts) {
+        const previouslySet = new Set(previously);
+        for (const lvl of nowActive) {
+          if (!previouslySet.has(lvl)) {
+            this.alerts.push({
+              id: this.nextAlertId++,
+              watchlist_id: w.id,
+              ticker: w.ticker,
+              kind: 'drawdown_level',
+              level: lvl,
+              price: w.price ?? 0,
+              drawdown_from_high: dd,
+              captured_at: new Date().toISOString(),
+              acknowledged_at: null,
+            });
+          }
+        }
+      }
+      (w as unknown as { __levels?: DrawdownLevel[] }).__levels = nowActive.slice();
     }
   }
+
+  // ---- Sessions ---------------------------------------------------------
 
   listSessions(): Session[] {
     return [...this.sessions].sort((a, b) => b.session_number - a.session_number);
@@ -109,14 +182,11 @@ class MockStore {
 
   completeSession(sessionNumber: number, answers: string[]): Session {
     const draft = this.drafts.get(sessionNumber);
-    if (!draft) {
-      throw new Error(`No draft session #${sessionNumber}`);
-    }
+    if (!draft) throw new Error(`No draft session #${sessionNumber}`);
     const wordCount = answers.reduce(
       (n, a) => n + (a.trim() ? a.trim().split(/\s+/).length : 0),
       0
     );
-    const read = getMockRead(draft.regime, answers);
     const session: Session = {
       id: sessionNumber,
       session_number: sessionNumber,
@@ -126,7 +196,7 @@ class MockStore {
       market_snapshot: getMockSnapshot(),
       questions: draft.questions,
       answers,
-      mentor_read: read,
+      mentor_read: getMockRead(draft.regime, answers),
       word_count: wordCount,
       tags: deriveTags(answers),
       completed_at: new Date().toISOString(),
@@ -137,23 +207,44 @@ class MockStore {
     return session;
   }
 
+  // ---- Watchlist --------------------------------------------------------
+
   listWatchlist(): WatchlistItem[] {
-    this.recomputeEntryDrawdowns();
+    this.refreshDerived({ emitAlerts: false });
     return this.watchlist.filter((w) => w.active);
   }
 
   addWatchlist(
     item: Omit<
       WatchlistItem,
-      'id' | 'added_at' | 'archived_at' | 'active' | 'entry_price' | 'entry_at' | 'drawdown_from_entry'
-    > & { entry_price?: number | null; entry_at?: string | null }
+      | 'id'
+      | 'added_at'
+      | 'archived_at'
+      | 'active'
+      | 'entry_price'
+      | 'entry_at'
+      | 'high_water_mark'
+      | 'high_water_mark_at'
+      | 'drawdown_from_entry'
+      | 'drawdown_from_high'
+      | 'levels_triggered'
+      | 'deepest_level'
+    > & {
+      entry_price?: number | null;
+      entry_at?: string | null;
+      high_water_mark?: number | null;
+      high_water_mark_at?: string | null;
+    }
   ): WatchlistItem {
     const now = new Date().toISOString();
-    // If caller didn't provide entry_price, capture the current price as entry.
     const entryPrice =
       item.entry_price !== undefined && item.entry_price !== null
         ? item.entry_price
         : (item.price ?? null);
+    const high =
+      item.high_water_mark !== undefined && item.high_water_mark !== null
+        ? item.high_water_mark
+        : (item.price ?? entryPrice ?? null);
     const next: WatchlistItem = {
       id: this.nextWatchlistId++,
       ticker: item.ticker,
@@ -167,12 +258,15 @@ class MockStore {
       trigger_hit: item.trigger_hit,
       entry_price: entryPrice,
       entry_at: entryPrice !== null ? (item.entry_at ?? now) : null,
+      high_water_mark: high,
+      high_water_mark_at: high !== null ? (item.high_water_mark_at ?? now) : null,
+      levels_triggered: [],
       added_at: now,
       archived_at: null,
       active: true,
     };
     this.watchlist.push(next);
-    this.recomputeEntryDrawdowns();
+    this.refreshDerived({ emitAlerts: true });
     return next;
   }
 
@@ -183,6 +277,7 @@ class MockStore {
       trigger_price?: number | null;
       invalidator?: string | null;
       entry_price?: number | null;
+      high_water_mark?: number | null;
       price?: number | null;
     }>
   ): { added: number; skipped: string[] } {
@@ -204,6 +299,7 @@ class MockStore {
         trigger_price: it.trigger_price ?? null,
         invalidator: it.invalidator ?? null,
         entry_price: it.entry_price ?? it.price ?? null,
+        high_water_mark: it.high_water_mark ?? null,
         price: it.price ?? undefined,
       });
       existing.add(ticker);
@@ -221,6 +317,39 @@ class MockStore {
       archived_at: new Date().toISOString(),
     };
     return true;
+  }
+
+  // ---- Alerts -----------------------------------------------------------
+
+  listAlerts(opts: { unacknowledgedOnly?: boolean } = {}): Alert[] {
+    const rows = opts.unacknowledgedOnly
+      ? this.alerts.filter((a) => a.acknowledged_at === null)
+      : this.alerts;
+    return [...rows].sort(
+      (a, b) => new Date(b.captured_at).getTime() - new Date(a.captured_at).getTime()
+    );
+  }
+
+  acknowledgeAlert(id: number): boolean {
+    const idx = this.alerts.findIndex((a) => a.id === id);
+    if (idx === -1) return false;
+    this.alerts[idx] = {
+      ...this.alerts[idx],
+      acknowledged_at: new Date().toISOString(),
+    };
+    return true;
+  }
+
+  acknowledgeAllAlerts(): number {
+    const now = new Date().toISOString();
+    let n = 0;
+    for (const a of this.alerts) {
+      if (a.acknowledged_at === null) {
+        a.acknowledged_at = now;
+        n++;
+      }
+    }
+    return n;
   }
 }
 

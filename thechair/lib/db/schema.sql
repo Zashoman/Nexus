@@ -31,7 +31,10 @@ CREATE TABLE IF NOT EXISTS watchlist (
   trigger_price REAL,
   invalidator TEXT,
   entry_price REAL,                               -- price captured when added to The Chair
-  entry_at TEXT,                                  -- ISO 8601 UTC, when entry_price was set
+  entry_at TEXT,                                  -- when entry_price was set
+  high_water_mark REAL,                           -- peak price tracked (52w high or all-time-since-added)
+  high_water_mark_at TEXT,                        -- when high_water_mark was last updated
+  levels_triggered TEXT NOT NULL DEFAULT '[]',    -- JSON array of crossed levels e.g. [25,30]
   added_at TEXT NOT NULL,
   archived_at TEXT,
   active INTEGER NOT NULL DEFAULT 1
@@ -87,15 +90,23 @@ CREATE TABLE IF NOT EXISTS watchlist_snapshots (
 );
 CREATE INDEX IF NOT EXISTS idx_wl_snapshots_captured ON watchlist_snapshots(captured_at);
 
--- Trigger alerts
+-- Alerts
+-- One row per actionable event. The polling worker writes a row when a
+-- watchlist name newly crosses one of the four drawdown levels (25/30/35/40)
+-- below its high_water_mark, when its user-defined trigger_price fires, or
+-- when a configured invalidator is met. UI surfaces unacknowledged rows.
 CREATE TABLE IF NOT EXISTS alerts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   watchlist_id INTEGER NOT NULL REFERENCES watchlist(id),
-  kind TEXT NOT NULL,                             -- 'trigger_hit' | 'invalidator_hit'
+  kind TEXT NOT NULL,                             -- 'drawdown_level' | 'trigger_hit' | 'invalidator_hit'
+  level INTEGER,                                  -- 25 | 30 | 35 | 40 when kind = 'drawdown_level'
   price REAL NOT NULL,
+  drawdown_from_high REAL,
   captured_at TEXT NOT NULL,
   acknowledged_at TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_alerts_captured ON alerts(captured_at);
+CREATE INDEX IF NOT EXISTS idx_alerts_unacked ON alerts(acknowledged_at) WHERE acknowledged_at IS NULL;
 
 -- Settings / runtime state
 CREATE TABLE IF NOT EXISTS settings (

@@ -2,13 +2,12 @@
 
 import useSWR from 'swr';
 import Link from 'next/link';
-import type { WatchlistItem } from '../../lib/types';
+import type { WatchlistItem, DrawdownLevel } from '../../lib/types';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-// Coloring rule for "Since Entry": treat -30% as a hard demand-attention
-// threshold (the level the investor flagged as the trigger to revisit thesis),
-// -15% as elevated, otherwise neutral or positive.
+// Coloring rules ----------------------------------------------------------
+
 function entryColor(pct?: number): string {
   if (typeof pct !== 'number') return 'text-bone-300';
   if (pct <= -30) return 'text-dislocation font-medium';
@@ -16,6 +15,34 @@ function entryColor(pct?: number): string {
   if (pct >= 15) return 'text-up';
   return 'text-bone-200';
 }
+
+// "From High" is the buy-zone signal. -30 is the act level — color it loud.
+function fromHighColor(pct?: number): string {
+  if (typeof pct !== 'number') return 'text-bone-300';
+  if (pct <= -40) return 'text-dislocation font-semibold';
+  if (pct <= -35) return 'text-dislocation font-medium';
+  if (pct <= -30) return 'text-stressed font-medium';
+  if (pct <= -25) return 'text-elevated';
+  return 'text-bone-200';
+}
+
+const LEVEL_PILL: Record<DrawdownLevel, string> = {
+  25: 'border-elevated/60 text-elevated',
+  30: 'border-stressed/70 text-stressed',
+  35: 'border-dislocation/70 text-dislocation',
+  40: 'border-dislocation text-dislocation font-semibold',
+};
+
+function rowAccent(deepest?: DrawdownLevel): string {
+  // Subtle row tint for names in the buy zone, cumulative by level.
+  if (!deepest) return '';
+  if (deepest >= 40) return 'bg-dislocation/[0.07]';
+  if (deepest >= 35) return 'bg-dislocation/[0.05]';
+  if (deepest >= 30) return 'bg-stressed/[0.05]';
+  return 'bg-elevated/[0.04]';
+}
+
+// Component ---------------------------------------------------------------
 
 export default function WatchlistStrip({ initial }: { initial: WatchlistItem[] }) {
   const { data } = useSWR<WatchlistItem[]>('/api/watchlist', fetcher, {
@@ -46,7 +73,7 @@ export default function WatchlistStrip({ initial }: { initial: WatchlistItem[] }
         </div>
       ) : (
         <div className="tile overflow-x-auto">
-          <table className="w-full min-w-[860px] border-collapse">
+          <table className="w-full min-w-[920px] border-collapse">
             <thead>
               <tr className="border-b border-ink-700 text-left mono text-[9px] uppercase tracking-widest text-bone-400">
                 <th className="px-4 py-2 font-normal">Symbol</th>
@@ -54,14 +81,19 @@ export default function WatchlistStrip({ initial }: { initial: WatchlistItem[] }
                 <th className="px-3 py-2 font-normal text-right">1D %</th>
                 <th
                   className="px-3 py-2 font-normal text-right"
-                  title="% from the price when this name was added to The Chair"
+                  title="% from the high-water mark since added — the buy-zone signal"
                 >
-                  Since Entry
+                  From High
                 </th>
+                <th
+                  className="px-3 py-2 font-normal"
+                  title="Drawdown alert level crossed: 25 / 30 / 35 / 40"
+                >
+                  Level
+                </th>
+                <th className="px-3 py-2 font-normal text-right">Since Entry</th>
                 <th className="px-3 py-2 font-normal text-right">IV Rk</th>
-                <th className="px-3 py-2 font-normal text-right">52W DD</th>
                 <th className="px-3 py-2 font-normal text-right">Trigger</th>
-                <th className="px-3 py-2 font-normal text-right">To Trg</th>
                 <th className="px-4 py-2 font-normal">Status</th>
               </tr>
             </thead>
@@ -98,22 +130,15 @@ function Row({ item }: { item: WatchlistItem }) {
           ? 'text-elevated'
           : 'text-bone-300';
 
-  const ddColor =
-    item.drawdown_52w === undefined
-      ? 'text-bone-300'
-      : item.drawdown_52w <= -20
-        ? 'text-down'
-        : item.drawdown_52w <= -10
-          ? 'text-elevated'
-          : 'text-bone-300';
-
   const distanceToTrigger =
     typeof item.price === 'number' && typeof item.trigger_price === 'number'
       ? ((item.price - item.trigger_price) / item.trigger_price) * 100
       : null;
 
   return (
-    <tr className="border-b border-ink-800 hover:bg-ink-900/60 transition-colors">
+    <tr
+      className={`border-b border-ink-800 transition-colors hover:bg-ink-900/60 ${rowAccent(item.deepest_level)}`}
+    >
       <td className="px-4 py-2.5">
         <Link
           href="/watchlist"
@@ -129,7 +154,31 @@ function Row({ item }: { item: WatchlistItem }) {
         {pct !== undefined ? `${changeSign}${pct.toFixed(2)}%` : '—'}
       </td>
       <td
-        className={`px-3 py-2.5 mono tabular-nums text-right text-sm ${entryColor(item.drawdown_from_entry)}`}
+        className={`px-3 py-2.5 mono tabular-nums text-right text-sm ${fromHighColor(item.drawdown_from_high)}`}
+        title={
+          typeof item.high_water_mark === 'number' && typeof item.high_water_mark_at === 'string'
+            ? `High $${item.high_water_mark.toFixed(2)} on ${new Date(item.high_water_mark_at).toLocaleDateString()}`
+            : 'No high recorded'
+        }
+      >
+        {typeof item.drawdown_from_high === 'number'
+          ? `${item.drawdown_from_high.toFixed(1)}%`
+          : '—'}
+      </td>
+      <td className="px-3 py-2.5">
+        {item.deepest_level ? (
+          <span
+            className={`mono inline-flex rounded border px-1.5 py-0.5 text-[10px] tracking-wider ${LEVEL_PILL[item.deepest_level]}`}
+            title={`Crossed: ${item.levels_triggered?.map((l) => `−${l}%`).join(', ')}`}
+          >
+            −{item.deepest_level}
+          </span>
+        ) : (
+          <span className="mono text-[10px] text-bone-400">—</span>
+        )}
+      </td>
+      <td
+        className={`px-3 py-2.5 mono tabular-nums text-right text-xs ${entryColor(item.drawdown_from_entry)}`}
         title={
           typeof item.entry_price === 'number' && typeof item.entry_at === 'string'
             ? `Entry: $${item.entry_price.toFixed(2)} on ${new Date(item.entry_at).toLocaleDateString()}`
@@ -143,26 +192,20 @@ function Row({ item }: { item: WatchlistItem }) {
       <td className={`px-3 py-2.5 mono tabular-nums text-right text-xs ${ivColor}`}>
         {typeof item.iv_rank === 'number' ? item.iv_rank.toFixed(0) : '—'}
       </td>
-      <td className={`px-3 py-2.5 mono tabular-nums text-right text-xs ${ddColor}`}>
-        {typeof item.drawdown_52w === 'number'
-          ? `${item.drawdown_52w.toFixed(1)}%`
-          : '—'}
-      </td>
       <td className="px-3 py-2.5 mono tabular-nums text-right text-xs text-bone-300">
         {typeof item.trigger_price === 'number'
           ? `$${item.trigger_price.toFixed(0)}`
           : '—'}
-      </td>
-      <td
-        className={`px-3 py-2.5 mono tabular-nums text-right text-xs ${
-          distanceToTrigger !== null && Math.abs(distanceToTrigger) < 3
-            ? 'text-accent'
-            : 'text-bone-300'
-        }`}
-      >
-        {distanceToTrigger !== null
-          ? `${distanceToTrigger > 0 ? '+' : ''}${distanceToTrigger.toFixed(1)}%`
-          : '—'}
+        {distanceToTrigger !== null && (
+          <span
+            className={`ml-1 text-[10px] ${
+              Math.abs(distanceToTrigger) < 3 ? 'text-accent' : 'text-bone-400'
+            }`}
+          >
+            ({distanceToTrigger > 0 ? '+' : ''}
+            {distanceToTrigger.toFixed(0)}%)
+          </span>
+        )}
       </td>
       <td className="px-4 py-2.5 text-xs">
         {item.trigger_hit ? (

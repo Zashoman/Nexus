@@ -21,24 +21,47 @@ export interface MarketSnapshot {
   sub_signals: Record<string, number>; // 0-100 contribution per sub-signal
 }
 
+// Drawdown alert thresholds, in negative percent off the high-water mark.
+// Crossing into any of these (from less-deep to at-or-deeper) emits an alert.
+// -30 is the buy signal; -25 is a heads-up; -35 / -40 are the deeper levels.
+export const DRAWDOWN_LEVELS = [25, 30, 35, 40] as const;
+export type DrawdownLevel = typeof DRAWDOWN_LEVELS[number];
+
 export interface WatchlistItem {
   id: number;
   ticker: string;
   thesis: string;
   trigger_price: number | null;
   invalidator: string | null;
-  entry_price: number | null;       // price when added to The Chair
-  entry_at: string | null;          // ISO 8601 UTC; when entry_price was captured
+  entry_price: number | null;
+  entry_at: string | null;
+  high_water_mark: number | null;     // peak price tracked since added (or 52w high)
+  high_water_mark_at: string | null;  // when the high was set
   added_at: string;
   archived_at: string | null;
   active: boolean;
   // Enriched (optional, present on detail/list endpoints)
   price?: number;
-  change_1d?: number;               // percent, signed
+  change_1d?: number;
   iv_rank?: number;
-  drawdown_52w?: number;            // off 52-week high (independent of when added)
-  drawdown_from_entry?: number;     // signed % since this name joined the list
-  trigger_hit?: boolean;
+  drawdown_52w?: number;
+  drawdown_from_entry?: number;
+  drawdown_from_high?: number;        // signed % vs high_water_mark — the buy-zone signal
+  levels_triggered?: DrawdownLevel[]; // which thresholds have been crossed since added
+  deepest_level?: DrawdownLevel;      // the most-extreme level currently active
+  trigger_hit?: boolean;              // user-defined trigger_price hit
+}
+
+export interface Alert {
+  id: number;
+  watchlist_id: number;
+  ticker: string;
+  kind: 'drawdown_level' | 'trigger_hit' | 'invalidator_hit';
+  level?: DrawdownLevel;          // present when kind === 'drawdown_level'
+  price: number;
+  drawdown_from_high?: number;
+  captured_at: string;
+  acknowledged_at: string | null;
 }
 
 export interface MentorQuestion {

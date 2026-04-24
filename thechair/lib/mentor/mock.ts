@@ -11,9 +11,10 @@ import type {
 // not with metrics that already live on the Home tab.
 
 interface SalientNames {
+  // Active drawdown-level breach is the strongest signal — the investor's own
+  // pre-committed buy-zone rule has been crossed. Sort by deepest level first.
+  inBuyZone: WatchlistItem[];
   biggestDrawdown: WatchlistItem | null;
-  // Worst drawdown FROM ENTRY price — i.e. since the investor added it to
-  // The Chair. This is the stronger conviction-test signal than 52w drawdown.
   worstSinceEntry: WatchlistItem | null;
   triggerHit: WatchlistItem | null;
   biggestMoveDown: WatchlistItem | null;
@@ -27,6 +28,7 @@ function pickSalient(watchlist: WatchlistItem[]): SalientNames {
   const active = watchlist.filter((w) => w.active);
   if (active.length === 0) {
     return {
+      inBuyZone: [],
       biggestDrawdown: null,
       worstSinceEntry: null,
       triggerHit: null,
@@ -37,6 +39,13 @@ function pickSalient(watchlist: WatchlistItem[]): SalientNames {
       highIV: null,
     };
   }
+
+  // Names that have crossed at least one drawdown alert level (-25 / -30 / -35 / -40),
+  // sorted deepest first. -30 is the buy signal; the rest bracket it.
+  const inBuyZone = active
+    .filter((w) => (w.deepest_level ?? 0) > 0)
+    .sort((a, b) => (b.deepest_level ?? 0) - (a.deepest_level ?? 0));
+
   const byDrawdown = [...active].sort(
     (a, b) => (a.drawdown_52w ?? 0) - (b.drawdown_52w ?? 0)
   );
@@ -71,6 +80,7 @@ function pickSalient(watchlist: WatchlistItem[]): SalientNames {
       : null;
 
   return {
+    inBuyZone,
     biggestDrawdown: byDrawdown[0] ?? null,
     worstSinceEntry,
     triggerHit,
@@ -83,6 +93,18 @@ function pickSalient(watchlist: WatchlistItem[]): SalientNames {
     oldestOnList: byAge[0] ?? null,
     highIV,
   };
+}
+
+function fmtLevelQuestion(item: WatchlistItem): string {
+  const lvl = item.deepest_level!;
+  const dd = Math.abs(item.drawdown_from_high ?? 0).toFixed(1);
+  const action =
+    lvl === 30
+      ? 'Your rule says you buy at this level.'
+      : lvl > 30
+        ? 'You are past your -30% buy line.'
+        : 'You are inside your heads-up zone.';
+  return `${item.ticker} crossed −${lvl}% off the high (now −${dd}%, last ${fmtPrice(item.price)}). ${action} What is the action — buy, wait, or change the rule? Pick one.`;
 }
 
 function daysOn(item: WatchlistItem): number {
@@ -115,6 +137,16 @@ export function getMockQuestions(
   // Questions are selected per-regime. Each regime gets 2-8 questions, almost
   // all focused on names + plan. One metric-flavored prompt is allowed in
   // Stressed/Dislocation as grounding, not as the spine.
+
+  // When a name has crossed a drawdown alert level, that is the spine of the
+  // session regardless of regime. The investor's own rule has fired.
+  if (s.inBuyZone[0]) {
+    push(fmtLevelQuestion(s.inBuyZone[0]), [
+      s.inBuyZone[0].ticker,
+      `−${s.inBuyZone[0].deepest_level}%`,
+      'buy, wait, or change the rule',
+    ]);
+  }
 
   if (regime === 'calm') {
     // 2 questions — keep it quiet. Focus on list hygiene and the plan.
@@ -252,7 +284,14 @@ export function getMockQuestions(
   }
 
   // DISLOCATION — 7-8 questions. No politeness. Names, prices, plans.
-  if (s.worstSinceEntry && (s.worstSinceEntry.drawdown_from_entry ?? 0) <= -25) {
+  // If multiple names are in the buy zone, surface the next one too — at -30%
+  // across more than one name the investor has to pick where the conviction is.
+  if (s.inBuyZone[1]) {
+    push(
+      `${s.inBuyZone[1].ticker} is also through −${s.inBuyZone[1].deepest_level}% (now ${(s.inBuyZone[1].drawdown_from_high ?? 0).toFixed(1)}% off the high). With ${s.inBuyZone[0]?.ticker} also triggered, only one of these gets the bullet today. Which?`,
+      [s.inBuyZone[1].ticker, s.inBuyZone[0]?.ticker ?? '', 'gets the bullet']
+    );
+  } else if (s.worstSinceEntry && (s.worstSinceEntry.drawdown_from_entry ?? 0) <= -25) {
     push(
       `${s.worstSinceEntry.ticker} is down ${Math.abs(s.worstSinceEntry.drawdown_from_entry ?? 0).toFixed(0)}% from your entry on ${new Date(s.worstSinceEntry.entry_at ?? s.worstSinceEntry.added_at).toLocaleDateString()}. This is the moment you find out what you actually believe. What is the action?`,
       [s.worstSinceEntry.ticker, 'what you actually believe', 'the action']
