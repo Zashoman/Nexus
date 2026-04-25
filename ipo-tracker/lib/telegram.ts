@@ -53,11 +53,6 @@ function formatUsd(n: number | null | undefined): string | null {
   return `$${n.toLocaleString()}`;
 }
 
-function formatNumber(n: number | null | undefined): string | null {
-  if (!n || n <= 0) return null;
-  return n.toLocaleString();
-}
-
 function formatPe(n: number | null | undefined): string | null {
   if (n === null || n === undefined || !Number.isFinite(n)) return null;
   if (n <= 0) return null;
@@ -84,12 +79,6 @@ export function formatIpoMessage(ipo: Ipo): string {
         : null;
   if (priceRange) rows.push(`Price range: ${priceRange}`);
 
-  const shares = formatNumber(ipo.shares_offered);
-  if (shares) rows.push(`Shares: ${shares}`);
-
-  const deal = formatUsd(ipo.deal_size_usd);
-  if (deal) rows.push(`Deal size: ${deal}`);
-
   if (ipo.sectors.length) {
     rows.push(`Sectors: ${ipo.sectors.map(escapeHtml).join(", ")}`);
   }
@@ -111,13 +100,10 @@ export function formatIpoMessage(ipo: Ipo): string {
   const pe = formatPe(ipo.pe_ratio);
   if (pe) finRows.push(`P/E (offer): ${pe}`);
 
-  const finBlock = finRows.length ? `\n<b>Financials</b>\n${finRows.join("\n")}` : "";
-
   // 2-paragraph description from research. Cap length so messages stay sane.
   const desc = ipo.business_description
     ? escapeHtml(ipo.business_description.slice(0, 1500))
     : "";
-  const descBlock = desc ? `\n${desc}` : "";
 
   const links: string[] = [];
   if (ipo.website_url) {
@@ -126,11 +112,16 @@ export function formatIpoMessage(ipo: Ipo): string {
   if (ipo.source_url) {
     links.push(`<a href="${escapeHtml(ipo.source_url)}">Source</a>`);
   }
-  const linksBlock = links.length ? `\n${links.join(" · ")}` : "";
 
-  return [headline, "", nameLine, rows.join("\n"), finBlock, descBlock, linksBlock]
-    .filter(Boolean)
-    .join("\n");
+  // Each section is its own block. Join with a blank line between blocks.
+  const sections: string[] = [];
+  sections.push(`${headline}\n${nameLine}`);
+  if (rows.length) sections.push(rows.join("\n"));
+  if (finRows.length) sections.push(`<b>Financials</b>\n${finRows.join("\n")}`);
+  if (desc) sections.push(desc);
+  if (links.length) sections.push(links.join(" · "));
+
+  return sections.join("\n\n");
 }
 
 export interface SendResult {

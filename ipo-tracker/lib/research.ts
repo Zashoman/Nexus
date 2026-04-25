@@ -70,48 +70,43 @@ export async function researchCompany(
   companyName: string,
 ): Promise<ResearchResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return EMPTY;
+  if (!apiKey) throw new Error("Missing ANTHROPIC_API_KEY");
 
   const client = new Anthropic({ apiKey });
 
-  const userPrompt = `Research the IPO of ${companyName} (ticker: ${ticker}). Find their corporate website, write a 2-paragraph plain-English description, and extract their most recent annual revenue, net income, and P/E ratio at the IPO offer price. Use web_search to consult primary sources. Return JSON only.`;
+  const userPrompt = `Research the IPO of ${companyName} (ticker: ${ticker}). Find their corporate website, write a 2-paragraph plain-English description, and extract their most recent annual revenue, net income, and P/E ratio at the IPO offer price. Use web_search to consult primary sources. Return JSON only — no prose, no fences.`;
 
-  let raw: string;
-  try {
-    const res = await client.messages.create({
-      model: MODEL,
-      max_tokens: 4000,
-      system: [
-        {
-          type: "text",
-          text: RESEARCH_SYSTEM,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      tools: [
-        {
-          type: "web_search_20260209",
-          name: "web_search",
-          max_uses: 5,
-        },
-      ],
-      messages: [{ role: "user", content: userPrompt }],
-      output_config: {
-        format: {
-          type: "json_schema",
-          schema: RESPONSE_SCHEMA,
-        },
+  const res = await client.messages.create({
+    model: MODEL,
+    max_tokens: 16000,
+    system: [
+      {
+        type: "text",
+        text: RESEARCH_SYSTEM,
+        cache_control: { type: "ephemeral" },
       },
-    } as Anthropic.MessageCreateParamsNonStreaming);
+    ],
+    tools: [
+      {
+        type: "web_search_20260209",
+        name: "web_search",
+        max_uses: 5,
+      },
+    ],
+    messages: [{ role: "user", content: userPrompt }],
+    output_config: {
+      format: {
+        type: "json_schema",
+        schema: RESPONSE_SCHEMA,
+      },
+    },
+  } as Anthropic.MessageCreateParamsNonStreaming);
 
-    raw = res.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("")
-      .trim();
-  } catch {
-    return EMPTY;
-  }
+  const raw = res.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
 
   return parseResearch(raw);
 }
