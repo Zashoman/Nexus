@@ -25,6 +25,8 @@ export const CANONICAL_SECTORS = [
   "industrials",
   "healthcare-services",
   "real-estate",
+  "advanced-materials",
+  "hardware",
   "spac",
   "bdc",
   "other",
@@ -71,6 +73,10 @@ export interface Ipo {
   source_url: string | null;
   is_spac: boolean;
   classification_confidence: number | null;
+  website_url: string | null;
+  revenue_usd: number | null;
+  net_income_usd: number | null;
+  pe_ratio: number | null;
   first_seen_at?: string;
   updated_at?: string;
 }
@@ -92,11 +98,24 @@ export interface SourceLog {
 }
 
 // Input shape the pipeline builds before upsert. Raw sources produce this.
+// Research and classification fields are filled in later.
 export type IpoDraft = Omit<
   Ipo,
-  "sectors" | "is_spac" | "classification_confidence" | "first_seen_at" | "updated_at"
+  | "sectors"
+  | "is_spac"
+  | "classification_confidence"
+  | "website_url"
+  | "revenue_usd"
+  | "net_income_usd"
+  | "pe_ratio"
+  | "first_seen_at"
+  | "updated_at"
 > & {
   sectors?: Sector[];
   is_spac?: boolean;
   classification_confidence?: number | null;
+  website_url?: string | null;
+  revenue_usd?: number | null;
+  net_income_usd?: number | null;
+  pe_ratio?: number | null;
 };

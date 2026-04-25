@@ -3,6 +3,7 @@ import { adminClient } from "@/lib/supabase";
 import { fetchFinnhubIpos } from "@/lib/sources/finnhub";
 import { fetchEdgarIpos } from "@/lib/sources/edgar";
 import { classifyIpo } from "@/lib/classify";
+import { researchCompany } from "@/lib/research";
 import { routeIpo } from "@/lib/route";
 import { formatIpoMessage, sendMessage } from "@/lib/telegram";
 import type { Channel, Ipo, IpoDraft } from "@/lib/types";
@@ -93,6 +94,22 @@ async function runScan() {
       };
     }
 
+    // Web-search-backed research. Soft-fail to nulls; never block the alert.
+    let research = {
+      website_url: null as string | null,
+      description: null as string | null,
+      revenue_usd: null as number | null,
+      net_income_usd: null as number | null,
+      pe_ratio: null as number | null,
+    };
+    try {
+      research = await researchCompany(draft.ticker, draft.company_name);
+    } catch (err) {
+      summary.errors.push(
+        `research ${draft.ticker}: ${(err as Error).message}`,
+      );
+    }
+
     const ipo: Ipo = {
       ticker: draft.ticker,
       company_name: draft.company_name,
@@ -104,11 +121,16 @@ async function runScan() {
       price_high: draft.price_high ?? null,
       shares_offered: draft.shares_offered ?? null,
       expected_date: draft.expected_date ?? null,
-      business_description: draft.business_description ?? null,
+      // Prefer the researched 2-paragraph description; fall back to whatever the source provided.
+      business_description: research.description ?? draft.business_description ?? null,
       source: draft.source,
       source_url: draft.source_url ?? null,
       is_spac: classification.is_spac,
       classification_confidence: classification.confidence,
+      website_url: research.website_url,
+      revenue_usd: research.revenue_usd,
+      net_income_usd: research.net_income_usd,
+      pe_ratio: research.pe_ratio,
     };
 
     const { error: upsertErr } = await db

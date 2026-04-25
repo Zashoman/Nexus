@@ -27,6 +27,8 @@ const SECTOR_EMOJI: Record<string, string> = {
   industrials: "🏭",
   "healthcare-services": "🏥",
   "real-estate": "🏢",
+  "advanced-materials": "🧪",
+  hardware: "🔧",
   spac: "🪙",
   bdc: "🏦",
   other: "📈",
@@ -54,6 +56,12 @@ function formatUsd(n: number | null | undefined): string | null {
 function formatNumber(n: number | null | undefined): string | null {
   if (!n || n <= 0) return null;
   return n.toLocaleString();
+}
+
+function formatPe(n: number | null | undefined): string | null {
+  if (n === null || n === undefined || !Number.isFinite(n)) return null;
+  if (n <= 0) return null;
+  return `${n.toFixed(1)}x`;
 }
 
 export function formatIpoMessage(ipo: Ipo): string {
@@ -86,15 +94,41 @@ export function formatIpoMessage(ipo: Ipo): string {
     rows.push(`Sectors: ${ipo.sectors.map(escapeHtml).join(", ")}`);
   }
 
-  const description = ipo.business_description
-    ? `\n${escapeHtml(ipo.business_description.slice(0, 500))}`
-    : "";
+  // Financial metrics block — only render if we have at least one.
+  const finRows: string[] = [];
+  const revenue = formatUsd(ipo.revenue_usd);
+  if (revenue) finRows.push(`Revenue (TTM): ${revenue}`);
+  if (ipo.net_income_usd !== null && ipo.net_income_usd !== undefined) {
+    const ni = ipo.net_income_usd;
+    if (ni < 0) {
+      const lossLabel = formatUsd(Math.abs(ni));
+      if (lossLabel) finRows.push(`Net income: −${lossLabel}`);
+    } else {
+      const gainLabel = formatUsd(ni);
+      if (gainLabel) finRows.push(`Net income: ${gainLabel}`);
+    }
+  }
+  const pe = formatPe(ipo.pe_ratio);
+  if (pe) finRows.push(`P/E (offer): ${pe}`);
 
-  const source = ipo.source_url
-    ? `\n<a href="${escapeHtml(ipo.source_url)}">Source</a>`
-    : "";
+  const finBlock = finRows.length ? `\n<b>Financials</b>\n${finRows.join("\n")}` : "";
 
-  return [headline, "", nameLine, rows.join("\n"), description, source]
+  // 2-paragraph description from research. Cap length so messages stay sane.
+  const desc = ipo.business_description
+    ? escapeHtml(ipo.business_description.slice(0, 1500))
+    : "";
+  const descBlock = desc ? `\n${desc}` : "";
+
+  const links: string[] = [];
+  if (ipo.website_url) {
+    links.push(`<a href="${escapeHtml(ipo.website_url)}">Website</a>`);
+  }
+  if (ipo.source_url) {
+    links.push(`<a href="${escapeHtml(ipo.source_url)}">Source</a>`);
+  }
+  const linksBlock = links.length ? `\n${links.join(" · ")}` : "";
+
+  return [headline, "", nameLine, rows.join("\n"), finBlock, descBlock, linksBlock]
     .filter(Boolean)
     .join("\n");
 }

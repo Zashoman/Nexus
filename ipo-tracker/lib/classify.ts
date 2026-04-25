@@ -17,6 +17,13 @@ Rules:
 - confidence is 0..1. Use <0.5 when the description is sparse or ambiguous.
 - Return ONLY JSON, no prose, no markdown fences.
 
+Sector hints (apply when relevant):
+- advanced-materials: novel chemistries, battery cells/cathodes, photonics materials, alloys, nanotech, polymers for industry, chip/semi materials, carbon-fiber, thin films.
+- hardware: physical products other than semis/robotics — drones, sensors, IoT devices, industrial machinery, medical devices outside diagnostics, defense kit, networking gear.
+- semis vs hardware: semis is for IC / chip / wafer / fabless / foundry companies; hardware is for finished physical products.
+- defense vs dual-use: defense = primarily DoD/military; dual-use = product serves both military and commercial.
+- ai-infra vs ai-software: ai-infra = chips, training clusters, model APIs; ai-software = applied AI products.
+
 Canonical sectors: ${CANONICAL_SECTORS.join(", ")}
 
 Response shape:
