@@ -36,26 +36,8 @@ What to extract:
 Rules:
 - Return null for any field you cannot verify from a credible source. Do not hallucinate or guess.
 - All numeric fields must be raw dollars or unitless ratios — never strings, never units like "$50M" or "50 million".
-- Output valid JSON only, matching the schema. No prose, no fences, no commentary.`;
-
-const RESPONSE_SCHEMA = {
-  type: "object",
-  properties: {
-    website_url: { type: ["string", "null"] },
-    description: { type: ["string", "null"] },
-    revenue_usd: { type: ["number", "null"] },
-    net_income_usd: { type: ["number", "null"] },
-    pe_ratio: { type: ["number", "null"] },
-  },
-  required: [
-    "website_url",
-    "description",
-    "revenue_usd",
-    "net_income_usd",
-    "pe_ratio",
-  ],
-  additionalProperties: false,
-} as const;
+- Output valid JSON only matching this exact shape, no prose, no markdown fences:
+  {"website_url": <string|null>, "description": <string|null>, "revenue_usd": <number|null>, "net_income_usd": <number|null>, "pe_ratio": <number|null>}`;
 
 const EMPTY: ResearchResult = {
   website_url: null,
@@ -79,13 +61,7 @@ export async function researchCompany(
   const res = await client.messages.create({
     model: MODEL,
     max_tokens: 16000,
-    system: [
-      {
-        type: "text",
-        text: RESEARCH_SYSTEM,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
+    system: RESEARCH_SYSTEM,
     tools: [
       {
         type: "web_search_20260209",
@@ -94,13 +70,7 @@ export async function researchCompany(
       },
     ],
     messages: [{ role: "user", content: userPrompt }],
-    output_config: {
-      format: {
-        type: "json_schema",
-        schema: RESPONSE_SCHEMA,
-      },
-    },
-  } as Anthropic.MessageCreateParamsNonStreaming);
+  });
 
   const raw = res.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
