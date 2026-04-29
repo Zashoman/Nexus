@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase";
 import { fetchFinnhubIpos } from "@/lib/sources/finnhub";
 import { fetchEdgarIpos } from "@/lib/sources/edgar";
+import { fetchAsianIpos } from "@/lib/sources/asian";
 import { classifyIpo } from "@/lib/classify";
 import { researchCompany } from "@/lib/research";
 import { routeIpo } from "@/lib/route";
@@ -27,7 +28,7 @@ async function logSource(
 async function runScan() {
   const db = adminClient();
   const summary = {
-    fetched: { finnhub: 0, edgar: 0 },
+    fetched: { finnhub: 0, edgar: 0, asian: 0 },
     new_ipos: 0,
     alerts_sent: 0,
     alerts_failed: 0,
@@ -35,22 +36,27 @@ async function runScan() {
   };
 
   // 1. Fetch sources in parallel.
-  const [finnhub, edgar] = await Promise.all([
+  const [finnhub, edgar, asian] = await Promise.all([
     fetchFinnhubIpos(14),
     fetchEdgarIpos(),
+    fetchAsianIpos(),
   ]);
   summary.fetched.finnhub = finnhub.items.length;
   summary.fetched.edgar = edgar.items.length;
+  summary.fetched.asian = asian.items.length;
   await Promise.all([
     logSource(db, "finnhub", finnhub.items.length, finnhub.error),
     logSource(db, "edgar", edgar.items.length, edgar.error),
+    logSource(db, "asian", asian.items.length, asian.error),
   ]);
   if (finnhub.error) summary.errors.push(`finnhub: ${finnhub.error}`);
   if (edgar.error) summary.errors.push(`edgar: ${edgar.error}`);
+  if (asian.error) summary.errors.push(`asian: ${asian.error}`);
 
-  // Merge + dedup within this batch (prefer finnhub rows since they carry more fields).
+  // Merge + dedup within this batch. Finnhub rows carry the most structured
+  // fields so prefer them; Asian rows fill in tickers Finnhub doesn't cover.
   const batch = new Map<string, IpoDraft>();
-  for (const item of [...finnhub.items, ...edgar.items]) {
+  for (const item of [...finnhub.items, ...edgar.items, ...asian.items]) {
     if (!batch.has(item.ticker)) batch.set(item.ticker, item);
   }
   if (batch.size === 0) return summary;

@@ -34,7 +34,19 @@ export const CANONICAL_SECTORS = [
 
 export type Sector = (typeof CANONICAL_SECTORS)[number];
 
-export const GEOGRAPHIES = ["US", "HK", "LSE", "EU", "CA", "JP", "AU"] as const;
+export const GEOGRAPHIES = [
+  "US",
+  "HK",
+  "CN",
+  "JP",
+  "KR",
+  "SG",
+  "TW",
+  "LSE",
+  "EU",
+  "CA",
+  "AU",
+] as const;
 export type Geography = (typeof GEOGRAPHIES)[number];
 
 export const STAGES = ["filed", "priced"] as const;
@@ -69,7 +81,7 @@ export interface Ipo {
   shares_offered: number | null;
   expected_date: string | null; // ISO date
   business_description: string | null;
-  source: "finnhub" | "edgar";
+  source: "finnhub" | "edgar" | "asian";
   source_url: string | null;
   is_spac: boolean;
   classification_confidence: number | null;

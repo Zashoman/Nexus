@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { fetchFinnhubIpos } from "@/lib/sources/finnhub";
 import { fetchEdgarIpos } from "@/lib/sources/edgar";
+import { fetchAsianIpos } from "@/lib/sources/asian";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
 // Debug endpoint: returns the raw items from each source, so we can see
@@ -22,9 +23,10 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const days = Number(url.searchParams.get("days") ?? "21");
 
-  const [finnhub, edgar] = await Promise.all([
+  const [finnhub, edgar, asian] = await Promise.all([
     fetchFinnhubIpos(days),
     fetchEdgarIpos(),
+    fetchAsianIpos(),
   ]);
 
   return NextResponse.json({
@@ -48,6 +50,19 @@ export async function GET(req: Request) {
         ticker: i.ticker,
         company_name: i.company_name,
         source_url: i.source_url,
+      })),
+    },
+    asian: {
+      count: asian.items.length,
+      error: asian.error,
+      items: asian.items.map((i) => ({
+        ticker: i.ticker,
+        company_name: i.company_name,
+        exchange: i.exchange,
+        stage: i.stage,
+        deal_size_usd: i.deal_size_usd,
+        expected_date: i.expected_date,
+        business_description: i.business_description?.slice(0, 120) ?? null,
       })),
     },
   });

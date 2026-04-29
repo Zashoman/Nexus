@@ -9,6 +9,10 @@ const EXCHANGE_MAP: Record<string, Geography> = {
   OTC: "US",
   HKEX: "HK",
   SEHK: "HK",
+  SSE: "CN",
+  SZSE: "CN",
+  SHANGHAI: "CN",
+  SHENZHEN: "CN",
   LSE: "LSE",
   AIM: "LSE",
   EURONEXT: "EU",
@@ -18,6 +22,13 @@ const EXCHANGE_MAP: Record<string, Geography> = {
   TSXV: "CA",
   TSE: "JP",
   JPX: "JP",
+  TYO: "JP",
+  KOSPI: "KR",
+  KOSDAQ: "KR",
+  KRX: "KR",
+  SGX: "SG",
+  TWSE: "TW",
+  TPE: "TW",
   ASX: "AU",
 };
 
@@ -30,9 +41,13 @@ export function exchangeToGeography(
   // Heuristic fallbacks.
   if (key.includes("NASDAQ") || key.includes("NYSE")) return "US";
   if (key.includes("HONG KONG") || key.includes("HKEX")) return "HK";
+  if (key.includes("SHANGHAI") || key.includes("SHENZHEN")) return "CN";
   if (key.includes("LONDON") || key.includes("LSE")) return "LSE";
   if (key.includes("TORONTO") || key.includes("TSX")) return "CA";
-  if (key.includes("TOKYO")) return "JP";
+  if (key.includes("TOKYO") || key.includes("JAPAN")) return "JP";
+  if (key.includes("KOREA")) return "KR";
+  if (key.includes("SINGAPORE")) return "SG";
+  if (key.includes("TAIWAN")) return "TW";
   if (key.includes("AUSTRAL")) return "AU";
   return null;
 }
