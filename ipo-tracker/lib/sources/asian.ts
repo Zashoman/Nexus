@@ -52,34 +52,45 @@ export interface FetchResult {
   error: string | null;
 }
 
+// Hard wall-clock timeout so a slow web-search call never hangs the cron.
+const SOFT_TIMEOUT_MS = 70_000;
+
 export async function fetchAsianIpos(): Promise<FetchResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { items: [], error: "Missing ANTHROPIC_API_KEY" };
 
   const client = new Anthropic({ apiKey });
 
+  const apiCall = client.messages.create({
+    model: MODEL,
+    max_tokens: 6000,
+    system: SYSTEM,
+    tools: [
+      {
+        type: "web_search_20260209",
+        name: "web_search",
+        max_uses: 3,
+      },
+    ],
+    messages: [
+      {
+        role: "user",
+        content:
+          "Find IPOs filing or pricing in the next 14 days on HKEX, TSE, SSE, SZSE, KOSPI, KOSDAQ, SGX, TWSE. Return JSON only.",
+      },
+    ],
+  });
+
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error("asian fetch timed out")),
+      SOFT_TIMEOUT_MS,
+    ),
+  );
+
   let raw: string;
   try {
-    const res = await client.messages.create({
-      model: MODEL,
-      max_tokens: 16000,
-      system: SYSTEM,
-      tools: [
-        {
-          type: "web_search_20260209",
-          name: "web_search",
-          max_uses: 8,
-        },
-      ],
-      messages: [
-        {
-          role: "user",
-          content:
-            "Find all upcoming or recently-filed IPOs on Asian exchanges (HKEX, TSE, SSE, SZSE, KOSPI, KOSDAQ, SGX, TWSE) for the next 14 days. Return JSON only.",
-        },
-      ],
-    });
-
+    const res = await Promise.race([apiCall, timeout]);
     raw = res.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)
